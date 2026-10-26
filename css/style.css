@@ -463,7 +463,8 @@ select {
   bottom: calc(var(--space-s) + var(--safe-bottom));
   font-size: 11px;
   opacity: 0.7;
-  pointer-events: none;
+  padding: 6px 0 6px 12px; /* 管理者モードの入り口なので、少しだけタップしやすく */
+  cursor: default;
 }
 
 /* タイトル下部のアイコンメニュー（6つを横に並べる） */
@@ -2085,4 +2086,40 @@ select {
   0% { opacity: 0; }
   15%, 80% { opacity: 1; }
   100% { opacity: 0; }
+}
+
+/* オンライン対戦：待ち受けの状態とバージョン（つながらないときの手がかり） */
+.online-wait-state,
+.online-version {
+  margin-top: var(--space-s);
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* 管理者モード */
+.admin-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-s);
+}
+
+.admin-net {
+  margin-bottom: var(--space-s);
+  padding: var(--space-s) var(--space-m);
+  border-radius: var(--radius-s);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* 合言葉から作った番号（コピーしやすいように、選択できる文字にする） */
+.admin-made {
+  margin-top: var(--space-m);
+  font-family: monospace;
+  font-size: 12px;
+  word-break: break-all;
+  -webkit-user-select: all;
+  user-select: all;
 }

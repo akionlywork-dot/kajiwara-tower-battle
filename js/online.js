@@ -38,6 +38,18 @@ const Online = (() => {
   let tried = { direct: false, relay: false }; // ゲスト：どちらを試したか
   let failed = { direct: false, relay: false }; // どちらが失敗したか
 
+  // 通信のやり方のバージョン。やりとりの形を変えたら数字を上げる。
+  // 相手と違うときは「ページを再読み込みしてください」と知らせる
+  const PROTOCOL = 2;
+  const OLD_VERSION_MESSAGE = "相手のスマホのゲームが、こちらと違うバージョンです。\n両方のスマホでページを再読み込みしてから、もう一度試してください。";
+
+  // ホスト：待ち受けの状態（"wait"=準備中 / "ok"=待ち受け中 / "retry"=つなぎ直し中 / "ng"=使えない）
+  let waitState = { direct: "wait", relay: "wait" };
+  function setWait(kind, value) {
+    waitState[kind] = value;
+    if (handlers.onWaitState) handlers.onWaitState(Object.assign({}, waitState));
+  }
+
   // ---------- 部屋を作る（ホスト） ----------
   function host(h) {
     reset();
@@ -53,37 +65,62 @@ const Online = (() => {
     // 直接：コードを名前にして仲介サーバーに登録し、つないでくるのを待つ
     if (CONF().useDirect !== false) {
       peer = new Peer(PREFIX + code, { debug: 0 });
-      peer.on("open", showCode);
+      peer.on("open", () => {
+        showCode();
+        setWait("direct", "ok");
+      });
       peer.on("connection", (c) => {
         c.on("open", () => attach(directLink(c), c));
       });
-      peer.on("error", (err) => {
-        if (err.type === "unavailable-id") return host(h); // コードがほかの部屋とかぶったら、作り直す
-        if (!link) bothFailed("direct", errorMessage(err));
+      // 仲介サーバーとのつながりが切れた（ほかのアプリに切りかえたときなど）→ つなぎ直す
+      peer.on("disconnected", () => {
+        if (!active || link || !peer || peer.destroyed) return;
+        setWait("direct", "retry");
+        try { peer.reconnect(); } catch (e) {}
       });
-    } else failed.direct = true;
+      peer.on("error", (err) => {
+        if (err.type === "unavailable-id" && !codeShown) return host(h); // コードがほかの部屋とかぶったら、作り直す
+        if (link) return;
+        setWait("direct", "ng");
+        bothFailed("direct", errorMessage(err));
+      });
+    } else {
+      failed.direct = true;
+      setWait("direct", "ng");
+    }
 
     // 中継：コードの宛先で、参加の申しこみを待つ
     connectRelay(
       (client) => {
         showCode();
+        setWait("relay", "ok");
         client.subscribe(TOPIC + code + "/g2h");
         client.on("message", (topic, payload) => {
           const env = parse(payload);
           if (!env) return;
           if (env.m && env.m.t === "join") {
-            // 参加の申しこみ。まだ相手がいなければ受け付ける（いれば満員と返す）
-            const ok = !link;
-            client.publish(TOPIC + code + "/h2g", JSON.stringify({ sid: env.sid, m: { t: ok ? "accept" : "full" } }));
-            if (ok) attach(relayLink(client, TOPIC + code + "/h2g", env.sid), null);
+            // 参加の申しこみ。バージョンが違えば断る。まだ相手がいなければ受け付ける（いれば満員と返す）
+            const reply = env.m.v !== PROTOCOL ? "old" : link ? "full" : "accept";
+            client.publish(TOPIC + code + "/h2g", JSON.stringify({ sid: env.sid, m: { t: reply, v: PROTOCOL } }));
+            if (reply === "accept") attach(relayLink(client, TOPIC + code + "/h2g", env.sid), null);
             return;
           }
           if (link && link.kind === "relay" && env.sid === link.peerSid) deliver(env.m);
         });
       },
-      () => bothFailed("relay", "サーバーに接続できません。\n通信できる場所で、もう一度試してください。")
+      () => {
+        setWait("relay", "ng");
+        bothFailed("relay", "サーバーに接続できません。\n通信できる場所で、もう一度試してください。");
+      },
+      (state) => setWait("relay", state) // 途切れた・つなぎ直せた
     );
   }
+
+  // 画面に戻ってきたとき（ほかのアプリから戻ったとき）、直接の待ち受けが切れていたらつなぎ直す
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden || !active || link || !peer || peer.destroyed || !peer.disconnected) return;
+    try { peer.reconnect(); } catch (e) {}
+  });
 
   // ---------- 部屋に入る（ゲスト） ----------
   function join(code, h) {
@@ -124,15 +161,22 @@ const Online = (() => {
     connectRelay(
       (client) => {
         client.subscribe(TOPIC + code + "/h2g");
-        const ask = () => client.publish(TOPIC + code + "/g2h", JSON.stringify({ sid: mySid, m: { t: "join" } }));
+        const ask = () => client.publish(TOPIC + code + "/g2h", JSON.stringify({ sid: mySid, m: { t: "join", v: PROTOCOL } }));
         ask();
         const askTimer = setInterval(() => (link ? clearInterval(askTimer) : ask()), 1500);
         timers.push(askTimer);
-        // 中継で8秒たっても返事がない ＝ その部屋は無い
+        // 中継で10秒たっても返事がない ＝ その部屋は無い（か、部屋を作った側が待ち受けていない）
         timers.push(
           setTimeout(() => {
-            if (!link) fail(failed.directMessage && !/部屋/.test(failed.directMessage) ? failed.directMessage : "部屋が見つかりません。\nルームコードを確認してください。");
-          }, 8000)
+            if (link) return;
+            if (failed.directMessage && !/部屋/.test(failed.directMessage)) return fail(failed.directMessage);
+            fail(
+              "部屋が見つかりません。次のことを確認してください。\n" +
+                "・ルームコードが合っているか\n" +
+                "・部屋を作った側が、コードの画面を開いたままにしているか（ほかのアプリに切りかえると、待ち受けが止まることがあります）\n" +
+                "・両方のスマホで、ページを再読み込みしたか"
+            );
+          }, 10000)
         );
         client.on("message", (topic, payload) => {
           const env = parse(payload);
@@ -141,6 +185,8 @@ const Online = (() => {
             if (!link) attach(relayLink(client, TOPIC + code + "/g2h", mySid), null);
           } else if (env.m.t === "full") {
             fail("その部屋はもう対戦中です。");
+          } else if (env.m.t === "old") {
+            fail(OLD_VERSION_MESSAGE);
           } else if (link && link.kind === "relay") {
             deliver(env.m);
           }
@@ -177,25 +223,35 @@ const Online = (() => {
   }
 
   // 中継サーバーにつなぐ（config.js の relayBrokers を上から順に試す）
-  function connectRelay(onReady, onFail) {
+  //   onReady(client) … 初めてつながったとき
+  //   onFail()        … どのサーバーにもつながらなかったとき
+  //   onChange(state) … 待ち受け中に途切れた（"retry"）・つなぎ直せた（"ok"）とき
+  function connectRelay(onReady, onFail, onChange) {
     if (typeof mqtt === "undefined") return onFail();
     const brokers = CONF().relayBrokers || [];
     let i = 0;
     const tryNext = () => {
       if (!active) return;
       if (i >= brokers.length) return onFail();
-      const client = mqtt.connect(brokers[i++], { connectTimeout: 6000, reconnectPeriod: 0, clean: true });
+      // reconnectPeriod: 途切れたら2秒ごとに自動でつなぎ直す（宛先の登録もつなぎ直したときに自動で戻る）
+      const client = mqtt.connect(brokers[i++], { connectTimeout: 6000, reconnectPeriod: 2000, clean: true });
       let ok = false;
       let gaveUp = false;
       client.on("connect", () => {
         if (!active) return closeRelay(client);
+        if (ok) return onChange && onChange("ok"); // つなぎ直せた
         ok = true;
         relay = client;
         onReady(client);
       });
       const bad = () => {
         if (client.closedByMe || gaveUp) return; // 自分で閉じた・もうあきらめた
-        if (ok) return lost(); // つながったあとで切れた
+        if (ok) {
+          // つながったあとで途切れた。対戦中なら切断、待ち受け中なら自動でつなぎ直すのを待つ
+          if (link && link.kind === "relay") return lost();
+          if (onChange) onChange("retry");
+          return;
+        }
         gaveUp = true; // エラーと切断の知らせが両方来ても、次を試すのは1回だけ
         closeRelay(client);
         tryNext(); // つながらなかった → 次のサーバー
@@ -243,6 +299,7 @@ const Online = (() => {
       send({ t: "ping" });
       if (Date.now() - lastSeen > TIMEOUT_MS) lost();
     }, HEARTBEAT_MS);
+    send({ t: "ver", v: PROTOCOL }); // 通信のバージョンを伝え合う（違えば、再読み込みをお願いする）
     if (handlers.onConnected) handlers.onConnected(link.kind);
   }
 
@@ -251,6 +308,10 @@ const Online = (() => {
     lastSeen = Date.now();
     if (!msg || msg.t === "ping") return;
     if (msg.t === "bye") return lost(); // 相手がやめた
+    if (msg.t === "ver") {
+      if (msg.v !== PROTOCOL) versionMismatch();
+      return;
+    }
     if (handlers.onMessage) handlers.onMessage(msg);
   }
 
@@ -272,6 +333,14 @@ const Online = (() => {
   function bothFailed(kind, message) {
     failed[kind] = true;
     if (failed.direct && failed.relay) fail(message);
+  }
+
+  // 相手とバージョンが違った：つながりを切って、再読み込みをお願いする
+  function versionMismatch() {
+    const h = handlers;
+    send({ t: "bye" });
+    reset();
+    if (h.onError) h.onError(OLD_VERSION_MESSAGE);
   }
 
   // つながったあとで切れた
@@ -316,6 +385,7 @@ const Online = (() => {
     mySid = Math.random().toString(36).slice(2, 10);
     tried = { direct: false, relay: false };
     failed = { direct: false, relay: false };
+    waitState = { direct: "wait", relay: "wait" };
     handlers = {};
   }
 
@@ -342,5 +412,7 @@ const Online = (() => {
     host, join, send, leave,
     get active() { return active; },
     get kind() { return link ? link.kind : null; }, // "direct" / "relay" / null
+    // 確認用：中継・直接のつながりそのもの（ブラウザのコンソールから調べるため）
+    get debug() { return { relay, peer, waitState }; },
   };
 })();

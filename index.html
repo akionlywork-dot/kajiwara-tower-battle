@@ -34,7 +34,7 @@
   <meta property="og:image:alt" content="かじわらタワーバトル：キャラを積み上げるバランスゲーム">
   <meta name="twitter:card" content="summary_large_image">
   <!-- 将来 PWA 対応するときは、ここに <link rel="manifest" href="manifest.json"> を追加する -->
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=1.1.0">
 </head>
 <body>
   <div id="app">
@@ -182,6 +182,7 @@
             <p class="online-label">ルームコード</p>
             <p id="online-code" class="online-code">------</p>
             <p id="online-host-status" class="online-status"></p>
+            <p id="online-wait-state" class="online-wait-state"></p>
           </div>
           <!-- 3. 部屋に入る：コードを入力 -->
           <div id="online-join" class="online-view hidden">
@@ -190,6 +191,7 @@
             <button id="btn-online-connect" class="btn btn-big btn-primary">参加する</button>
             <p id="online-join-status" class="online-status"></p>
           </div>
+          <p id="online-version" class="online-version"></p>
           <div class="online-notes">
             <p>・まず2台を直接つなぎます。直接つながらないときは、自動で公開の中継サーバー経由に切りかえます（少し反応がゆっくりになります）。</p>
             <p>・ルームコードは、対戦する相手にだけ伝えてください（SNS などに貼らないでください）。</p>
@@ -263,7 +265,12 @@
               </label>
             </div>
           </div>
-          <!-- 開発用：config.js の devMode が true のときだけ表示される -->
+          <!-- 管理者モードの端末だけ表示される -->
+          <div id="setting-admin-row" class="setting-row hidden">
+            <span>管理者メニュー<small>この端末は管理者モードです</small></span>
+            <button class="btn btn-small btn-sub" data-open="admin">開く</button>
+          </div>
+          <!-- 開発用：config.js の devMode が true（または管理者モード）のときだけ表示される -->
           <div id="setting-debug-row" class="setting-row hidden">
             <span>当たり判定を表示<small>開発用</small></span>
             <button class="toggle" data-setting="debug" role="switch" aria-label="当たり判定を表示"></button>
@@ -449,6 +456,73 @@
       </div>
     </div>
 
+    <!-- ===== 管理者モード（入り口：タイトル右下のバージョン表示を7回タップ） ===== -->
+    <section id="screen-admin" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <button class="btn btn-icon" data-back="title" aria-label="もどる">‹</button>
+          <h2>管理者モード</h2>
+        </header>
+        <div class="page-body">
+          <!-- まだ開いていないとき -->
+          <div id="admin-locked">
+            <!-- 合言葉で開く（config.js の passHash が設定ずみのとき） -->
+            <div id="admin-unlock-area">
+              <form onsubmit="return false">
+                <label class="field">
+                  <span>合言葉</span>
+                  <input id="admin-pass" type="password" autocomplete="off">
+                </label>
+              </form>
+              <div class="menu">
+                <button id="btn-admin-unlock" class="btn btn-big btn-primary">開く</button>
+              </div>
+              <p id="admin-lock-status" class="online-status"></p>
+            </div>
+            <!-- 合言葉の登録（config.js の passHash がまだ "" のとき） -->
+            <div id="admin-setup-area">
+              <p class="page-note">まだ合言葉が登録されていません。下に合言葉（8文字以上）を入れて「番号を作る」を押し、出てきた1行を config.js の admin の passHash の行と置きかえてください。合言葉そのものは、どこにも保存されません。</p>
+              <form onsubmit="return false">
+                <label class="field">
+                  <span>新しい合言葉</span>
+                  <input id="admin-new-pass" type="password" autocomplete="new-password">
+                </label>
+              </form>
+              <div class="menu">
+                <button id="btn-admin-make" class="btn btn-big btn-sub">番号を作る</button>
+              </div>
+              <p id="admin-made" class="admin-made"></p>
+            </div>
+          </div>
+
+          <!-- 開いたとき：管理者メニュー -->
+          <div id="admin-panel" class="hidden">
+            <h3 class="section-title">表示</h3>
+            <div class="setting-row">
+              <span>当たり判定を表示</span>
+              <button class="toggle" data-setting="debug" role="switch" aria-label="当たり判定を表示"></button>
+            </div>
+            <h3 class="section-title">次に出すキャラ</h3>
+            <label class="field">
+              <select id="admin-next"></select>
+            </label>
+            <h3 class="section-title">図鑑・実績</h3>
+            <div class="admin-buttons">
+              <button id="btn-admin-dex-all" class="btn btn-small btn-sub">図鑑を全部登録</button>
+              <button id="btn-admin-dex-reset" class="btn btn-small btn-sub">図鑑をリセット</button>
+              <button id="btn-admin-ach-all" class="btn btn-small btn-sub">実績を全部達成</button>
+              <button id="btn-admin-ach-reset" class="btn btn-small btn-sub">実績をリセット</button>
+            </div>
+            <h3 class="section-title">オンライン対戦の接続</h3>
+            <pre id="admin-net" class="admin-net"></pre>
+            <button id="btn-admin-net" class="btn btn-small btn-sub">更新</button>
+            <p class="page-note">称号「開発者」は、プロフィールの称号から選べます（管理者モードの端末だけ）。</p>
+            <button id="btn-admin-lock" class="btn btn-small btn-danger">管理者モードを終わる</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ===== 確認ダイアログ（UI.confirm で使う） ===== -->
     <div id="dialog" class="dialog">
       <div class="dialog-box">
@@ -477,33 +551,35 @@
     </div>
   </div>
 
+  <!-- ?v= のあとの番号：更新したら config.js の version と一緒に上げる（スマホに古いファイルが残らないように） -->
   <!-- ライブラリ（lib/ に同梱） -->
-  <script src="lib/decomp.min.js"></script>
-  <script src="lib/matter.min.js"></script>
-  <script src="lib/peerjs.min.js"></script>
-  <script src="lib/mqtt.min.js"></script>
+  <script src="lib/decomp.min.js?v=1.1.0"></script>
+  <script src="lib/matter.min.js?v=1.1.0"></script>
+  <script src="lib/peerjs.min.js?v=1.1.0"></script>
+  <script src="lib/mqtt.min.js?v=1.1.0"></script>
   <!-- 設定ファイル -->
-  <script src="config.js"></script>
-  <script src="characters.js"></script>
+  <script src="config.js?v=1.1.0"></script>
+  <script src="characters.js?v=1.1.0"></script>
   <!-- ゲーム本体 -->
-  <script src="js/settings.js"></script>
-  <script src="js/save.js"></script>
-  <script src="js/audio.js"></script>
-  <script src="js/shape.js"></script>
-  <script src="js/game.js"></script>
-  <script src="js/rules.js"></script>
-  <script src="js/cpu.js"></script>
-  <script src="js/online.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/themes.js"></script>
-  <script src="js/profile.js"></script>
-  <script src="js/data-file.js"></script>
-  <script src="js/news.js"></script>
-  <script src="js/ranking.js"></script>
-  <script src="js/records.js"></script>
-  <script src="js/dex.js"></script>
-  <script src="js/achievements.js"></script>
-  <script src="js/backup.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/settings.js?v=1.1.0"></script>
+  <script src="js/save.js?v=1.1.0"></script>
+  <script src="js/audio.js?v=1.1.0"></script>
+  <script src="js/shape.js?v=1.1.0"></script>
+  <script src="js/game.js?v=1.1.0"></script>
+  <script src="js/rules.js?v=1.1.0"></script>
+  <script src="js/cpu.js?v=1.1.0"></script>
+  <script src="js/online.js?v=1.1.0"></script>
+  <script src="js/ui.js?v=1.1.0"></script>
+  <script src="js/themes.js?v=1.1.0"></script>
+  <script src="js/profile.js?v=1.1.0"></script>
+  <script src="js/data-file.js?v=1.1.0"></script>
+  <script src="js/news.js?v=1.1.0"></script>
+  <script src="js/ranking.js?v=1.1.0"></script>
+  <script src="js/records.js?v=1.1.0"></script>
+  <script src="js/dex.js?v=1.1.0"></script>
+  <script src="js/achievements.js?v=1.1.0"></script>
+  <script src="js/backup.js?v=1.1.0"></script>
+  <script src="js/admin.js?v=1.1.0"></script>
+  <script src="js/main.js?v=1.1.0"></script>
 </body>
 </html>

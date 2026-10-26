@@ -24,7 +24,6 @@ window.CHARACTERS = [
   { file: "images/chara07.webp", name: "篠笛教師", rarity: "N", description: "白シャツで棒をかかげる、先生風のポーズ。" },
   { file: "images/chara08.webp", name: "篠笛マスター", rarity: "R", description: "サングラスで前かがみ。何かを吹いている？" },
   { file: "images/chara09.webp", name: "片足バランス", rarity: "N", description: "片足で前のめりにバランスをとる。積むと一番グラグラするかも。" },
-  // 手の指先で立つポーズでグラつくので、指先などの細い出っぱりを削って簡略化
   { file: "images/chara10.webp", name: "名前募集中2", rarity: "N", description: "前かがみで手を床につく。", tolerance: 2, smooth: 4 },
   { file: "images/chara11.webp", name: "名前募集中3", rarity: "SR", description: "剣を振りかぶる、白Tシャツの剣士。" },
   { file: "images/chara12.webp", name: "横ガニ90度", rarity: "R", description: "片足を上げて手を広げる、おどけたポーズ。" },

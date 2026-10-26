@@ -78,5 +78,13 @@ const Dex = (() => {
     $("dex-popup").classList.add("active");
   }
 
-  return { init, register, count, total };
+  // 管理者モード：全部登録する（on=true）／全部消す（on=false）
+  function setAll(on) {
+    const now = new Date().toISOString();
+    for (const key of Object.keys(registered())) delete registered()[key];
+    if (on) for (const c of chars()) registered()[c.file] = now;
+    Save.write();
+  }
+
+  return { init, register, count, total, setAll };
 })();

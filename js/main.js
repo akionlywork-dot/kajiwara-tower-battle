@@ -50,7 +50,7 @@
     Sound.setBgmEnabled(Settings.get("bgm"));
     Sound.setSeEnabled(Settings.get("se"));
     // 当たり判定の表示は開発用。公開版（devMode: false）では、設定に関係なく常にOFF
-    Game.setDebug(CONFIG.devMode && Settings.get("debug"));
+    Game.setDebug((CONFIG.devMode || Admin.unlocked) && Settings.get("debug"));
     if (Game.playing && !isCpuTurn()) Game.setTurnTimeLimit(turnTimeLimit());
   }
 
@@ -89,6 +89,7 @@
     Game.stop();
     UI.clearConfetti();
     $("turn-banner").className = "hidden";
+    $("rare-banner").className = "hidden"; // ゲーム中に出た「レア！」が残らないように
     updateBestCard();
     UI.show("title");
     UI.replayAnimations("title");
@@ -338,6 +339,11 @@
       onCode: (code) => {
         $("online-code").textContent = code;
         $("online-host-status").innerHTML = `このコードを相手に伝えてください<br>相手を待っています<span class="dots"></span>`;
+      },
+      // ホスト：待ち受けの状態（直接・中継）を表示する（つながらないときの手がかりに）
+      onWaitState: (st) => {
+        const label = { wait: "準備中…", ok: "○", retry: "つなぎ直し中…", ng: "×" };
+        $("online-wait-state").textContent = `待ち受け：直接 ${label[st.direct]} ／ 中継 ${label[st.relay]}`;
       },
       onConnected: () => {
         online = { role, me: role === "host" ? 1 : 2, names: { 1: "", 2: "" } };
@@ -693,7 +699,17 @@
   // スプラッシュをタップすると、それが「最初の操作」になって音が鳴らせるようになる
   //（音の有効化は、上の unlockOnce がすべてのタップで行っている）
   $("version").textContent = CONFIG.version;
+  $("online-version").textContent = `ゲームのバージョン：${CONFIG.version}（2台で同じか確かめてください）`;
+  // 管理者モード：この端末に正しい鍵があれば開く。開いた・閉じたときに表示を切りかえる
+  function applyAdmin() {
+    $("setting-debug-row").classList.toggle("hidden", !(CONFIG.devMode || Admin.unlocked));
+    $("setting-admin-row").classList.toggle("hidden", !Admin.unlocked);
+    applySettings();
+    Profile.refresh();
+  }
+  Admin.onChange = applyAdmin;
   $("setting-debug-row").classList.toggle("hidden", !CONFIG.devMode);
+  Admin.init().then(applyAdmin);
   applySettings();
   Profile.init();
   News.init();

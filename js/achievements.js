@@ -113,5 +113,15 @@ const Achievements = (() => {
       .join("");
   }
 
-  return { init, load, check, unlockedList, find };
+  // 管理者モード：全部達成する（on=true）／全部消す（on=false）
+  function setAll(on) {
+    const now = new Date().toISOString();
+    for (const key of Object.keys(unlocked())) delete unlocked()[key];
+    if (on) for (const a of defs || []) unlocked()[a.id] = now;
+    Save.write();
+    if (typeof Themes !== "undefined") Themes.apply(); // 使えなくなった背景・土台は元に戻す
+    if (typeof Profile !== "undefined") Profile.refresh();
+  }
+
+  return { init, load, check, unlockedList, find, setAll };
 })();

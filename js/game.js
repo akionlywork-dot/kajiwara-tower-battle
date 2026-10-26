@@ -363,8 +363,15 @@ const Game = (() => {
   }
 
   // 次のキャラをランダムに選んで、画面上部に持たせる
+  // 管理者モード：次に出すキャラを決めておく（ファイル名。null ならふつうにランダム）
+  let forcedFile = null;
+  function setForcedShape(file) {
+    forcedFile = file;
+  }
+
   function nextPiece() {
-    held = { shape: ruleShape(randomShape()), x: WORLD_W / 2, angle: 0 };
+    const forced = forcedFile && shapes.find((s) => s.file === forcedFile);
+    held = { shape: ruleShape(forced || randomShape()), x: WORLD_W / 2, angle: 0 };
     clampHeld();
     state = "aim";
     aimStartAt = simTime;
@@ -1152,7 +1159,7 @@ const Game = (() => {
   }
 
   return {
-    init, start, stop, startDemo, setDemoCeiling, setTheme, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
+    init, start, stop, startDemo, setForcedShape, setDemoCeiling, setTheme, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
     get state() { return state; },
     get paused() { return paused; },
     get heldX() { return held ? held.x : WORLD_W / 2; }, // 持っているキャラの位置

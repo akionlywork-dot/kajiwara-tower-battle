@@ -89,7 +89,10 @@ const Profile = (() => {
 
   // 達成した実績の一覧（実績の機能がまだ読み込まれていなければ空）
   function unlockedTitles() {
-    return typeof Achievements !== "undefined" ? Achievements.unlockedList() : [];
+    const list = typeof Achievements !== "undefined" ? Achievements.unlockedList() : [];
+    // 管理者モードの端末だけ、特別な称号「開発者」を選べる
+    if (typeof Admin !== "undefined" && Admin.unlocked) list.unshift({ id: "developer", title: "開発者" });
+    return list;
   }
 
   // 称号の id → 称号の文字（無ければ ""）
