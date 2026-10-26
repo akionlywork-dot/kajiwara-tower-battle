@@ -90,6 +90,15 @@ window.GAME_CONFIG = {
     hard: { name: "つよい", candidates: 56, choice: "best", noise: 0, thinkTime: 1.6, maxThink: 3.5 },
   },
 
+  // オンライン対戦
+  //   まず 2台を直接つなぐ（PeerJS / WebRTC）。directTimeout 秒でつながらなければ、
+  //   公開のメッセージ中継サーバー（MQTT）経由に切りかえる
+  online: {
+    directTimeout: 6, // 直接つながるのを待つ時間（秒）
+    // 中継サーバー（上から順に試す。ホストとゲストが同じサーバーを使う必要がある）
+    relayBrokers: ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt"],
+  },
+
   // 特殊ルール（モード選択の「特殊ルール」から選ぶ。1人モードで遊ぶ）
   // ルールの動きは js/rules.js に書いてある。ここでは名前・説明・数値を調整できる
   rules: {

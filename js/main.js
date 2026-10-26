@@ -200,7 +200,7 @@
     }
     // オンライン対戦（ホスト）：相手に手番の交代を知らせる
     if (mode === "online") {
-      Online.send({ t: "turn", p: player, n: stacked, h: maxHeight, f: droppedShape ? droppedShape.file : null });
+      sendImportant({ t: "turn", g: online.gameNo, p: player, n: stacked, h: maxHeight, f: droppedShape ? droppedShape.file : null });
     }
     Game.nextPiece();
     updateHud();
@@ -269,6 +269,14 @@
   // ゲストは自分の手番に、持っているキャラの位置と角度・「落とす」をホストに送る
   let sendTimer = null; // ホスト：状態を送るタイマー / ゲスト：位置を送るタイマー
   let lastPoseSent = "";
+
+  // 大事なメッセージ（開始・手番の交代・決着）は、取りこぼされても届くよう、少し間をあけて3回送る。
+  // 受け取る側は、同じものが重ねて届いても1回だけ処理する
+  function sendImportant(msg) {
+    Online.send(msg);
+    setTimeout(() => Online.send(msg), 300);
+    setTimeout(() => Online.send(msg), 900);
+  }
   let shapesByFile = {}; // ファイル名 → キャラの形（ゲストがレア演出を出すときに使う）
   const click = (id, fn) => $(id).addEventListener("click", fn);
 
@@ -302,7 +310,10 @@
   });
 
   click("btn-online-connect", () => {
-    const code = $("online-code-input").value.replace(/\D/g, "");
+    // 全角の数字（１２３）も半角（123）に直してから、数字以外を取りのぞく
+    const code = $("online-code-input")
+      .value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+      .replace(/\D/g, "");
     if (code.length !== 6) {
       $("online-join-status").textContent = "6桁の数字を入力してください。";
       return;
@@ -332,7 +343,12 @@
         online = { role, me: role === "host" ? 1 : 2, names: { 1: "", 2: "" } };
         online.names[online.me] = Save.playerName(1);
         Online.send({ t: "hello", name: Save.playerName(1) });
-        $(role === "host" ? "online-host-status" : "online-join-status").textContent = "つながりました！";
+        $(role === "host" ? "online-host-status" : "online-join-status").textContent =
+          Online.kind === "relay" ? "つながりました！（中継サーバー経由）" : "つながりました！";
+      },
+      // ゲスト：直接つながらず、中継サーバーに切りかえたとき
+      onStatus: (text) => {
+        $("online-join-status").textContent = text;
       },
       onMessage: (msg) => (role === "host" ? hostMessage(msg) : guestMessage(msg)),
       onError: (message) => {
@@ -380,14 +396,16 @@
   // ホスト：オンライン対戦を始める
   function startOnlineHost() {
     if (!online) return;
-    Online.send({ t: "start", names: online.names });
+    online.gameNo = (online.gameNo || 0) + 1; // 何回目のゲームか（前のゲームのメッセージと区別する）
+    sendImportant({ t: "start", g: online.gameNo, names: online.names });
     startGame("online");
     Game.setInputEnabled(true); // ホストが先攻
-    // 1秒に20回、状態をゲストに送る
+    // 状態をゲストに送る。直接つながっていれば1秒に20回、
+    // 中継サーバー経由なら1秒に10回（公開サーバーに負担をかけすぎないように）
     clearInterval(sendTimer);
     sendTimer = setInterval(() => {
-      if (online && mode === "online") Online.send({ t: "s", d: Game.snapshot(), p: player });
-    }, 50);
+      if (online && mode === "online") Online.send({ t: "s", g: online.gameNo, d: Game.snapshot(), p: player, n: stacked, h: maxHeight });
+    }, Online.kind === "relay" ? 100 : 50);
   }
 
   // ---------- ゲスト ----------
@@ -396,23 +414,36 @@
     if (msg.t === "hello") {
       online.names[1] = String(msg.name || "プレイヤー1").slice(0, 10);
     } else if (msg.t === "start") {
+      if (msg.g === online.gameNo) return; // 同じ開始の知らせが重ねて届いた
+      online.gameNo = msg.g;
       online.names = Object.assign(online.names, msg.names, { 2: Save.playerName(1) });
       startOnlineGuest();
     } else if (msg.t === "s" && mode === "online") {
+      if (msg.g !== online.gameNo) return; // 前のゲームの状態
+      // 積んだ数・高さ・手番は、状態のメッセージでも受け取る（「turn」を取りこぼしても合うように）
+      if (msg.n > stacked) {
+        stacked = msg.n;
+        maxHeight = msg.h;
+      }
       if (msg.p !== player) {
         player = msg.p;
-        updateHud();
+        showTurnBanner();
       }
+      updateHud();
       Game.applySnapshot(msg.d, player === online.me);
     } else if (msg.t === "turn" && mode === "online") {
-      // 1体積めて、手番が交代した
-      player = msg.p;
-      stacked = msg.n;
-      maxHeight = msg.h;
+      // 1体積めて、手番が交代した（重ねて届いたものは、積んだ数で見分けて1回だけ処理する）
+      if (msg.g !== online.gameNo || msg.n <= online.countedTurns) return;
+      online.countedTurns = msg.n;
+      if (player !== msg.p) {
+        player = msg.p;
+        showTurnBanner();
+      }
+      stacked = Math.max(stacked, msg.n);
+      maxHeight = Math.max(maxHeight, msg.h);
       Records.addPiece();
       if (msg.f) Dex.register(msg.f);
       Achievements.check(gameStatus());
-      showTurnBanner();
       updateHud();
     } else if (msg.t === "se") {
       Sound.play(msg.name);
@@ -420,6 +451,8 @@
       const shape = shapesByFile[msg.f];
       if (shape) showRareBanner(shape, CONFIG.rarity[shape.rarity]);
     } else if (msg.t === "over") {
+      if (msg.g !== online.gameNo || online.overShown === msg.g) return; // 重ねて届いた
+      online.overShown = msg.g;
       stacked = msg.n;
       maxHeight = msg.h;
       lastDropper = msg.loser;
@@ -436,12 +469,13 @@
     player = 1;
     stacked = 0;
     maxHeight = 0;
+    online.countedTurns = 0; // 手番の交代を数えなおす（重ねて届いた知らせを見分けるため）
     UI.clearConfetti();
     UI.show(null);
     Game.startRemote({
       dropOnRelease: () => Settings.get("release"),
       // 自分の手番で「落とす」を押したら、位置と角度をホストに送る
-      onRemoteDrop: (x, a) => Online.send({ t: "drop", x, a }),
+      onRemoteDrop: (x, a) => sendImportant({ t: "drop", x, a }),
     });
     Game.setInputEnabled(true);
     Sound.startBgm();
@@ -555,7 +589,7 @@
       if (mode === "online") {
         clearInterval(sendTimer);
         // ホストは、ゲストにも結果を知らせる
-        if (online && online.role === "host") Online.send({ t: "over", loser, n: stacked, h: maxHeight });
+        if (online && online.role === "host") sendImportant({ t: "over", g: online.gameNo, loser, n: stacked, h: maxHeight });
         if (online) Records.addOnlineResult(winner === online.me);
       } else if (cpuLevel) Records.addCpuResult(cpuLevel, winner === 1);
       else Records.addVersusResult(winner);

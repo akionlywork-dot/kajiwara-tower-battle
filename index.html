@@ -191,9 +191,9 @@
             <p id="online-join-status" class="online-status"></p>
           </div>
           <div class="online-notes">
-            <p>・同じ Wi-Fi につなぐと、つながりやすくなります。携帯回線どうしや、学校・会社の Wi-Fi ではつながらないことがあります。</p>
+            <p>・まず2台を直接つなぎます。直接つながらないときは、自動で公開の中継サーバー経由に切りかえます（少し反応がゆっくりになります）。</p>
             <p>・ルームコードは、対戦する相手にだけ伝えてください（SNS などに貼らないでください）。</p>
-            <p>・対戦中は、お互いのネット上の住所（IPアドレス）が相手の端末に伝わります。知っている人と遊んでください。</p>
+            <p>・直接つながったときは、お互いのネット上の住所（IPアドレス）が相手の端末に伝わります。中継サーバー経由のときは、ゲームのデータ（キャラの位置・名前）が中継サーバーを通ります。知っている人と遊んでください。</p>
             <p>・画面を消したり、ほかのアプリに切りかえたりすると、接続が切れます。</p>
           </div>
         </div>
@@ -481,6 +481,7 @@
   <script src="lib/decomp.min.js"></script>
   <script src="lib/matter.min.js"></script>
   <script src="lib/peerjs.min.js"></script>
+  <script src="lib/mqtt.min.js"></script>
   <!-- 設定ファイル -->
   <script src="config.js"></script>
   <script src="characters.js"></script>
