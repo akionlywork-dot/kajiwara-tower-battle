@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <!-- スマホで拡大縮小させない・ノッチの裏まで画面いっぱいに表示する（safe-area は CSS で避ける） -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#7ec8f0">
+  <!-- ホーム画面に追加して開いたとき、アドレスバーなしの全画面で表示する（Android と iPhone） -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="タワーバトル">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- ページの名前と説明（検索結果などに出る） -->
+  <title>かじわらタワーバトル</title>
+  <meta name="description" content="キャラを積み上げて、落とした方が負け！スマホのブラウザで遊べるバランス積みゲーム。ひとりでスコアアタック、ふたりで交互に対戦できます。">
+
+  <!-- アイコン（ブラウザのタブ・iPhone のホーム画面） -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+  <!-- SNS で URL を共有したときに表示されるタイトル・説明・画像（OGP） -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="かじわらタワーバトル">
+  <meta property="og:title" content="かじわらタワーバトル">
+  <meta property="og:description" content="キャラを積み上げて、落とした方が負け！スマホのブラウザで遊べるバランス積みゲーム。">
+  <meta property="og:locale" content="ja_JP">
+  <!-- 公開先の URL（SNS の多くは、画像を https:// から始まる完全な URL で書かないと表示してくれないため、
+       ここだけは相対パスではなく完全な URL で書いている。リポジトリ名を変えたらここも変える） -->
+  <meta property="og:url" content="https://akionlywork-dot.github.io/kajiwara-tower-battle/">
+  <meta property="og:image" content="https://akionlywork-dot.github.io/kajiwara-tower-battle/ogp.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="かじわらタワーバトル：キャラを積み上げるバランスゲーム">
+  <meta name="twitter:card" content="summary_large_image">
+  <!-- 将来 PWA 対応するときは、ここに <link rel="manifest" href="manifest.json"> を追加する -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- ===== ゲーム画面（物理演算の描画先。タイトルなどの後ろでも空を描いている） ===== -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- 上部の情報表示（スコア・手番）とポーズボタン -->
+    <div id="hud" class="game-ui">
+      <div id="hud-info"></div>
+      <button id="btn-pause" class="btn btn-icon" aria-label="ポーズ">❚❚</button>
+    </div>
+
+    <!-- 下部の操作ボタン -->
+    <div id="controls" class="game-ui">
+      <button id="btn-rotate" class="btn btn-ctrl">⟳ 回転</button>
+      <button id="btn-drop" class="btn btn-ctrl btn-primary">⬇ 落とす</button>
+    </div>
+
+    <!-- 2人対戦の「〇〇の番」表示 -->
+    <div id="turn-banner" class="hidden"></div>
+
+    <!-- ===== タイトル画面 ===== -->
+    <!-- 背景（空・雲・土台・デモ）はキャンバスに描いているので、この画面は透明 -->
+    <section id="screen-title" class="screen screen-clear">
+      <!-- 右上：設定（歯車） -->
+      <button id="btn-title-settings" class="btn btn-icon btn-corner" aria-label="設定">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+          <path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6a.5.5 0 0 0 .1-.6l-2-3.5a.5.5 0 0 0-.6-.2l-2.5 1a7.3 7.3 0 0 0-1.7-1l-.4-2.6a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0-.5.4l-.4 2.7a7.3 7.3 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.5a.5.5 0 0 0 .1.6L4.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6a.5.5 0 0 0-.1.6l2 3.5c.1.2.4.3.6.2l2.5-1c.5.4 1.1.7 1.7 1l.4 2.6c0 .3.2.5.5.5h4c.3 0 .5-.2.5-.4l.4-2.7c.6-.3 1.2-.6 1.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.5a.5.5 0 0 0-.1-.6L19.4 13zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/>
+        </svg>
+      </button>
+
+      <!-- 左上：自分のプロフィール（タップでプロフィール画面へ） -->
+      <button id="profile-chip" class="profile-chip" data-open="profile" aria-label="プロフィール">
+        <span id="chip-avatar" class="avatar"></span>
+        <span class="profile-chip-text">
+          <b id="chip-name"></b>
+          <small id="chip-title"></small>
+        </span>
+      </button>
+
+      <div class="title-layout">
+        <!-- 上：タイトルロゴ -->
+        <div class="title-top">
+          <div class="logo-pop">
+            <h1 class="logo">かじわら<br>タワーバトル</h1>
+          </div>
+          <p class="tagline">落としたら負け！</p>
+        </div>
+        <!-- 中央：ハイスコア -->
+        <div class="title-middle">
+          <div id="best-score" class="best-card"></div>
+          <p id="notice" class="notice hidden"></p>
+        </div>
+        <!-- 下寄り：スタートボタン（親指で押しやすい位置） -->
+        <div class="title-bottom">
+          <button id="btn-start" class="btn btn-big btn-primary btn-start" disabled>読み込み中…</button>
+
+          <!-- アイコン付きメニュー（data-open に開く画面の名前） -->
+          <nav class="title-menu">
+            <button class="menu-icon" data-open="news" aria-label="お知らせ">
+              <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0"/></svg>
+              <span>お知らせ</span>
+              <i id="news-badge" class="badge hidden"></i>
+            </button>
+            <button class="menu-icon" data-open="ranking" aria-label="ランキング">
+              <svg viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 21h8M10 17h4v4h-4z"/></svg>
+              <span>ランキング</span>
+            </button>
+            <button class="menu-icon" data-open="dex" aria-label="図鑑">
+              <svg viewBox="0 0 24 24"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5zM5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3M9 7h6"/></svg>
+              <span>図鑑</span>
+            </button>
+            <button class="menu-icon" data-open="achievements" aria-label="実績">
+              <svg viewBox="0 0 24 24"><path d="M8 2l2.5 6M16 2l-2.5 6"/><circle cx="12" cy="14.5" r="6"/><path d="M12 11.5l1 2 2.2.3-1.6 1.5.4 2.2-2-1-2 1 .4-2.2-1.6-1.5 2.2-.3z"/></svg>
+              <span>実績</span>
+            </button>
+            <button class="menu-icon" data-open="records" aria-label="戦績">
+              <svg viewBox="0 0 24 24"><path d="M4 20h16M7 17v-5M12 17V6M17 17v-8"/></svg>
+              <span>戦績</span>
+            </button>
+            <button class="menu-icon" data-open="profile" aria-label="プロフィール">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+              <span>プロフィール</span>
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- 右下：バージョン番号（config.js の version） -->
+      <p id="version" class="version"></p>
+    </section>
+
+    <!-- ===== モード選択画面 ===== -->
+    <section id="screen-mode" class="screen">
+      <div class="screen-inner">
+        <h2 class="screen-title">モードを選ぶ</h2>
+        <div class="menu">
+          <button id="btn-solo" class="btn btn-big btn-p1">ひとりで<small>スコアアタック</small></button>
+          <button id="btn-versus" class="btn btn-big btn-p2">ふたりで<small>1台で交互に対戦</small></button>
+          <button id="btn-mode-back" class="btn btn-big btn-sub">もどる</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== ポーズ画面 ===== -->
+    <section id="screen-pause" class="screen screen-dim">
+      <div class="screen-inner">
+        <h2 class="screen-title">ポーズ</h2>
+        <div class="menu">
+          <button id="btn-resume" class="btn btn-big btn-primary">つづける</button>
+          <button id="btn-restart" class="btn btn-big btn-sub">最初からやり直す</button>
+          <button id="btn-pause-settings" class="btn btn-big btn-sub">設定</button>
+          <button id="btn-pause-title" class="btn btn-big btn-sub">タイトルへ</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 設定画面 ===== -->
+    <section id="screen-settings" class="screen screen-dim">
+      <div class="screen-inner">
+        <h2 class="screen-title">設定</h2>
+        <div class="settings-list">
+          <!-- data-setting の名前は settings.js の DEFAULTS と同じにする -->
+          <div class="setting-row">
+            <span>BGM</span>
+            <button class="toggle" data-setting="bgm" role="switch" aria-label="BGM"></button>
+          </div>
+          <div class="setting-row">
+            <span>効果音</span>
+            <button class="toggle" data-setting="se" role="switch" aria-label="効果音"></button>
+          </div>
+          <div class="setting-row">
+            <span>制限時間<small id="timer-desc"></small></span>
+            <button class="toggle" data-setting="timer" role="switch" aria-label="制限時間"></button>
+          </div>
+          <div class="setting-row">
+            <span>指を離したら落とす<small>ドラッグして指を離すと落下</small></span>
+            <button class="toggle" data-setting="release" role="switch" aria-label="指を離したら落とす"></button>
+          </div>
+          <!-- 開発用：config.js の devMode が true のときだけ表示される -->
+          <div id="setting-debug-row" class="setting-row hidden">
+            <span>当たり判定を表示<small>開発用</small></span>
+            <button class="toggle" data-setting="debug" role="switch" aria-label="当たり判定を表示"></button>
+          </div>
+        </div>
+        <div class="menu">
+          <button id="btn-settings-back" class="btn btn-big btn-sub">もどる</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== リザルト画面 ===== -->
+    <section id="screen-result" class="screen screen-dim">
+      <div id="confetti"></div>
+      <div class="screen-inner">
+        <div id="result-content"></div>
+        <div class="menu">
+          <button id="btn-retry" class="btn btn-big btn-primary">もう一度</button>
+          <button id="btn-result-title" class="btn btn-big btn-sub">タイトルへ</button>
+          <!-- 将来、SNS共有ボタンはここに追加する -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== プロフィール画面 ===== -->
+    <!-- .page は「上に見出し、下にスクロールする中身」の画面。data-back は「もどる」で戻る画面 -->
+    <section id="screen-profile" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <button class="btn btn-icon" data-back="title" aria-label="もどる">‹</button>
+          <h2>プロフィール</h2>
+        </header>
+        <div class="page-body">
+          <div class="profile-icon-area">
+            <span id="profile-avatar" class="avatar avatar-xl"></span>
+            <div class="profile-icon-buttons">
+              <!-- 端末の写真を選ぶ。label の中の input を押したことになる -->
+              <label class="btn btn-sub btn-small">
+                写真を選ぶ
+                <input type="file" id="icon-file" accept="image/*" hidden>
+              </label>
+              <button id="btn-icon-remove" class="btn btn-sub btn-small">写真を外す</button>
+            </div>
+          </div>
+          <label class="field">
+            <span>名前<small>10文字まで</small></span>
+            <input id="input-name" type="text" maxlength="10" placeholder="プレイヤー" autocomplete="off">
+          </label>
+          <label class="field">
+            <span>称号<small>実績を達成すると選べる</small></span>
+            <select id="select-title"></select>
+          </label>
+          <p class="page-note">写真と名前はこの端末の中だけに保存され、どこにも送信されません。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== アイコンの調整画面（写真を丸く切り抜く） ===== -->
+    <section id="screen-crop" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <button class="btn btn-icon" data-back="profile" aria-label="キャンセル">‹</button>
+          <h2>アイコンの調整</h2>
+        </header>
+        <div class="page-body crop-body">
+          <div class="crop-frame">
+            <canvas id="crop-canvas"></canvas>
+          </div>
+          <input id="crop-zoom" type="range" min="1" max="4" step="0.01" value="1" aria-label="大きさ">
+          <p class="page-note">指でドラッグして位置を、2本指（またはスライダー）で大きさを調整できます。</p>
+          <div class="menu">
+            <button id="btn-crop-ok" class="btn btn-big btn-primary">決定</button>
+            <button class="btn btn-big btn-sub" data-back="profile">キャンセル</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== お知らせ一覧 ===== -->
+    <section id="screen-news" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <button class="btn btn-icon" data-back="title" aria-label="もどる">‹</button>
+          <h2>お知らせ</h2>
+        </header>
+        <div id="news-list" class="page-body"></div>
+      </div>
+    </section>
+
+    <!-- ===== お知らせの詳細 ===== -->
+    <section id="screen-news-detail" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <button class="btn btn-icon" data-back="news" aria-label="もどる">‹</button>
+          <h2>お知らせ</h2>
+        </header>
+        <div id="news-detail" class="page-body"></div>
+      </div>
+    </section>
+
+    <!-- ===== ランキング ===== -->
+    <section id="screen-ranking" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <button class="btn btn-icon" data-back="title" aria-label="もどる">‹</button>
+          <h2>ランキング</h2>
+        </header>
+        <div id="ranking-list" class="page-body"></div>
+        <!-- 画面の下に固定：自分のハイスコア -->
+        <div class="page-footer">
+          <div id="ranking-mine" class="my-record"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 戦績 ===== -->
+    <section id="screen-records" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <button class="btn btn-icon" data-back="title" aria-label="もどる">‹</button>
+          <h2>戦績</h2>
+        </header>
+        <div class="page-body">
+          <div id="records-content"></div>
+          <button id="btn-records-reset" class="btn btn-small btn-danger">記録をリセット</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== キャラ図鑑 ===== -->
+    <section id="screen-dex" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <button class="btn btn-icon" data-back="title" aria-label="もどる">‹</button>
+          <h2>キャラ図鑑</h2>
+          <span id="dex-count" class="header-count"></span>
+        </header>
+        <div class="page-body">
+          <div id="dex-grid" class="dex-grid"></div>
+          <p class="page-note">一度でも積んだキャラが登録されます。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 実績 ===== -->
+    <section id="screen-achievements" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <button class="btn btn-icon" data-back="title" aria-label="もどる">‹</button>
+          <h2>実績</h2>
+          <span id="achievements-count" class="header-count"></span>
+        </header>
+        <div class="page-body">
+          <div id="achievements-list"></div>
+          <p class="page-note">達成すると称号がもらえます。称号はプロフィール画面で選ぶと、名前の横に表示されます。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 図鑑のキャラの詳細 ===== -->
+    <div id="dex-popup" class="dialog">
+      <div class="dialog-box dex-popup-box">
+        <div id="dex-popup-content"></div>
+        <div class="dialog-buttons">
+          <button id="dex-popup-close" class="btn btn-primary">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 未読のお知らせのポップアップ（起動時） ===== -->
+    <div id="news-popup" class="dialog">
+      <div class="dialog-box news-popup-box">
+        <div id="news-popup-content"></div>
+        <div class="dialog-buttons">
+          <button id="news-popup-list" class="btn btn-sub">一覧を見る</button>
+          <button id="news-popup-close" class="btn btn-primary">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 確認ダイアログ（UI.confirm で使う） ===== -->
+    <div id="dialog" class="dialog">
+      <div class="dialog-box">
+        <p id="dialog-message"></p>
+        <div class="dialog-buttons">
+          <button id="dialog-cancel" class="btn btn-sub">キャンセル</button>
+          <button id="dialog-ok" class="btn btn-primary">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 通知（「実績解除！」など。UI.toast で使う） ===== -->
+    <div id="toasts"></div>
+
+    <!-- ===== 読み込み中の表示（最初から表示しておき、キャラの読み込みが終わったら消す） ===== -->
+    <div id="loading" class="loading-screen">
+      <div class="spinner"></div>
+      <p>読み込み中…</p>
+      <div class="loading-bar"><div id="loading-bar-fill"></div></div>
+      <p id="loading-count" class="loading-count"></p>
+    </div>
+
+    <!-- ===== 起動時のスプラッシュ画面（会社名。文字は config.js の splash.text） ===== -->
+    <div id="splash" class="hidden">
+      <p id="splash-text"></p>
+    </div>
+  </div>
+
+  <!-- ライブラリ（lib/ に同梱） -->
+  <script src="lib/decomp.min.js"></script>
+  <script src="lib/matter.min.js"></script>
+  <!-- 設定ファイル -->
+  <script src="config.js"></script>
+  <script src="characters.js"></script>
+  <!-- ゲーム本体 -->
+  <script src="js/settings.js"></script>
+  <script src="js/save.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/shape.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/profile.js"></script>
+  <script src="js/data-file.js"></script>
+  <script src="js/news.js"></script>
+  <script src="js/ranking.js"></script>
+  <script src="js/records.js"></script>
+  <script src="js/dex.js"></script>
+  <script src="js/achievements.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

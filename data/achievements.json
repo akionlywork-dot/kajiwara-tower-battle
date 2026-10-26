@@ -1,0 +1,81 @@
+{
+  "achievements": [
+    {
+      "id": "first_stack",
+      "name": "はじめの一歩",
+      "title": "見習い",
+      "description": "初めてキャラを積んだ",
+      "condition": { "type": "count", "value": 1 }
+    },
+    {
+      "id": "stack10",
+      "name": "10体積み",
+      "title": "積み上げ名人",
+      "description": "1回のゲームで10体積んだ",
+      "condition": { "type": "count", "value": 10 }
+    },
+    {
+      "id": "height3",
+      "name": "高さ3m",
+      "title": "高所の住人",
+      "description": "タワーの高さが3mに届いた",
+      "condition": { "type": "height", "value": 3 }
+    },
+    {
+      "id": "height5",
+      "name": "高さ5m達成",
+      "title": "天空の塔",
+      "description": "タワーの高さが5mに届いた",
+      "condition": { "type": "height", "value": 5 }
+    },
+    {
+      "id": "score1000",
+      "name": "1000点突破",
+      "title": "スコアラー",
+      "description": "ひとりモードで1000点以上をとった",
+      "condition": { "type": "score", "value": 1000 }
+    },
+    {
+      "id": "dex_half",
+      "name": "図鑑 半分",
+      "title": "コレクター",
+      "description": "図鑑に6体登録した",
+      "condition": { "type": "dexCount", "value": 6 }
+    },
+    {
+      "id": "dex_complete",
+      "name": "図鑑コンプリート",
+      "title": "図鑑マスター",
+      "description": "図鑑のキャラを全部登録した",
+      "condition": { "type": "dexComplete" }
+    },
+    {
+      "id": "versus_win1",
+      "name": "初勝利",
+      "title": "勝負師",
+      "description": "2人対戦で初めて勝った（プレイヤー1）",
+      "condition": { "type": "versusWins", "value": 1 }
+    },
+    {
+      "id": "versus_win10",
+      "name": "対戦10勝",
+      "title": "対戦王",
+      "description": "2人対戦で10勝した（プレイヤー1）",
+      "condition": { "type": "versusWins", "value": 10 }
+    },
+    {
+      "id": "plays10",
+      "name": "10回プレイ",
+      "title": "常連さん",
+      "description": "ゲームを10回遊んだ",
+      "condition": { "type": "plays", "value": 10 }
+    },
+    {
+      "id": "total100",
+      "name": "合計100体",
+      "title": "積み職人",
+      "description": "これまでに合計100体積んだ",
+      "condition": { "type": "totalPieces", "value": 100 }
+    }
+  ]
+}
