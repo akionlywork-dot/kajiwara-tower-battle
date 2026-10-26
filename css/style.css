@@ -2123,3 +2123,9 @@ select {
   -webkit-user-select: all;
   user-select: all;
 }
+
+/* 設定の行の小さいボタン：文字が折り返さないように */
+.setting-row .btn-small {
+  flex-shrink: 0;
+  white-space: nowrap;
+}

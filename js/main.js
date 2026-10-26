@@ -718,6 +718,7 @@
   Dex.init();
   Achievements.init();
   Backup.init();
+  PWA.init(); // アプリとしてインストールできるようにする
   // 実績の定義を読み込んだら、称号の表示を最新にし、すでに条件を満たしている実績を達成にする
   Achievements.load().then(() => {
     Profile.refresh();
