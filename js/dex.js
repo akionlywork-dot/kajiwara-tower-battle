@@ -45,23 +45,34 @@ const Dex = (() => {
       .map((c, i) => {
         const got = !!registered()[c.file];
         const no = String(i + 1).padStart(2, "0");
+        const r = rarityOf(c);
+        // レア度は、未登録のキャラでも★だけ見せる（「レアがまだいる！」と分かるように）
         return `
-          <button class="dex-card ${got ? "" : "dex-locked"}" data-file="${UI.escape(c.file)}" ${got ? "" : "disabled"}>
+          <button class="dex-card ${got ? "" : "dex-locked"} ${r.id !== "N" ? "dex-rare" : ""}" style="--rare-color:${r.color}" data-file="${UI.escape(c.file)}" ${got ? "" : "disabled"}>
             <span class="dex-img"><img src="${UI.escape(c.file)}" alt=""></span>
-            <span class="dex-no">No.${no}</span>
+            <span class="dex-no">No.${no} <span class="rarity-stars">${"★".repeat(r.stars)}</span></span>
             <b class="dex-name">${got ? UI.escape(c.name) : "？？？"}</b>
           </button>`;
       })
       .join("");
   }
 
+  // キャラのレア度の情報 { id, name, color, stars }（config.js の rarity）
+  function rarityOf(c) {
+    const table = window.GAME_CONFIG.rarity;
+    const id = table[c.rarity] ? c.rarity : "N";
+    return Object.assign({ id }, table[id]);
+  }
+
   function openDetail(file) {
     const c = chars().find((x) => x.file === file);
     if (!c) return;
     const date = new Date(registered()[file]);
+    const r = rarityOf(c);
     $("dex-popup-content").innerHTML =
       `<div class="dex-detail-img"><img src="${UI.escape(c.file)}" alt=""></div>` +
       `<h3 class="dex-detail-name">${UI.escape(c.name)}</h3>` +
+      `<span class="rarity-label" style="--rare-color:${r.color}">${"★".repeat(r.stars)} ${UI.escape(r.name)}</span>` +
       `<p class="dex-detail-text">${UI.escape(c.description || "")}</p>` +
       `<p class="dex-detail-date">登録日：${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}</p>`;
     $("dex-popup").classList.add("active");

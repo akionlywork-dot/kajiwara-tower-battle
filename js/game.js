@@ -72,6 +72,8 @@ const Game = (() => {
 
   // タイトル画面のデモの状態（デモ中でなければ null）
   let demo = null;
+  // 今の特殊ルール（rules.js の Rules.get で作ったもの）。ふつうのルールなら null
+  let rule = null;
 
   // 空に浮かぶ雲 { x, y, scale, speed }。x, y は画面の割合（0〜1）
   const clouds = [];
@@ -152,11 +154,43 @@ const Game = (() => {
   function start(cb, opts) {
     callbacks = cb || {};
     demo = null;
+    remote = false;
+    remoteBodies = new Map();
     createWorld(PLATFORM_FROM_BOTTOM);
     setTurnTimeLimit(opts && opts.turnTimeLimit);
 
+    // 特殊ルール（rules.js）。無ければ null
+    rule = (opts && opts.rule) || null;
+    if (rule) {
+      rule.state = {};
+      if (rule.platformOptions) Body.set(platform, rule.platformOptions(rule.params));
+      if (rule.start) rule.start(ruleAPI, rule.params, rule.state);
+    }
+
     lastShape = null;
     nextPiece();
+  }
+
+  // ---------- 特殊ルールに渡す窓口 ----------
+  // ルール（rules.js）からは、ここにあるものだけを使う
+  const ruleAPI = {
+    get simTime() { return simTime; },
+    get worldW() { return WORLD_W; },
+    get worldH() { return worldH; },
+    Body,
+    bodies: () => bodies(),
+    setPlatformAngle: (angle) => Body.setAngle(platform, angle),
+  };
+
+  // キャラの物理的な性質（特殊ルールで変わることがある）
+  function pieceOptions() {
+    return rule && rule.bodyOptions ? rule.bodyOptions(BODY_OPTIONS, rule.params) : BODY_OPTIONS;
+  }
+
+  // キャラの形（特殊ルールで大きさが変わることがある）
+  function ruleShape(shape) {
+    const scale = rule && rule.shapeScale ? rule.shapeScale(rule.params) : 1;
+    return scale === 1 ? shape : Shape.scaled(shape, scale);
   }
 
   // ゲームをやめる（タイトルに戻るとき）
@@ -164,6 +198,9 @@ const Game = (() => {
     engine = null;
     held = null;
     demo = null;
+    rule = null;
+    remote = false;
+    remoteBodies = new Map();
     state = "idle";
     paused = false;
     platformTop = worldH - DEMO_PLATFORM_FROM_BOTTOM;
@@ -190,6 +227,7 @@ const Game = (() => {
   function startDemo(opts) {
     if (!shapes.length) return;
     callbacks = {};
+    rule = null;
     createWorld(DEMO_PLATFORM_FROM_BOTTOM);
     state = "demo";
     demo = {
@@ -326,20 +364,36 @@ const Game = (() => {
 
   // 次のキャラをランダムに選んで、画面上部に持たせる
   function nextPiece() {
-    held = { shape: randomShape(), x: WORLD_W / 2, angle: 0 };
+    held = { shape: ruleShape(randomShape()), x: WORLD_W / 2, angle: 0 };
     clampHeld();
     state = "aim";
     aimStartAt = simTime;
+    // レアキャラが出たら知らせる（main.js が「レア！」を表示する）
+    if (rareInfo(held.shape) && callbacks.onRare) callbacks.onRare(held.shape, rareInfo(held.shape));
   }
 
-  // キャラをランダムに選ぶ（同じキャラが2回続かないように）
+  // キャラを選ぶ。出やすさ（weight）に合わせて、くじ引きのように選ぶ（同じキャラが2回続かないように）
   function randomShape() {
-    let shape;
-    do {
-      shape = shapes[Math.floor(Math.random() * shapes.length)];
-    } while (shapes.length > 1 && shape === lastShape);
+    const pool = shapes.length > 1 ? shapes.filter((s) => s !== lastShape) : shapes;
+    const total = pool.reduce((sum, s) => sum + (s.weight || 1), 0);
+    let r = Math.random() * total; // 0〜合計 のどこかに当たりを置き、
+    let shape = pool[pool.length - 1];
+    for (const s of pool) {
+      r -= s.weight || 1; // 出やすいキャラほど「幅」が広いので当たりやすい
+      if (r < 0) {
+        shape = s;
+        break;
+      }
+    }
     lastShape = shape;
     return shape;
+  }
+
+  // レア度の情報（config.js の rarity）。ノーマルや不明なら null
+  function rareInfo(shape) {
+    const id = shape && shape.rarity;
+    if (!id || id === "N") return null;
+    return (window.GAME_CONFIG.rarity || {})[id] || null;
   }
 
   // 制限時間の残り（ミリ秒）。制限なしのときは null
@@ -361,6 +415,208 @@ const Game = (() => {
     clampHeld();
   }
 
+  // ---------- オンライン対戦 ----------
+  // ホスト（部屋を作った側）はふつうに物理計算をして、snapshot() で今の状態を書き出す。
+  // ゲスト（参加した側）は startRemote() で始め、物理計算はせずに、
+  // applySnapshot() で受け取った位置にキャラを描くだけ。
+  // 画面の高さは端末ごとに違うので、y は「土台の上面からの高さ」でやりとりする
+  let remote = false; // ゲストとして表示しているか
+  let remoteBodies = new Map(); // 体の番号 → { shape, x, y, angle（表示中）, tx, ty, ta（届いた位置） }
+  let awaitingDrop = false; // ゲストが落としたあと、ホストで実際に落ちるまで待っている
+
+  function startRemote(cb) {
+    callbacks = cb || {};
+    demo = null;
+    rule = null;
+    createWorld(PLATFORM_FROM_BOTTOM);
+    setTurnTimeLimit(0);
+    remote = true;
+    remoteBodies = new Map();
+    awaitingDrop = false;
+    state = "remote";
+  }
+
+  const shapeByFile = (file) => shapes.find((s) => s.file === file) || shapes[0];
+  const round = (v, k) => Math.round(v * k) / k;
+
+  // ホスト：今の状態を書き出す（小さく送れるよう、数字の配列にする）
+  function snapshot() {
+    return {
+      b: pieces().map((b) => [b.id, b.shape.file, round(b.position.x, 10), round(b.position.y - platformTop, 10), round(b.angle, 1000)]),
+      h: held && state === "aim" ? [held.shape.file, round(held.x, 10), round(held.angle, 1000)] : null,
+    };
+  }
+
+  // ゲスト：受け取った状態を反映する。myTurn: 自分（ゲスト）の手番か
+  function applySnapshot(snap, myTurn) {
+    if (!remote) return;
+    const seen = new Set();
+    let top = platformTop;
+    for (const [id, file, x, yRel, a] of snap.b) {
+      seen.add(id);
+      const y = yRel + platformTop;
+      let r = remoteBodies.get(id);
+      if (!r) {
+        r = { shape: shapeByFile(file), x, y, angle: a };
+        remoteBodies.set(id, r);
+      }
+      r.tx = x;
+      r.ty = y;
+      r.ta = a;
+      top = Math.min(top, y - Math.max(r.shape.w, r.shape.h) / 2);
+    }
+    for (const id of [...remoteBodies.keys()]) if (!seen.has(id)) remoteBodies.delete(id);
+    camTargetY = Math.min(0, top - (HOLD_Y + 240));
+
+    // 持っているキャラ
+    if (!snap.h) {
+      awaitingDrop = false; // ホストで落ちた
+      if (!(myTurn && state === "aim")) {
+        held = null;
+        state = "remote";
+      }
+      return;
+    }
+    if (awaitingDrop) return; // 自分が落としたキャラが、まだホストで落ちていない
+    const [file, x, angle] = snap.h;
+    const shape = shapeByFile(file);
+    if (myTurn) {
+      // 自分の手番：最初の1回だけ受け取り、あとは自分の指で動かす
+      if (!held || held.shape !== shape || state !== "aim") {
+        held = { shape, x, angle };
+        clampHeld();
+        state = "aim";
+      }
+    } else {
+      held = { shape, x, angle }; // 相手の手番：相手が動かしているのを、そのまま映す
+      state = "remote";
+    }
+  }
+
+  // ゲスト：届いた位置に向かって、表示中の位置をなめらかに近づける
+  function smoothRemote() {
+    for (const r of remoteBodies.values()) {
+      r.x += (r.tx - r.x) * 0.4;
+      r.y += (r.ty - r.y) * 0.4;
+      let da = r.ta - r.angle;
+      da = Math.atan2(Math.sin(da), Math.cos(da)); // 一番近い回り方
+      r.angle += da * 0.4;
+    }
+  }
+
+  // ホスト：相手（ゲスト）が動かしているキャラの位置と角度を反映する
+  function setHeldPose(x, angle) {
+    if (!held) return;
+    held.angle = angle;
+    moveHeldTo(x);
+  }
+
+  // 持っているキャラの位置と角度（ゲストが相手に送るため）。持っていなければ null
+  function heldPose() {
+    return held && state === "aim" ? { x: held.x, angle: held.angle } : null;
+  }
+
+  // ---------- CPU 用 ----------
+  // 持っているキャラを、指定した位置に動かす（画面からはみ出さないように調整される）
+  function moveHeldTo(x) {
+    if (!held) return;
+    held.x = x;
+    clampHeld();
+  }
+
+  // 置き方を試してみる：今の塔を別の世界にそっくり写し、
+  // 持っているキャラを位置 x・角度 angle で落としてみて、どうなったかを返す。
+  // 塔のキャラも本物と同じように動くので、ぶつかった衝撃で塔が崩れるかも分かる。
+  // 本物のゲームには何も影響しない
+  function evaluatePlacement(x, angle) {
+    if (!held || !engine) return null;
+    const sim = Engine.create();
+    sim.positionIterations = engine.positionIterations;
+    sim.velocityIterations = engine.velocityIterations;
+    const plat = Bodies.rectangle(platform.position.x, platform.position.y, PLATFORM_W, PLATFORM_H, {
+      isStatic: true,
+      angle: platform.angle,
+      friction: platform.friction,
+    });
+    Composite.add(sim.world, plat);
+    const tower = [];
+    for (const b of pieces()) {
+      const copy = Shape.spawnBody(b.shape, b.position.x, b.position.y, b.angle, pieceOptions());
+      copy.landed = true;
+      copy.startPos = { x: b.position.x, y: b.position.y };
+      Composite.add(sim.world, copy);
+      tower.push(copy);
+    }
+    // 画面からはみ出さない位置に直してから落とす（本物と同じ）
+    const saved = { x: held.x, angle: held.angle };
+    held.angle = angle;
+    moveHeldTo(x);
+    const startX = held.x;
+    const piece = Shape.spawnBody(held.shape, held.x, camY + holdY(), angle, pieceOptions());
+    held.x = saved.x;
+    held.angle = saved.angle;
+    Composite.add(sim.world, piece);
+
+    // 本物と同じ細かさで計算する（落下速度の上限・小さな揺れを弱める処理も同じ）
+    const all = [piece, ...tower];
+    let landed = false, still = 0;
+    for (let i = 0; i < 300 && still < 15; i++) {
+      for (let k = 0; k < SUBSTEPS; k++) {
+        if (!landed && piece.velocity.y > MAX_FALL_SPEED) Body.setVelocity(piece, { x: piece.velocity.x, y: MAX_FALL_SPEED });
+        Engine.update(sim, STEP_MS / SUBSTEPS);
+        for (const b of all) {
+          if (b.speed < 0.3) Body.setVelocity(b, { x: b.velocity.x * 0.9, y: b.velocity.y * 0.9 });
+          if (b.angularSpeed < 0.004) Body.setAngularVelocity(b, b.angularVelocity * 0.9);
+        }
+      }
+      if (!landed && piece.speed < 1 && piece.position.y > camY + holdY() + 20) landed = true;
+      const moving = all.some((b) => b.speed > 0.15 || b.angularSpeed > 0.01);
+      still = landed && !moving ? still + 1 : 0;
+      // どれかが土台から落ちたら、もうだめな置き方なので計算を打ち切る（時間の節約）
+      if (all.some((b) => b.bounds.min.y > platformTop - 2)) break;
+    }
+    // 塔のキャラがどれだけ動いたか（大きいほど、置いた衝撃で塔がぐらついた）
+    let towerMove = 0;
+    for (const b of tower) towerMove += Math.hypot(b.position.x - b.startPos.x, b.position.y - b.startPos.y);
+    const anyFell = all.some((b) => b.bounds.min.y > platformTop - 2);
+    return {
+      x: startX, // 実際に落とした位置
+      fell: anyFell || still < 15, // どれかが土台から落ちた・止まらなかった
+      drift: Math.abs(piece.position.x - startX), // 着地してから横にずれた量
+      turn: Math.abs(piece.angle - angle), // 着地してから回った量
+      towerMove,
+      restY: piece.position.y, // 止まったときの重心の高さ（大きいほど低い＝安定）
+      top: piece.bounds.min.y, // 止まったときの上端
+      centerGap: Math.abs(piece.position.x - platform.position.x), // 土台の真ん中からのずれ
+    };
+  }
+
+  // CPU が置き方を考えるときの、位置の候補（塔のてっぺん付近を中心に7か所）
+  function candidateXs() {
+    let top = null;
+    for (const b of pieces()) if (!top || b.bounds.min.y < top.bounds.min.y) top = b;
+    const center = top ? (top.position.x + WORLD_W / 2) / 2 : WORLD_W / 2;
+    return [-75, -50, -25, 0, 25, 50, 75].map((d) => center + d);
+  }
+
+  // 人の操作を受け付けるか（CPU の手番では受け付けない）
+  let inputEnabled = true;
+  function setInputEnabled(on) {
+    inputEnabled = on;
+  }
+
+  // 持っているキャラを表示する高さ（画面の上から）。
+  // ふつうは HOLD_Y。大きいキャラ（ジャイアントなど）は、頭が画面の上の表示に隠れないよう少し下げる
+  function holdY() {
+    if (!held) return HOLD_Y;
+    const cos = Math.cos(held.angle), sin = Math.sin(held.angle);
+    let top = 0; // 重心から見た、キャラの一番上の位置（マイナスが上）
+    for (const part of held.shape.parts) {
+      for (const p of part) top = Math.min(top, p.x * sin + p.y * cos); // 回転したあとの y
+    }
+    return Math.max(HOLD_Y, 95 - top);
+  }
+
   // 持っているキャラが画面の左右からはみ出さないようにする
   function clampHeld() {
     const cos = Math.cos(held.angle), sin = Math.sin(held.angle);
@@ -377,7 +633,15 @@ const Game = (() => {
 
   function drop() {
     if (paused || state !== "aim" || !held) return false;
-    const body = Shape.spawnBody(held.shape, held.x, camY + HOLD_Y, held.angle, BODY_OPTIONS);
+    if (remote) {
+      // ゲスト：自分では落とさず、位置と角度をホストに送ってもらう（main.js 経由）
+      if (callbacks.onRemoteDrop) callbacks.onRemoteDrop(held.x, held.angle);
+      held = null;
+      state = "remote";
+      awaitingDrop = true;
+      return true;
+    }
+    const body = Shape.spawnBody(held.shape, held.x, camY + holdY(), held.angle, pieceOptions());
     Composite.add(engine.world, body);
     dropped = body;
     droppedAt = simTime;
@@ -404,6 +668,7 @@ const Game = (() => {
         checkGameOverDelay();
         stepDemo();
       }
+      if (remote) smoothRemote();
       // カメラをなめらかに目標へ近づける
       camY += (camTargetY - camY) * 0.08;
     }
@@ -419,6 +684,10 @@ const Game = (() => {
       dampSlowBodies();
     }
     simTime += STEP_MS;
+    // 特殊ルールの毎ステップの処理（風を吹かせる、土台を傾ける など）
+    if (rule && rule.step && (state === "aim" || state === "falling" || state === "settled")) {
+      rule.step(ruleAPI, rule.params, rule.state);
+    }
   }
 
   // 落としたキャラが着地するまでは、落下速度に上限をつける（ふわっと置く感じにする）
@@ -531,9 +800,14 @@ const Game = (() => {
     drawPillar();
     drawPlatform();
 
-    // 積まれたキャラ
+    // 積まれたキャラ（落ちている途中のレアキャラは光らせる）
     if (engine) {
-      for (const b of pieces()) drawSprite(b.shape, b.position.x, b.position.y, b.angle, 1);
+      for (const b of pieces()) {
+        const glow = state !== "demo" && b === dropped && !b.landed ? rareInfo(b.shape) : null;
+        drawSprite(b.shape, b.position.x, b.position.y, b.angle, 1, glow);
+      }
+      // ゲスト：ホストから届いた位置のキャラ
+      if (remote) for (const r of remoteBodies.values()) drawSprite(r.shape, r.x, r.y, r.angle, 1);
     }
     // 地面はキャラより手前に描く（落ちたキャラが地面の向こうに消えていくように）
     drawGround();
@@ -543,8 +817,9 @@ const Game = (() => {
     }
 
     // 持っているキャラ（と、落ちる位置のガイド線）
-    if (held && state === "aim") {
-      const y = camY + HOLD_Y;
+    // （オンライン対戦のゲストでは、相手が動かしているキャラも state "remote" で描く）
+    if (held && (state === "aim" || state === "remote")) {
+      const y = camY + holdY();
       ctx.strokeStyle = "rgba(255,255,255,0.8)";
       ctx.setLineDash([6, 8]);
       ctx.lineWidth = 2;
@@ -553,23 +828,51 @@ const Game = (() => {
       ctx.lineTo(held.x, platformTop);
       ctx.stroke();
       ctx.setLineDash([]);
-      drawSprite(held.shape, held.x, y, held.angle, 1);
+      const rare = rareInfo(held.shape);
+      drawSprite(held.shape, held.x, y, held.angle, 1, rare);
+      if (rare && rare.stars >= 3) addSparkles(held.x, y, held.shape); // スーパーレアはキラキラ
       if (debug) drawHeldDebug(held, y);
       drawTimer(held.x, y);
     }
 
+    drawSparkles();
     if (debug) drawDebug();
     ctx.restore();
+    // 特殊ルールの表示（風の筋など。画面の座標で描く）
+    if (rule && rule.draw) rule.draw(ctx, ruleAPI, rule.params, rule.state);
   }
+
+  // ---------- 背景と土台の色（themes.js で選んだもの） ----------
+  // 何も選ばれていないときの色（config.js の themes の「青空」「木の台」と同じ）
+  let bgTheme = { top: "#7ec8f0", bottom: "#d8f0ff", cloud: "#f4faff", ground: "#7cc35a", groundDark: "#5fa845" };
+  let platTheme = { body: "#8a5a3b", top: "#6fbf4a", pillar: "#a39587" };
+
+  function setTheme(background, platformDef) {
+    if (background) bgTheme = background;
+    if (platformDef) platTheme = platformDef;
+  }
+
+  // 空に散らばる星（星空の背景のとき）。位置は画面の割合
+  const stars = Array.from({ length: 50 }, () => ({ x: Math.random(), y: Math.random() * 0.7, r: 0.6 + Math.random() * 1.2 }));
 
   // 空のグラデーション（高く登るほど濃い青に）
   function drawBackground() {
     const t = Math.min(1, -camY / 3000);
     const g = ctx.createLinearGradient(0, 0, 0, worldH);
-    g.addColorStop(0, mix("#7ec8f0", "#1d2b64", t));
-    g.addColorStop(1, mix("#d8f0ff", "#4a6fb5", t));
+    g.addColorStop(0, mix(bgTheme.top, "#1d2b64", t));
+    g.addColorStop(1, mix(bgTheme.bottom, "#4a6fb5", t));
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, WORLD_W, worldH);
+    if (bgTheme.stars) {
+      ctx.fillStyle = "#ffffff";
+      for (const s of stars) {
+        ctx.globalAlpha = 0.5 + 0.5 * Math.sin(performance.now() / 700 + s.x * 40); // ちかちか
+        ctx.beginPath();
+        ctx.arc(s.x * WORLD_W, s.y * worldH, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
     drawClouds();
   }
 
@@ -587,7 +890,7 @@ const Game = (() => {
   const CLOUD_PUFFS = [[0, 0, 34, 16], [-26, 5, 22, 12], [28, 4, 24, 13], [4, -10, 20, 14]];
 
   function drawClouds() {
-    ctx.fillStyle = "#f4faff";
+    ctx.fillStyle = bgTheme.cloud;
     for (const c of clouds) {
       // カメラが上に行くと、雲は少しだけ下に流れる（遠くにある感じを出す）
       const x = c.x * WORLD_W;
@@ -611,7 +914,7 @@ const Game = (() => {
     const w = 70;
     const x = WORLD_W / 2 - w / 2;
     const top = platformTop + PLATFORM_H;
-    ctx.fillStyle = "#a39587";
+    ctx.fillStyle = platTheme.pillar;
     ctx.fillRect(x, top, w, groundY() - top + 10);
     ctx.fillStyle = "rgba(0,0,0,0.12)"; // 右側に影
     ctx.fillRect(x + w - 16, top, 16, groundY() - top + 10);
@@ -633,11 +936,11 @@ const Game = (() => {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
-    ctx.fillStyle = "#8a5a3b";
+    ctx.fillStyle = platTheme.body;
     ctx.fillRect(-PLATFORM_W / 2, -PLATFORM_H / 2, PLATFORM_W, PLATFORM_H);
     ctx.fillStyle = "rgba(0,0,0,0.15)";
     ctx.fillRect(-PLATFORM_W / 2, PLATFORM_H / 2 - 8, PLATFORM_W, 8);
-    ctx.fillStyle = "#6fbf4a"; // 上の芝生
+    ctx.fillStyle = platTheme.top; // 上の面（木の台なら芝生）
     ctx.fillRect(-PLATFORM_W / 2, -PLATFORM_H / 2, PLATFORM_W, 8);
     ctx.restore();
   }
@@ -645,7 +948,7 @@ const Game = (() => {
   // 地面（なだらかな丘）
   function drawGround() {
     const top = groundY();
-    ctx.fillStyle = "#7cc35a";
+    ctx.fillStyle = bgTheme.ground;
     ctx.beginPath();
     ctx.moveTo(-10, top + 14);
     ctx.quadraticCurveTo(WORLD_W * 0.25, top - 10, WORLD_W / 2, top);
@@ -654,7 +957,7 @@ const Game = (() => {
     ctx.lineTo(-10, top + 3000);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = "#5fa845"; // 少し下に濃い色の帯
+    ctx.fillStyle = bgTheme.groundDark; // 少し下に濃い色の帯
     ctx.fillRect(-10, top + 40, WORLD_W + 20, 3000);
   }
 
@@ -710,14 +1013,60 @@ const Game = (() => {
   }
 
   // 画像を、重心 (x, y) を中心に angle だけ回して描く
-  function drawSprite(shape, x, y, angle, alpha) {
+  // glow にレア度の情報を渡すと、その色でキャラの形に沿って光らせる
+  function drawSprite(shape, x, y, angle, alpha, glow) {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(x, y);
     ctx.rotate(angle);
-    // 画像の左上は「重心から com だけ左上」にある
+    if (glow) {
+      // 影をぼかして光に見せる。時間でふわふわ強さを変える
+      ctx.shadowColor = glow.color;
+      ctx.shadowBlur = 16 + 8 * Math.sin(performance.now() / 180);
+      // 画像の左上は「重心から com だけ左上」にある
+      ctx.drawImage(shape.img, -shape.com.x, -shape.com.y, shape.w, shape.h);
+      ctx.shadowBlur *= 0.5; // 2回重ねて、光を濃くする
+    }
     ctx.drawImage(shape.img, -shape.com.x, -shape.com.y, shape.w, shape.h);
     ctx.restore();
+  }
+
+  // ---------- キラキラ（スーパーレアの演出） ----------
+  const sparkles = []; // { x, y, vx, vy, life, size }
+
+  // キャラのまわりに、キラキラを少しずつ出す
+  function addSparkles(x, y, shape) {
+    if (reducedMotion.matches || Math.random() > 0.35) return;
+    const r = Math.max(shape.w, shape.h) * 0.55;
+    const a = Math.random() * Math.PI * 2;
+    sparkles.push({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, vx: (Math.random() - 0.5) * 0.6, vy: -0.4 - Math.random() * 0.6, life: 1, size: 3 + Math.random() * 4 });
+  }
+
+  // キラキラを描く（少しずつ上に流れて、消えていく）
+  function drawSparkles() {
+    for (let i = sparkles.length - 1; i >= 0; i--) {
+      const s = sparkles[i];
+      s.x += s.vx;
+      s.y += s.vy;
+      s.life -= 0.02;
+      if (s.life <= 0) {
+        sparkles.splice(i, 1);
+        continue;
+      }
+      // 4つのとんがりがある星の形
+      ctx.save();
+      ctx.globalAlpha = s.life;
+      ctx.fillStyle = "#fff6c2";
+      ctx.translate(s.x, s.y);
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) {
+        const rr = k % 2 === 0 ? s.size : s.size * 0.3;
+        const ang = (k * Math.PI) / 4;
+        ctx.lineTo(Math.cos(ang) * rr, Math.sin(ang) * rr);
+      }
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   // デバッグ：当たり判定の線と重心を表示
@@ -767,7 +1116,7 @@ const Game = (() => {
     let moved = 0; // ドラッグした距離（タップとドラッグを区別するため）
 
     canvas.addEventListener("pointerdown", (e) => {
-      if (paused || state !== "aim") return;
+      if (paused || state !== "aim" || !inputEnabled) return;
       dragging = true;
       moved = 0;
       lastX = e.clientX;
@@ -803,15 +1152,19 @@ const Game = (() => {
   }
 
   return {
-    init, start, stop, startDemo, setDemoCeiling, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
+    init, start, stop, startDemo, setDemoCeiling, setTheme, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
     get state() { return state; },
     get paused() { return paused; },
+    get heldX() { return held ? held.x : WORLD_W / 2; }, // 持っているキャラの位置
     // ゲーム中（ポーズできる状態）か
     get playing() { return !!engine && ["aim", "falling", "settled"].includes(state); },
     // デバッグ用：ブラウザのコンソールから Game.debugInfo() で中身を確認できる
     debugInfo: () => ({
       state, camY, platformTop,
       demo: demo && { phase: demo.phase, count: demo.count, settling: !!demo.current },
+      rule: rule && { id: rule.id, state: rule.state },
+      platformAngle: platform ? platform.angle : 0,
+      platformFriction: platform ? platform.friction : 0,
       held: held && { x: held.x, angle: held.angle, name: held.shape.name },
       bodies: engine ? pieces().map((b) => ({ x: Math.round(b.position.x), y: Math.round(b.position.y), top: Math.round(b.bounds.min.y), speed: b.speed, angularSpeed: b.angularSpeed, name: b.shape.name, rough: b.shape.rough })) : [],
     }),

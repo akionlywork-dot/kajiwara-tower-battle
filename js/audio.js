@@ -92,6 +92,9 @@ const Sound = (() => {
     } else if (name === "click") {
       // ボタンを押したときのプッ
       tone("sine", 660, 520, t, 0.06, 0.25, seGain);
+    } else if (name === "rare") {
+      // キラキラーン（高い音が駆け上がる）
+      [784, 988, 1175, 1568, 1976].forEach((f, i) => tone("sine", f, f, t + i * 0.06, i === 4 ? 0.5 : 0.12, 0.2, seGain));
     } else if (name === "record") {
       // ハイスコア更新のファンファーレ
       [523, 659, 784, 1047].forEach((f, i) => tone("triangle", f, f, t + i * 0.12, i === 3 ? 0.6 : 0.14, 0.25, seGain));

@@ -7,10 +7,16 @@
 
 const Save = (() => {
   const KEY = "stack.save";
+  // 保存データの形のバージョン。データの形を変えたら数字を1つ上げ、
+  // 下の migrate() に「古い形 → 新しい形」に直す処理を足す
+  const VERSION = 1;
+  // バックアップファイルの目印（このゲームのファイルかどうかの確認に使う）
+  const APP_ID = "kajiwara-tower-battle";
 
   // 保存データの初期値（初めて遊ぶ人はこの状態から始まる）
   function defaults() {
     return {
+      version: VERSION,
       // プロフィール
       profile: {
         name: "", // 名前（空欄なら「プレイヤー」と表示）
@@ -31,36 +37,98 @@ const Save = (() => {
         versusPlays: 0, // 2人対戦の回数
         versusWins: { 1: 0, 2: 0 }, // プレイヤー1・2の勝利数
         totalPieces: 0, // これまでに積んだキャラの合計（両モード）
+        // CPU対戦の強さごとの対戦数と勝利数（人どうしの対戦とは別に数える）
+        cpu: { easy: { plays: 0, wins: 0 }, normal: { plays: 0, wins: 0 }, hard: { plays: 0, wins: 0 } },
+        online: { plays: 0, wins: 0 }, // オンライン対戦の対戦数と勝利数
+        rulePlays: 0, // 特殊ルールのプレイ回数
+        ruleBest: {}, // 特殊ルールごとのハイスコア（ルール名 → { score, count, height }）
       },
       // お知らせ：最後に読んだお知らせの id
       news: { lastReadId: 0 },
+      // 選んでいる背景と土台（config.js の themes の id）
+      cosmetics: { background: "sky", platform: "wood" },
     };
   }
 
-  // 保存されていたデータを読み込む。項目ごとに初期値と合わせるので、
-  // 後から項目を増やしても古いデータのまま動く
+  // 古いバージョンのデータを、今の形に直す
+  // （例：バージョン2で項目の名前を変えたら、ここに「if (saved.version < 2) { ... }」を足す）
+  function migrate(saved) {
+    if (!saved.version) saved.version = 1; // バージョン番号が無いのは、最初の形（バージョン1）
+    // 今はバージョン1だけなので、直す処理はまだ無い
+    saved.version = VERSION;
+    return saved;
+  }
+
+  // 保存データ（またはバックアップの中身）を、初期値と合わせて今の形にする。
+  // 項目ごとに初期値と合わせるので、後から項目を増やしても古いデータのまま動く
+  function normalize(saved) {
+    const result = defaults();
+    if (!saved) return result;
+    migrate(saved);
+    for (const section of Object.keys(result)) {
+      if (saved[section] && typeof saved[section] === "object" && typeof result[section] === "object") {
+        result[section] = Object.assign(result[section], saved[section]);
+      }
+    }
+    return result;
+  }
+
   function load() {
-    const data = defaults();
     let saved = null;
     try {
       saved = JSON.parse(localStorage.getItem(KEY));
     } catch (e) {}
-    if (saved) {
-      for (const section of Object.keys(data)) {
-        if (saved[section] && typeof saved[section] === "object") {
-          data[section] = Object.assign(data[section], saved[section]);
-        }
-      }
-    }
+    const result = normalize(saved);
     // 以前のバージョンのハイスコア（stack.best）があれば引き継ぐ
     try {
       const oldBest = JSON.parse(localStorage.getItem("stack.best"));
-      if (oldBest && !data.stats.best) data.stats.best = oldBest;
+      if (oldBest && !result.stats.best) result.stats.best = oldBest;
     } catch (e) {}
-    return data;
+    return result;
   }
 
   const data = load();
+
+  // ---------- バックアップ（書き出し・読み込み） ----------
+  // 書き出すデータ：プレイデータと設定を1つにまとめる
+  function exportData() {
+    return {
+      app: APP_ID, // このゲームのファイルだという目印
+      saveVersion: VERSION, // データの形のバージョン
+      exportedAt: new Date().toISOString(), // 書き出した日時
+      save: data,
+      settings: Settings.all(),
+    };
+  }
+
+  // 読み込んだファイルの中身を確認する。
+  // 正しければ { ok: true, save, settings }、だめなら { ok: false, error: "理由" }
+  function checkImport(json) {
+    if (!json || typeof json !== "object" || json.app !== APP_ID) {
+      return { ok: false, error: "このゲームのバックアップファイルではありません。" };
+    }
+    if (typeof json.saveVersion !== "number" || !json.save || typeof json.save !== "object") {
+      return { ok: false, error: "ファイルが壊れているため読み込めません。" };
+    }
+    if (json.saveVersion > VERSION) {
+      return { ok: false, error: "新しいバージョンのゲームで書き出されたファイルです。\nゲームを最新にしてから読み込んでください。" };
+    }
+    const s = json.save;
+    const looksRight = s.profile && typeof s.profile === "object" && s.stats && typeof s.stats === "object";
+    if (!looksRight) return { ok: false, error: "ファイルが壊れているため読み込めません。" };
+    return { ok: true, save: normalize(JSON.parse(JSON.stringify(s))), settings: json.settings || {}, exportedAt: json.exportedAt };
+  }
+
+  // 確認ずみのデータで、今のデータを上書きする
+  function importData(checked) {
+    for (const key of Object.keys(data)) delete data[key];
+    Object.assign(data, checked.save);
+    Settings.replaceAll(checked.settings);
+    try {
+      localStorage.removeItem("stack.best"); // 古いハイスコアが混ざらないように
+    } catch (e) {}
+    return write();
+  }
 
   // 保存する。容量オーバーなどで保存できなかったら false を返す
   function write() {
@@ -89,5 +157,5 @@ const Save = (() => {
     return data.profile.name || "プレイヤー";
   }
 
-  return { data, write, resetStats, playerName };
+  return { data, write, resetStats, playerName, exportData, checkImport, importData };
 })();

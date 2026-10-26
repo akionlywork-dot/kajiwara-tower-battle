@@ -5,7 +5,7 @@
 // condition の type（条件の種類）：
 //   count       … 1回のゲームで value 体積んだ（1人・2人どちらでも）
 //   height      … 1回のゲームでタワーの高さが value m に届いた
-//   score       … ひとりモードで value 点以上
+//   score       … ひとりモード（ふつうのルール）で value 点以上
 //   plays       … ゲームを合計 value 回遊んだ（1人・2人の合計）
 //   totalPieces … これまでに合計 value 体積んだ
 //   versusWins  … 2人対戦でプレイヤー1が value 回勝った
@@ -38,7 +38,7 @@ const Achievements = (() => {
       case "height":
         return !!game && game.height >= v;
       case "score":
-        return !!game && game.mode === "solo" && game.score >= v;
+        return !!game && game.mode === "solo" && !game.rule && game.score >= v; // 特殊ルールは数えない
       case "plays":
         return s.soloPlays + s.versusPlays >= v;
       case "totalPieces":
@@ -69,7 +69,14 @@ const Achievements = (() => {
     }
     Save.write();
     Sound.play("record");
+    // 実績の達成で、新しい背景・土台が解放されたら知らせる
+    if (typeof Themes !== "undefined") Themes.notifyUnlocked(newly);
     return newly;
+  }
+
+  // id から実績を探す（背景・土台の解放条件の説明に使う）。無ければ null
+  function find(id) {
+    return (defs || []).find((a) => a.id === id) || null;
   }
 
   // 達成した実績の一覧 [{ id, title }]（プロフィールの称号の選択肢に使う）
@@ -106,5 +113,5 @@ const Achievements = (() => {
       .join("");
   }
 
-  return { init, load, check, unlockedList };
+  return { init, load, check, unlockedList, find };
 })();

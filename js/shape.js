@@ -338,5 +338,25 @@ const Shape = (() => {
     return options;
   }
 
-  return { create, spawnBody, optionsFrom };
+  // 形のデータを scale 倍に拡大したものを返す（特殊ルール「ジャイアント」などで使う）
+  // 一度作ったものは覚えておき、同じ倍率なら使い回す
+  const scaledCache = new Map();
+  function scaled(shape, scale) {
+    const key = shape.file + "@" + scale;
+    if (!scaledCache.has(key)) {
+      const mul = (p) => ({ x: p.x * scale, y: p.y * scale });
+      scaledCache.set(
+        key,
+        Object.assign({}, shape, {
+          w: shape.w * scale,
+          h: shape.h * scale,
+          com: mul(shape.com),
+          parts: shape.parts.map((part) => part.map(mul)),
+        })
+      );
+    }
+    return scaledCache.get(key);
+  }
+
+  return { create, spawnBody, optionsFrom, scaled };
 })();

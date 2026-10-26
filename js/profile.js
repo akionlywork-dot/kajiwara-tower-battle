@@ -51,6 +51,15 @@ const Profile = (() => {
       drawCrop();
     });
     setupCropGestures();
+    // 背景・土台の見本をタップしたら、それを選ぶ
+    for (const id of ["theme-backgrounds", "theme-platforms"]) {
+      $(id).addEventListener("click", (e) => {
+        const tile = e.target.closest("[data-kind]");
+        if (!tile) return;
+        Themes.select(tile.dataset.kind, tile.dataset.id);
+        renderThemes();
+      });
+    }
     UI.onShow("profile", render);
     refresh();
   }
@@ -69,7 +78,13 @@ const Profile = (() => {
       select.appendChild(opt);
     }
     select.value = p.titleId || "";
+    renderThemes();
     refresh();
+  }
+
+  function renderThemes() {
+    Themes.renderPicker($("theme-backgrounds"), "backgrounds");
+    Themes.renderPicker($("theme-platforms"), "platforms");
   }
 
   // 達成した実績の一覧（実績の機能がまだ読み込まれていなければ空）

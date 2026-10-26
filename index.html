@@ -133,8 +133,86 @@
         <h2 class="screen-title">モードを選ぶ</h2>
         <div class="menu">
           <button id="btn-solo" class="btn btn-big btn-p1">ひとりで<small>スコアアタック</small></button>
-          <button id="btn-versus" class="btn btn-big btn-p2">ふたりで<small>1台で交互に対戦</small></button>
+          <button class="btn btn-big btn-p2" data-open="versus">たいせん<small>ともだちと・CPUと</small></button>
+          <button class="btn btn-big btn-special" data-open="rules">特殊ルール<small>風・傾く土台・つるつる など</small></button>
           <button id="btn-mode-back" class="btn btn-big btn-sub">もどる</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 対戦の相手を選ぶ画面 ===== -->
+    <section id="screen-versus" class="screen">
+      <div class="screen-inner">
+        <h2 class="screen-title">たいせん</h2>
+        <div class="menu">
+          <button id="btn-versus" class="btn btn-big btn-p2">ともだちと<small>1台のスマホで交互に</small></button>
+          <button class="btn btn-big btn-online" data-open="online">オンライン対戦<small>近くの人と、2台のスマホで</small></button>
+          <p class="menu-label">CPUと対戦</p>
+          <div class="cpu-levels">
+            <button class="btn btn-big btn-cpu" data-cpu="easy">よわい</button>
+            <button class="btn btn-big btn-cpu" data-cpu="normal">ふつう</button>
+            <button class="btn btn-big btn-cpu" data-cpu="hard">つよい</button>
+          </div>
+          <button class="btn btn-big btn-sub" data-back="mode">もどる</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- レアキャラが出たときの表示 -->
+    <div id="rare-banner" class="hidden"></div>
+
+    <!-- ===== オンライン対戦の準備画面 ===== -->
+    <!-- 中の3つの表示（選ぶ・部屋を作った・部屋に入る）を、main.js が切りかえる -->
+    <section id="screen-online" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <button id="btn-online-back" class="btn btn-icon" aria-label="もどる">‹</button>
+          <h2>オンライン対戦</h2>
+        </header>
+        <div class="page-body online-body">
+          <!-- 1. 部屋を作るか、入るか -->
+          <div id="online-choose" class="online-view">
+            <div class="menu">
+              <button id="btn-online-host" class="btn btn-big btn-primary">部屋を作る<small>ルームコードを相手に伝える</small></button>
+              <button id="btn-online-join" class="btn btn-big btn-p2">部屋に入る<small>相手のルームコードを入力する</small></button>
+            </div>
+          </div>
+          <!-- 2. 部屋を作った：コードを表示して、相手を待つ -->
+          <div id="online-host" class="online-view hidden">
+            <p class="online-label">ルームコード</p>
+            <p id="online-code" class="online-code">------</p>
+            <p id="online-host-status" class="online-status"></p>
+          </div>
+          <!-- 3. 部屋に入る：コードを入力 -->
+          <div id="online-join" class="online-view hidden">
+            <p class="online-label">相手のルームコード（6桁）</p>
+            <input id="online-code-input" class="online-code-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="000000">
+            <button id="btn-online-connect" class="btn btn-big btn-primary">参加する</button>
+            <p id="online-join-status" class="online-status"></p>
+          </div>
+          <div class="online-notes">
+            <p>・同じ Wi-Fi につなぐと、つながりやすくなります。携帯回線どうしや、学校・会社の Wi-Fi ではつながらないことがあります。</p>
+            <p>・ルームコードは、対戦する相手にだけ伝えてください（SNS などに貼らないでください）。</p>
+            <p>・対戦中は、お互いのネット上の住所（IPアドレス）が相手の端末に伝わります。知っている人と遊んでください。</p>
+            <p>・画面を消したり、ほかのアプリに切りかえたりすると、接続が切れます。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CPU が考えている間の表示 -->
+    <div id="cpu-thinking" class="cpu-thinking hidden"></div>
+
+    <!-- ===== 特殊ルールを選ぶ画面（中身は rules.js と config.js の rules から作る） ===== -->
+    <section id="screen-rules" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <button class="btn btn-icon" data-back="mode" aria-label="もどる">‹</button>
+          <h2>特殊ルール</h2>
+        </header>
+        <div class="page-body">
+          <div id="rules-list"></div>
+          <p class="page-note">特殊ルールはひとりで遊びます。ハイスコアはルールごとに記録されます。</p>
         </div>
       </div>
     </section>
@@ -173,6 +251,17 @@
           <div class="setting-row">
             <span>指を離したら落とす<small>ドラッグして指を離すと落下</small></span>
             <button class="toggle" data-setting="release" role="switch" aria-label="指を離したら落とす"></button>
+          </div>
+          <!-- データのバックアップ（機種変更のときなど） -->
+          <div class="setting-row setting-data">
+            <span>データのバックアップ<small>名前・写真・図鑑・実績・戦績・設定</small></span>
+            <div class="setting-data-buttons">
+              <button id="btn-export" class="btn btn-small btn-sub">書き出す</button>
+              <label class="btn btn-small btn-sub">
+                読み込む
+                <input type="file" id="import-file" accept=".json,application/json" hidden>
+              </label>
+            </div>
           </div>
           <!-- 開発用：config.js の devMode が true のときだけ表示される -->
           <div id="setting-debug-row" class="setting-row hidden">
@@ -227,6 +316,11 @@
             <span>称号<small>実績を達成すると選べる</small></span>
             <select id="select-title"></select>
           </label>
+          <!-- 背景と土台（中身は themes.js が作る。種類と解放条件は config.js の themes） -->
+          <h3 class="section-title">背景</h3>
+          <div id="theme-backgrounds" class="theme-grid"></div>
+          <h3 class="section-title">土台</h3>
+          <div id="theme-platforms" class="theme-grid"></div>
           <p class="page-note">写真と名前はこの端末の中だけに保存され、どこにも送信されません。</p>
         </div>
       </div>
@@ -386,6 +480,7 @@
   <!-- ライブラリ（lib/ に同梱） -->
   <script src="lib/decomp.min.js"></script>
   <script src="lib/matter.min.js"></script>
+  <script src="lib/peerjs.min.js"></script>
   <!-- 設定ファイル -->
   <script src="config.js"></script>
   <script src="characters.js"></script>
@@ -395,7 +490,11 @@
   <script src="js/audio.js"></script>
   <script src="js/shape.js"></script>
   <script src="js/game.js"></script>
+  <script src="js/rules.js"></script>
+  <script src="js/cpu.js"></script>
+  <script src="js/online.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/themes.js"></script>
   <script src="js/profile.js"></script>
   <script src="js/data-file.js"></script>
   <script src="js/news.js"></script>
@@ -403,6 +502,7 @@
   <script src="js/records.js"></script>
   <script src="js/dex.js"></script>
   <script src="js/achievements.js"></script>
+  <script src="js/backup.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

@@ -1139,6 +1139,349 @@ select {
   height: 32px;
 }
 
+/* レアキャラが出たときの「レア！」 */
+.rare-banner {
+  position: absolute;
+  top: 34%;
+  left: 0;
+  right: 0;
+  z-index: 6;
+  text-align: center;
+  pointer-events: none;
+  animation: rare-pop 1.6s ease-out forwards;
+}
+
+.rare-banner span {
+  display: inline-block;
+  padding: 4px 24px;
+  border-radius: var(--radius-round);
+  font-size: 34px;
+  font-weight: bold;
+  color: #fff;
+  background: var(--rare-color);
+  box-shadow: 0 0 24px var(--rare-color);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+
+.rare-banner small {
+  display: block;
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: bold;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* スーパーレアは虹色に光る */
+.rare-banner.super span {
+  background: linear-gradient(90deg, #ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0);
+  box-shadow: 0 0 30px #ffc21a;
+}
+
+@keyframes rare-pop {
+  0% { opacity: 0; transform: scale(0.3); }
+  15% { opacity: 1; transform: scale(1.15); }
+  25% { transform: scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-20px); }
+}
+
+/* 図鑑のレア度（★） */
+.rarity-stars {
+  font-size: 11px;
+  letter-spacing: -1px;
+  color: var(--rare-color);
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+.dex-card.dex-rare {
+  box-shadow: inset 0 0 0 2px var(--rare-color);
+}
+
+.rarity-label {
+  display: inline-block;
+  margin-top: var(--space-xs);
+  padding: 2px 12px;
+  border-radius: var(--radius-round);
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+  background: var(--rare-color);
+}
+
+/* 背景・土台を選ぶ見本 */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-s);
+}
+
+.theme-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-s);
+  border: 3px solid transparent;
+  border-radius: var(--radius-m);
+  font-family: inherit;
+  color: var(--color-text);
+  background: var(--color-panel);
+  cursor: pointer;
+  transition: transform var(--dur-press);
+}
+
+.theme-tile:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.theme-tile.selected {
+  border-color: var(--color-gold);
+}
+
+.theme-tile.locked {
+  cursor: default;
+}
+
+.theme-tile b {
+  font-size: 14px;
+}
+
+.theme-tile small {
+  font-size: 10px;
+  line-height: 1.3;
+  opacity: 0.85;
+}
+
+/* 見本の絵（背景は空のグラデーション、土台は空の上に台） */
+.theme-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 64px;
+  border-radius: var(--radius-s);
+  overflow: hidden;
+}
+
+.theme-preview i {
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  bottom: 14px;
+  height: 14px;
+  border-top: 5px solid;
+}
+
+/* 未解放：見本を暗くして鍵マーク */
+.theme-tile.locked .theme-preview {
+  filter: grayscale(0.7) brightness(0.6);
+}
+
+.theme-preview em {
+  position: relative;
+  font-size: 26px;
+  font-style: normal;
+}
+
+/* オンライン対戦 */
+.btn-online {
+  color: #fff;
+  background: #15a37f;
+  --color-sub-shadow: #0b6e55;
+}
+
+.online-body {
+  text-align: center;
+}
+
+.online-label {
+  margin-top: var(--space-l);
+  font-size: var(--font-size-s);
+  font-weight: bold;
+  opacity: 0.85;
+}
+
+/* ルームコード（大きく、1文字ずつ間をあけて） */
+.online-code {
+  margin-top: var(--space-s);
+  padding: var(--space-m) 0;
+  border-radius: var(--radius-l);
+  font-size: 48px;
+  font-weight: bold;
+  letter-spacing: 0.25em;
+  text-indent: 0.25em;
+  color: var(--color-text-dark);
+  background: #fff;
+  -webkit-user-select: all;
+  user-select: all; /* 長押しでコピーしやすいように */
+}
+
+.online-code-input {
+  width: 100%;
+  height: 72px;
+  margin: var(--space-s) 0 var(--space-m);
+  border: none;
+  border-radius: var(--radius-l);
+  font-family: inherit;
+  font-size: 40px;
+  font-weight: bold;
+  letter-spacing: 0.25em;
+  text-align: center;
+  color: var(--color-text-dark);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.online-status {
+  min-height: 3em;
+  margin-top: var(--space-m);
+  font-size: 15px;
+  font-weight: bold;
+  line-height: 1.6;
+}
+
+.online-notes {
+  margin-top: var(--space-xl);
+  padding: var(--space-m);
+  border-radius: var(--radius-m);
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: left;
+  background: var(--color-panel);
+}
+
+.online-notes p + p {
+  margin-top: var(--space-xs);
+}
+
+/* リザルトの「あなたの勝ち！／負け…」 */
+.result-you {
+  margin-bottom: var(--space-s);
+  font-size: var(--font-size-l);
+  font-weight: bold;
+}
+
+/* 対戦相手を選ぶ画面 */
+.menu-label {
+  margin-bottom: calc(var(--space-s) * -1);
+  font-size: var(--font-size-s);
+  font-weight: bold;
+  opacity: 0.85;
+}
+
+.cpu-levels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-s);
+}
+
+.btn-cpu {
+  padding: var(--space-s) 0;
+  font-size: var(--font-size-m);
+  color: #fff;
+  background: #4a5a78;
+  --color-sub-shadow: #2c3850;
+}
+
+/* CPU が考えている間の表示 */
+.cpu-thinking {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  z-index: 6;
+  padding: var(--space-s) var(--space-l);
+  border-radius: var(--radius-l);
+  font-size: var(--font-size-m);
+  font-weight: bold;
+  line-height: 1.5;
+  text-align: center;
+  color: #fff;
+  background: rgba(61, 139, 255, 0.9);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* 「考え中...」の点が増えたり減ったりする */
+.dots::after {
+  content: "";
+  display: inline-block;
+  width: 1.5em;
+  text-align: left;
+  animation: dots 1.2s steps(4) infinite;
+}
+
+@keyframes dots {
+  0% { content: ""; }
+  25% { content: "・"; }
+  50% { content: "・・"; }
+  75% { content: "・・・"; }
+}
+
+/* 特殊ルール */
+.btn-special {
+  color: #fff;
+  background: #8e5cf0;
+  --color-sub-shadow: #5d36ad;
+}
+
+.rule-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-m);
+}
+
+.rule-icon {
+  flex-shrink: 0;
+  font-size: 32px;
+}
+
+.rule-main {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.rule-main b {
+  display: block;
+  font-size: var(--font-size-m);
+}
+
+.rule-main small {
+  display: block;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.rule-best {
+  flex-shrink: 0;
+  font-size: 10px;
+  text-align: right;
+  opacity: 0.9;
+}
+
+.rule-best b {
+  display: block;
+  font-size: 18px;
+  color: var(--color-gold);
+}
+
+/* ゲーム中・リザルトのルール名の札 */
+.rule-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--radius-round);
+  font-size: 12px;
+  vertical-align: middle;
+  background: rgba(142, 92, 240, 0.85);
+  text-shadow: none;
+}
+
+.result-rule {
+  margin-bottom: var(--space-s);
+}
+
 /* 危ない操作（リセットなど）のボタン */
 .btn.btn-danger {
   display: flex;
@@ -1526,6 +1869,21 @@ select {
   line-height: 1.3;
   font-weight: normal;
   opacity: 0.8;
+}
+
+/* 設定画面のバックアップの行（ボタンが2つ並ぶ） */
+.setting-data {
+  flex-wrap: wrap;
+}
+
+.setting-data-buttons {
+  display: flex;
+  gap: var(--space-s);
+}
+
+.setting-data .btn-small {
+  min-height: 36px;
+  padding: 0 14px;
 }
 
 /* ON/OFF スイッチ */

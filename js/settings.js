@@ -44,5 +44,18 @@ const Settings = (() => {
     write(KEY, values);
   }
 
-  return { get, set };
+  // 全部の設定（バックアップの書き出し用）
+  function all() {
+    return Object.assign({}, values);
+  }
+
+  // 設定をまとめて置きかえる（バックアップの読み込み用）。知らない項目は無視する
+  function replaceAll(obj) {
+    for (const key of Object.keys(DEFAULTS)) {
+      values[key] = typeof obj[key] === typeof DEFAULTS[key] ? obj[key] : DEFAULTS[key];
+    }
+    write(KEY, values);
+  }
+
+  return { get, set, all, replaceAll };
 })();

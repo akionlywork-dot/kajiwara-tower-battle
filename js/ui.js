@@ -38,11 +38,12 @@ const UI = (() => {
   // ブラウザの confirm() の代わり。ゲームの見た目に合わせたダイアログを出し、
   // 「OK」なら true、「キャンセル」なら false で終わる Promise を返す
   // 使い方： if (await UI.confirm("本当にリセットしますか？")) { ... }
-  function confirm(message, okLabel = "OK") {
+  function confirm(message, okLabel = "OK", withCancel = true) {
     return new Promise((resolve) => {
       const box = $("dialog");
       $("dialog-message").textContent = message;
       $("dialog-ok").textContent = okLabel;
+      $("dialog-cancel").classList.toggle("hidden", !withCancel);
       box.classList.add("active");
       const close = (result) => {
         box.classList.remove("active");
@@ -52,6 +53,11 @@ const UI = (() => {
       $("dialog-ok").onclick = () => close(true);
       $("dialog-cancel").onclick = () => close(false);
     });
+  }
+
+  // お知らせだけのダイアログ（OK ボタンだけ）。閉じたら終わる Promise を返す
+  function alert(message) {
+    return confirm(message, "OK", false);
   }
 
   // ---------- 通知（画面の上から出てきて、少したつと消える） ----------
@@ -182,7 +188,7 @@ const UI = (() => {
   );
 
   return {
-    show, onShow, replayAnimations, splash, confetti, clearConfetti, countUp, confirm, toast, escape,
+    show, onShow, replayAnimations, splash, confetti, clearConfetti, countUp, confirm, alert, toast, escape,
     get current() { return current; },
   };
 })();

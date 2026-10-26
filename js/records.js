@@ -41,6 +41,34 @@ const Records = (() => {
     return isNew;
   }
 
+  // 特殊ルールが終わった。そのルールのハイスコアを更新したら true を返す
+  function addRuleResult(ruleId, score, count, height) {
+    const s = stats();
+    s.rulePlays++;
+    const best = s.ruleBest[ruleId];
+    const isNew = !best || score > best.score;
+    if (isNew) s.ruleBest[ruleId] = { score, count, height };
+    Save.write();
+    return isNew;
+  }
+
+  // CPU対戦が終わった（won: プレイヤーが勝ったか）
+  function addCpuResult(level, won) {
+    const s = stats();
+    const r = (s.cpu[level] = s.cpu[level] || { plays: 0, wins: 0 });
+    r.plays++;
+    if (won) r.wins++;
+    Save.write();
+  }
+
+  // オンライン対戦が終わった（won: 自分が勝ったか）
+  function addOnlineResult(won) {
+    const s = stats();
+    s.online.plays++;
+    if (won) s.online.wins++;
+    Save.write();
+  }
+
   // 2人対戦が終わった
   function addVersusResult(winner) {
     const s = stats();
@@ -69,11 +97,35 @@ const Records = (() => {
       item(`${UI.escape(Save.playerName(1))} の勝利`, `${s.versusWins[1] || 0}<small>勝</small>`) +
       item(`${UI.escape(Save.playerName(2))} の勝利`, `${s.versusWins[2] || 0}<small>勝</small>`) +
       `</div>` +
+      `<h3 class="section-title">オンライン対戦</h3>` +
+      `<div class="stat-grid">` +
+      item("対戦回数", `${s.online.plays}<small>回</small>`) +
+      item("勝ち・負け", `${s.online.wins}<small>勝</small> ${s.online.plays - s.online.wins}<small>敗</small>`) +
+      `</div>` +
+      `<h3 class="section-title">CPU対戦</h3>` +
+      `<div class="stat-grid">` +
+      Object.entries(window.GAME_CONFIG.cpu)
+        .map(([level, p]) => {
+          const r = s.cpu[level] || { plays: 0, wins: 0 };
+          return item(`CPU（${UI.escape(p.name)}）`, `${r.wins}<small>勝</small> ${r.plays - r.wins}<small>敗</small>`);
+        })
+        .join("") +
+      `</div>` +
+      `<h3 class="section-title">特殊ルール</h3>` +
+      `<div class="stat-grid">` +
+      item("プレイ回数", `${s.rulePlays}<small>回</small>`) +
+      Rules.list()
+        .map((r) => {
+          const best = s.ruleBest[r.id];
+          return item(`${r.params.icon || ""} ${UI.escape(r.params.name)}`, best ? `${best.score}<small>点</small>` : "---");
+        })
+        .join("") +
+      `</div>` +
       `<h3 class="section-title">合計</h3>` +
       `<div class="stat-grid">` +
       item("積んだキャラの数", `${s.totalPieces}<small>体</small>`) +
       `</div>`;
   }
 
-  return { init, addPiece, addSoloResult, addVersusResult };
+  return { init, addPiece, addSoloResult, addRuleResult, addCpuResult, addOnlineResult, addVersusResult };
 })();

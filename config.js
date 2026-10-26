@@ -47,6 +47,82 @@ window.GAME_CONFIG = {
   // 1手の制限時間（秒）。設定画面で「制限時間」をONにしたときだけ使われる
   turnTimeLimit: 10,
 
+  // 背景と土台（プロフィール画面で選ぶ）
+  //   id     : 名前（半角英数字。一度公開したら変えない）
+  //   unlock : 解放条件。data/achievements.json の実績の id を書く（その実績を達成すると使える）。
+  //            null なら最初から使える
+  //   そのほかは色（"#" から始まる色の番号）
+  themes: {
+    backgrounds: [
+      { id: "sky", name: "青空", unlock: null, top: "#7ec8f0", bottom: "#d8f0ff", cloud: "#f4faff", ground: "#7cc35a", groundDark: "#5fa845" },
+      { id: "sunset", name: "夕焼け", unlock: "stack10", top: "#ff8a5c", bottom: "#ffd59a", cloud: "#ffe9dc", ground: "#6f9e4c", groundDark: "#557f3a" },
+      { id: "sakura", name: "さくら", unlock: "dex_half", top: "#ffb8d2", bottom: "#fff0f6", cloud: "#ffffff", ground: "#9fd36b", groundDark: "#82b854" },
+      // stars: true にすると、空に星を描く
+      { id: "night", name: "星空", unlock: "height5", top: "#0b1633", bottom: "#33467e", cloud: "#4d5f8f", ground: "#2e5a3b", groundDark: "#1f422a", stars: true },
+    ],
+    platforms: [
+      { id: "wood", name: "木の台", unlock: null, body: "#8a5a3b", top: "#6fbf4a", pillar: "#a39587" },
+      { id: "stone", name: "石の台", unlock: "first_stack", body: "#7d808c", top: "#b3b7c2", pillar: "#6b6e78" },
+      { id: "ice", name: "氷の台", unlock: "plays10", body: "#7ec4e8", top: "#e3f6ff", pillar: "#6aa9c9" },
+      { id: "gold", name: "金の台", unlock: "dex_complete", body: "#d4a019", top: "#ffe27a", pillar: "#b3861a" },
+    ],
+  },
+
+  // キャラのレア度（characters.js の rarity に "N" / "R" / "SR" を書く）
+  //   weight : 出やすさ。数が大きいほどよく出る（キャラごとに characters.js の weight で上書きできる）
+  //   color  : 光る色・図鑑の色
+  //   stars  : 図鑑に表示する★の数
+  rarity: {
+    N: { name: "ノーマル", weight: 10, color: "#b9c4d6", stars: 1 },
+    R: { name: "レア", weight: 4, color: "#3d9bff", stars: 2 },
+    SR: { name: "スーパーレア", weight: 1, color: "#ffc21a", stars: 3 },
+  },
+
+  // CPU対戦の強さ（ふたりで → CPUと）
+  //   candidates : 試してみる置き方の数（多いほど良い置き方が見つかる。最大56）
+  //   choice     : 選び方。"best"=一番良いもの / "top"=上位から選ぶ / "random"=落ちないものから適当に
+  //   noise      : 置く位置のずれ（大きいほど、狙いが雑になる）
+  //   thinkTime  : 考えている時間（秒）。計算が早く終わっても、この時間は「考え中…」を出す
+  //   maxThink   : 考える時間の上限（秒）。これを過ぎたら、それまでに試した中から選ぶ
+  cpu: {
+    easy: { name: "よわい", candidates: 6, choice: "random", noise: 45, thinkTime: 1.2, maxThink: 1.5 },
+    normal: { name: "ふつう", candidates: 24, choice: "top", noise: 10, thinkTime: 1.4, maxThink: 2.5 },
+    hard: { name: "つよい", candidates: 56, choice: "best", noise: 0, thinkTime: 1.6, maxThink: 3.5 },
+  },
+
+  // 特殊ルール（モード選択の「特殊ルール」から選ぶ。1人モードで遊ぶ）
+  // ルールの動きは js/rules.js に書いてある。ここでは名前・説明・数値を調整できる
+  rules: {
+    wind: {
+      name: "風",
+      icon: "🌬️",
+      description: "ときどき左右から風が吹き、落ちているキャラが流される",
+      interval: 6, // 風が吹く間隔（秒）
+      duration: 2.5, // 1回の風が吹いている時間（秒）
+      strength: 0.02, // 風の強さ（大きいほど流される）
+    },
+    tilt: {
+      name: "傾く土台",
+      icon: "⚖️",
+      description: "土台がゆっくり左右に傾く",
+      maxAngle: 6, // 一番傾いたときの角度（度）
+      period: 12, // 左→右→左と1往復する時間（秒）
+    },
+    slippery: {
+      name: "つるつる",
+      icon: "🧊",
+      description: "摩擦が小さく、キャラも土台もすべりやすい",
+      friction: 0.12, // すべりにくさ（ふつうは 0.9）
+      frictionStatic: 0.2, // 止まっているときのすべりにくさ（ふつうは 1.2）
+    },
+    giant: {
+      name: "ジャイアント",
+      icon: "🦖",
+      description: "キャラが大きくなる",
+      scale: 1.35, // 大きさの倍率
+    },
+  },
+
   // 効果音・BGM のファイル
   // sounds/ フォルダに音声ファイルを置いたら、ここにその場所を書く（例 "sounds/place.mp3"）。
   // "" のままのものは、プログラムで作った仮の音が鳴る（ファイルは読みに行かない）
@@ -55,6 +131,7 @@ window.GAME_CONFIG = {
     fall: "", // キャラが土台から落ちたとき
     gameover: "", // ゲームオーバー
     record: "", // ハイスコア更新・対戦の勝利
+    rare: "", // レアキャラが出たとき
     click: "", // メニューのボタンを押したとき
     bgm: "", // BGM（くり返し再生される）
   },
