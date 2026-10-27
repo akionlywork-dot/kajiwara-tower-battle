@@ -38,11 +38,12 @@ const UI = (() => {
   // ブラウザの confirm() の代わり。ゲームの見た目に合わせたダイアログを出し、
   // 「OK」なら true、「キャンセル」なら false で終わる Promise を返す
   // 使い方： if (await UI.confirm("本当にリセットしますか？")) { ... }
-  function confirm(message, okLabel = "OK", withCancel = true) {
+  function confirm(message, okLabel = "OK", withCancel = true, cancelLabel = "キャンセル") {
     return new Promise((resolve) => {
       const box = $("dialog");
       $("dialog-message").textContent = message;
       $("dialog-ok").textContent = okLabel;
+      $("dialog-cancel").textContent = cancelLabel;
       $("dialog-cancel").classList.toggle("hidden", !withCancel);
       box.classList.add("active");
       const close = (result) => {

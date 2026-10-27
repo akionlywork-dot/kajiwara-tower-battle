@@ -74,6 +74,7 @@
       Settings.set(name, !Settings.get(name));
       updateToggles();
       applySettings();
+      if (name === "ranking" && Settings.get("ranking")) Ranking.submitBest(); // 参加したら、今のハイスコアを送る
       Sound.play("click");
     });
   }
@@ -149,8 +150,9 @@
     gameToken++;
     showThinking(false);
     Game.setInputEnabled(true);
-    player = 1;
-    lastDropper = 1;
+    // 対戦の先攻は毎回ランダム（1人モードはいつもプレイヤー1）
+    player = isVs() ? randomFirst() : 1;
+    lastDropper = player;
     stacked = 0;
     maxHeight = 0;
     droppedShape = null;
@@ -182,7 +184,13 @@
     applySettings();
     Sound.startBgm();
     updateHud();
-    if (isVs()) showTurnBanner();
+    if (isVs()) showTurnBanner(true);
+    if (isCpuTurn()) runCpuTurn(); // CPU が先攻
+  }
+
+  // 先攻を決める（1 か 2）
+  function randomFirst() {
+    return Math.random() < 0.5 ? 1 : 2;
   }
 
   // 対戦か（ともだちと・CPUと・オンライン）
@@ -411,9 +419,10 @@
   function startOnlineHost() {
     if (!online) return;
     online.gameNo = (online.gameNo || 0) + 1; // 何回目のゲームか（前のゲームのメッセージと区別する）
-    sendImportant({ t: "start", g: online.gameNo, names: online.names });
-    startGame("online");
-    Game.setInputEnabled(true); // ホストが先攻
+    startGame("online"); // ここで先攻が決まる
+    // 先攻（p）もゲストに知らせる
+    sendImportant({ t: "start", g: online.gameNo, names: online.names, p: player });
+    Game.setInputEnabled(!isRemoteTurn()); // 相手が先攻なら、相手の番が終わるまで操作できない
     // 状態をゲストに送る。直接つながっていれば1秒に20回、
     // 中継サーバー経由なら1秒に10回（公開サーバーに負担をかけすぎないように）
     clearInterval(sendTimer);
@@ -431,7 +440,7 @@
       if (msg.g === online.gameNo) return; // 同じ開始の知らせが重ねて届いた
       online.gameNo = msg.g;
       online.names = Object.assign(online.names, msg.names, { 2: Save.playerName(1) });
-      startOnlineGuest();
+      startOnlineGuest(msg.p);
     } else if (msg.t === "s" && mode === "online") {
       if (msg.g !== online.gameNo) return; // 前のゲームの状態
       // 積んだ数・高さ・手番は、状態のメッセージでも受け取る（「turn」を取りこぼしても合うように）
@@ -475,12 +484,13 @@
   }
 
   // ゲスト：オンライン対戦を始める（物理計算はせず、届いた状態を描く）
-  function startOnlineGuest() {
+  // first: ホストが決めた先攻（1 か 2。古いバージョンのホストからは届かないので、そのときは 1）
+  function startOnlineGuest(first) {
     mode = "online";
     ruleId = null;
     cpuLevel = null;
     gameToken++;
-    player = 1;
+    player = first === 2 ? 2 : 1;
     stacked = 0;
     maxHeight = 0;
     online.countedTurns = 0; // 手番の交代を数えなおす（重ねて届いた知らせを見分けるため）
@@ -495,7 +505,7 @@
     Game.setInputEnabled(true);
     Sound.startBgm();
     updateHud();
-    showTurnBanner();
+    showTurnBanner(true);
     // 自分の手番の間、持っているキャラの位置と角度をホストに送る（相手の画面に映すため）
     clearInterval(sendTimer);
     lastPoseSent = "";
@@ -562,10 +572,10 @@
     UI.toast(`<span class="toast-sky">${stage.icon || ""} <b>${UI.escape(stage.name)}</b>に到達！</span>`);
   }
 
-  // 「〇〇 の番」を大きく表示する
-  function showTurnBanner() {
+  // 「〇〇 の番」を大きく表示する（ゲームの最初は「〇〇 の先攻！」）
+  function showTurnBanner(first = false) {
     const el = $("turn-banner");
-    el.textContent = `${nameOf(player)} の番`;
+    el.textContent = first ? `${nameOf(player)} の先攻！` : `${nameOf(player)} の番`;
     el.className = `p${player}`;
     // アニメーションを最初から再生しなおすためのおまじない
     el.style.animation = "none";
@@ -600,6 +610,11 @@
         `<div>ハイスコア<b>${best.score}</b></div>` +
         `</div>`;
       UI.countUp($("result-score-num"), score, 900);
+      // ランキング（ふつうのルールだけ）：スコアを見てもらってから、送る（初めてなら送っていいか聞く）。
+      // すぐに「もう一度」を押したときは聞かずに、次の機会に聞く
+      if (!ruleId) {
+        setTimeout(() => (UI.current === "result" ? Ranking.afterSoloGame() : Ranking.submitBest()), 1500);
+      }
       if (isNew) {
         Sound.play("record");
         UI.confetti(["#ffd84d", "#ff7a59", "#4cd964", "#3d8bff", "#ff5d73"]);

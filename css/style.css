@@ -2343,3 +2343,32 @@ select {
   font-size: 11px;
   vertical-align: middle;
 }
+
+/* ランキング：自分の行 */
+.rank-row.rank-me {
+  outline: 3px solid var(--color-primary);
+  outline-offset: -3px;
+}
+
+.rank-you {
+  display: inline-block;
+  margin-left: var(--space-xs);
+  padding: 0 8px;
+  border-radius: var(--radius-round);
+  color: #fff;
+  background: var(--color-primary);
+  font-size: 11px;
+  font-style: normal;
+  vertical-align: middle;
+}
+
+.my-rank {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.my-rank b {
+  color: var(--color-gold);
+}

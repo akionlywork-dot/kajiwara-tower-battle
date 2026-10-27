@@ -45,6 +45,13 @@ const Save = (() => {
       },
       // お知らせ：最後に読んだお知らせの id
       news: { lastReadId: 0 },
+      // ランキング（オンライン）
+      ranking: {
+        id: null, // この端末の番号（ランダム。ランキングで自分の行を見分ける）
+        asked: false, // 「ランキングに送りますか？」を聞いたか
+        sentScore: 0, // 最後に送ったスコア（これより高くなったら、また送る）
+        sentName: "", // 最後に送った名前（名前を変えたら、また送る）
+      },
       // 選んでいる背景と土台（config.js の themes の id）
       cosmetics: { background: "sky", platform: "wood" },
     };
