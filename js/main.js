@@ -874,6 +874,8 @@ ${location.origin}${location.pathname}`), "image/png");
       await shapesLoaded;
       showChallengePopup(received);
     } else News.popupIfUnread();
+    // ランキング：前からハイスコアがある人は、ここで載せる（送っていいか、初めてなら聞く）
+    shapesLoaded.then(() => Ranking.atStartup());
   });
 
   // characters.js に書いたキャラを全部読み込み、形（当たり判定）を作る

@@ -112,6 +112,25 @@ const Ranking = (() => {
   }
 
   // ---------- ハイスコアを送る ----------
+  // アプリを開いたとき（main.js から呼ばれる）：
+  // 前からハイスコアがある人には、遊ばなくても「送っていいか」を聞いて、自己ベストを載せる。
+  // 参加ずみの人は、前に送れなかった記録や、変えた名前を送りなおす
+  async function atStartup() {
+    if (!isOnline()) return;
+    if (!mem().asked && Save.data.stats.best) {
+      await waitTitle();
+      if (!mem().asked) return afterSoloGame(); // 待っているあいだに、ゲームのあとで聞いていなければ
+    }
+    return submitBest();
+  }
+
+  // タイトル画面で、ほかのポップアップ（お知らせ・挑戦状など）が出ていないときまで待つ
+  async function waitTitle() {
+    while (UI.current !== "title" || document.querySelector(".dialog.active") || !$("splash").classList.contains("hidden")) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
   // ひとりモード（ふつうのルール）が終わったときに main.js から呼ばれる。
   // 初めてなら「送ってもいいか」を聞く。自己ベストが前に送ったものより高いか、名前が変わったときだけ送る
   async function afterSoloGame() {
@@ -120,7 +139,7 @@ const Ranking = (() => {
       mem().asked = true;
       Save.write();
       const yes = await UI.confirm(
-        `ハイスコアを、みんなのランキングに自動で送りますか？\n\n送るもの：名前「${Save.playerName(1)}」・スコア・積んだ数・高さ\n名前はランキングで公開されます。写真は送りません。\n（設定画面でいつでも変えられます）`,
+        `あなたのハイスコア（${Save.data.stats.best.score}点）を、みんなのランキングに載せますか？\nこれからも、自己ベストを更新したら自動で送ります。\n\n送るもの：名前「${Save.playerName(1)}」・スコア・積んだ数・高さ\n名前はランキングで公開されます。写真は送りません。\n（設定画面でいつでも変えられます）`,
         "送る",
         true,
         "送らない"
@@ -154,5 +173,5 @@ const Ranking = (() => {
     }
   }
 
-  return { init, afterSoloGame, submitBest };
+  return { init, atStartup, afterSoloGame, submitBest };
 })();
