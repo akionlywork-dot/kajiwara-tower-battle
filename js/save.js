@@ -9,7 +9,7 @@ const Save = (() => {
   const KEY = "stack.save";
   // 保存データの形のバージョン。データの形を変えたら数字を1つ上げ、
   // 下の migrate() に「古い形 → 新しい形」に直す処理を足す
-  const VERSION = 1;
+  const VERSION = 2; // 2：図鑑を、画像のファイル名ではなくキャラの ID で記録するように
   // バックアップファイルの目印（このゲームのファイルかどうかの確認に使う）
   const APP_ID = "kajiwara-tower-battle";
 
@@ -23,7 +23,7 @@ const Save = (() => {
         icon: null, // アイコン画像（256px の JPEG を文字列にしたもの）
         titleId: null, // 名前の横に表示する称号（実績の id）
       },
-      // キャラ図鑑：積んだことのあるキャラのファイル名 → 初めて積んだ日時
+      // キャラ図鑑：積んだことのあるキャラの ID（例 "chara03"）→ 初めて積んだ日時
       dex: {},
       // 実績：達成した実績の id → 達成した日時
       achievements: {},
@@ -64,7 +64,15 @@ const Save = (() => {
   // （例：バージョン2で項目の名前を変えたら、ここに「if (saved.version < 2) { ... }」を足す）
   function migrate(saved) {
     if (!saved.version) saved.version = 1; // バージョン番号が無いのは、最初の形（バージョン1）
-    // 今はバージョン1だけなので、直す処理はまだ無い
+    // 1 → 2：図鑑の記録を「画像のファイル名」から「キャラの ID」に直す
+    //   （"images/chara03.webp" → "chara03"。同じ画像を使う★4のキャラと見分けるため）
+    if (saved.version < 2 && saved.dex && typeof saved.dex === "object") {
+      const dex = {};
+      for (const [key, date] of Object.entries(saved.dex)) {
+        dex[key.includes("/") ? Chars.idFromFile(key) : key] = date;
+      }
+      saved.dex = dex;
+    }
     saved.version = VERSION;
     return saved;
   }

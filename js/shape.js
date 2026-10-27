@@ -373,13 +373,17 @@ const Shape = (() => {
     return body;
   }
 
-  // characters.js の1行から、当たり判定の設定（tolerance / smooth / hull / base）だけを取り出す
-  // 書いていない項目は DEFAULTS の値が使われる
+  // characters.js の1行から、当たり判定の設定（tolerance / smooth / hull / feet）だけを取り出す
+  // 書いていない項目は DEFAULTS の値が使われる。
+  // 足の裏を平らにする範囲は feet に書く（前の書き方の「base: 数」も使える。
+  // 「base: "画像の場所"」は、別のキャラの画像を使う書き方なので、ここでは使わない）
   function optionsFrom(c) {
     const options = {};
-    for (const key of ["tolerance", "smooth", "hull", "base"]) {
+    for (const key of ["tolerance", "smooth", "hull"]) {
       if (c[key] !== undefined) options[key] = c[key];
     }
+    if (typeof c.feet === "number") options.base = c.feet;
+    else if (typeof c.base === "number") options.base = c.base;
     return options;
   }
 
@@ -387,7 +391,7 @@ const Shape = (() => {
   // 一度作ったものは覚えておき、同じ倍率なら使い回す
   const scaledCache = new Map();
   function scaled(shape, scale) {
-    const key = shape.file + "@" + scale;
+    const key = (shape.id || shape.file) + "@" + scale;
     if (!scaledCache.has(key)) {
       const mul = (p) => ({ x: p.x * scale, y: p.y * scale });
       scaledCache.set(

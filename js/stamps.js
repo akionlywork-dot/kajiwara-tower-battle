@@ -20,11 +20,10 @@ const Stamps = (() => {
   let coolUntil = 0;
   let pickingSlot = -1; // 選ぶ画面で、どの枠を選んでいるか
 
-  // キャラの ID（"images/chara03.webp" → "chara03"）
-  const idOf = (file) => String(file).replace(/^.*\//, "").replace(/\.[^.]+$/, "");
-  const byId = (id) => window.CHARACTERS.find((c) => idOf(c.file) === id) || null;
+  // キャラは ID で見分ける（chars.js）
+  const byId = (id) => Chars.byId(id);
   const saved = () => Save.data.stamps;
-  const isUnlocked = (c) => !!Save.data.dex[c.file];
+  const isUnlocked = (c) => !!Save.data.dex[c.id];
   const defaults = () => ((window.GAME_CONFIG.stamps || {}).defaults || []);
 
   function init() {
@@ -85,7 +84,7 @@ const Stamps = (() => {
         const open = isUnlocked(c);
         return `
           <button class="stamp-choice ${open ? "" : "locked"} ${current === c && !isDefault(slot) ? "selected" : ""}"
-                  data-stamp="${UI.escape(idOf(c.file))}" ${open ? "" : "disabled"} aria-label="${open ? UI.escape(c.name) : "まだ図鑑にいないキャラ"}">
+                  data-stamp="${UI.escape(c.id)}" ${open ? "" : "disabled"} aria-label="${open ? UI.escape(c.name) : "まだ図鑑にいないキャラ"}">
             <img src="${UI.escape(c.file)}" alt="">
           </button>`;
       })
@@ -118,7 +117,7 @@ const Stamps = (() => {
     $("stamp-status").textContent = "";
     $("stamp-buttons").innerHTML = Array.from({ length: SLOTS }, (_, i) => slotChar(i))
       .filter(Boolean)
-      .map((c) => `<button class="stamp-send" data-stamp="${UI.escape(idOf(c.file))}" aria-label="${UI.escape(c.name)}"><img src="${UI.escape(c.file)}" alt=""></button>`)
+      .map((c) => `<button class="stamp-send" data-stamp="${UI.escape(c.id)}" aria-label="${UI.escape(c.name)}"><img src="${UI.escape(c.file)}" alt=""></button>`)
       .join("");
     updateBar();
   }
@@ -179,5 +178,5 @@ const Stamps = (() => {
     setTimeout(() => el.remove(), SHOW_TIME);
   }
 
-  return { init, renderSlots, begin, end, peerLeft, receive, idOf };
+  return { init, renderSlots, begin, end, peerLeft, receive };
 })();

@@ -99,6 +99,11 @@ const Sound = (() => {
     } else if (name === "rare") {
       // キラキラーン（高い音が駆け上がる）
       [784, 988, 1175, 1568, 1976].forEach((f, i) => tone("sine", f, f, t + i * 0.06, i === 4 ? 0.5 : 0.12, 0.2, seGain));
+    } else if (name === "ultimate") {
+      // ★4：ドーン（低い音）→ 駆け上がる音 → キラキラの和音
+      tone("sawtooth", 110, 55, t, 0.5, 0.25, seGain);
+      [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone("triangle", f, f, t + 0.08 + i * 0.07, 0.14, 0.22, seGain));
+      [1047, 1319, 1568, 2093].forEach((f) => tone("sine", f, f * 1.01, t + 0.55, 0.9, 0.12, seGain));
     } else if (name === "record") {
       // ハイスコア更新のファンファーレ
       [523, 659, 784, 1047].forEach((f, i) => tone("triangle", f, f, t + i * 0.12, i === 3 ? 0.6 : 0.14, 0.25, seGain));

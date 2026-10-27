@@ -167,7 +167,7 @@ const Admin = (() => {
     const current = select.value;
     select.innerHTML =
       `<option value="">ランダム（ふつう）</option>` +
-      window.CHARACTERS.map((c) => `<option value="${UI.escape(c.file)}">${UI.escape(c.name)}</option>`).join("");
+      window.CHARACTERS.map((c) => `<option value="${UI.escape(c.id)}">${UI.escape(c.name)}（${UI.escape(c.rarity || "N")}）</option>`).join("");
     select.value = current;
     renderNet();
   }

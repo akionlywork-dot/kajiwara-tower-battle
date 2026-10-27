@@ -3,7 +3,7 @@
 // =============================================
 window.GAME_CONFIG = {
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v1.5.1",
+  version: "v1.6.0",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -138,6 +138,8 @@ window.GAME_CONFIG = {
     N: { name: "ノーマル", weight: 10, color: "#b9c4d6", stars: 1 },
     R: { name: "レア", weight: 4, color: "#3d9bff", stars: 2 },
     SR: { name: "スーパーレア", weight: 1, color: "#ffc21a", stars: 3 },
+    // ★4：オーラをまとったキャラ（characters.js の aura）。出ると「アルティメット！！！」
+    UR: { name: "アルティメット", weight: 0.5, color: "#ff5ec8", stars: 4 },
   },
 
   // CPU対戦の強さ（ふたりで → CPUと）
@@ -219,6 +221,7 @@ window.GAME_CONFIG = {
     rare: "", // レアキャラが出たとき
     click: "", // メニューのボタンを押したとき
     stamp: "", // スタンプを送った・届いたとき
+    ultimate: "", // ★4（アルティメット）が出たとき
     bgm: "", // BGM（くり返し再生される）
   },
 };

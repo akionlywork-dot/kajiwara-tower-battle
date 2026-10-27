@@ -68,6 +68,7 @@ const Game = (() => {
   let turnLimit = 0; // 1手の制限時間（ミリ秒）。0 なら制限なし
 
   let lastTime = 0;
+  let frameDt = 0; // 前のフレームからの秒数（オーラの粒を出す量に使う。ポーズ中は 0）
   let acc = 0;
 
   // タイトル画面のデモの状態（デモ中でなければ null）
@@ -149,6 +150,7 @@ const Game = (() => {
     });
 
     camY = camTargetY = 0;
+    Aura.clear(); // 前のゲームのオーラの粒を消す
     peakHeight = skyHeight = 0;
     skyStage = 0;
     simTime = 0;
@@ -275,14 +277,15 @@ const Game = (() => {
     }
   }
 
-  // config.js の sequence（ファイル名で指定）を、形データの並びに変換する
+  // config.js の sequence（ファイル名か id で指定）を、形データの並びに変換する
   // 見つからないキャラは飛ばす。sequence が空なら、ランダムに8体選ぶ
   function buildDemoSequence(list) {
     const seq = [];
     for (const item of list || []) {
-      const shape = shapes.find((s) => s.file === item.file);
+      // ファイル名で書いたときは、その画像の元のキャラ（★4のオーラ版ではなく）
+      const shape = item.id ? shapeById(item.id) : shapes.find((s) => s.file === item.file && !s.shared);
       if (shape) seq.push({ shape, x: item.x || 0, angle: ((item.angle || 0) * Math.PI) / 180 });
-      else console.warn("デモのキャラが見つかりません:", item.file);
+      else console.warn("デモのキャラが見つかりません:", item.id || item.file);
     }
     if (!seq.length) {
       for (let i = 0; i < 8; i++) seq.push({ shape: randomShape(), x: 0, angle: Math.PI / 2 });
@@ -389,14 +392,14 @@ const Game = (() => {
   }
 
   // 次のキャラをランダムに選んで、画面上部に持たせる
-  // 管理者モード：次に出すキャラを決めておく（ファイル名。null ならふつうにランダム）
-  let forcedFile = null;
-  function setForcedShape(file) {
-    forcedFile = file;
+  // 管理者モード：次に出すキャラを決めておく（キャラの ID。null ならふつうにランダム）
+  let forcedId = null;
+  function setForcedShape(id) {
+    forcedId = id;
   }
 
   function nextPiece() {
-    const forced = forcedFile && shapes.find((s) => s.file === forcedFile);
+    const forced = forcedId && shapeById(forcedId);
     held = { shape: ruleShape(forced || randomShape()), x: WORLD_W / 2, angle: 0 };
     clampHeld();
     state = "aim";
@@ -487,14 +490,15 @@ const Game = (() => {
     state = "remote";
   }
 
-  const shapeByFile = (file) => shapes.find((s) => s.file === file) || shapes[0];
+  // ID のキャラの形（知らない ID なら null。相手が新しいキャラのあるバージョンでも、落ちないように）
+  const shapeById = (id) => shapes.find((s) => s.id === id) || null;
   const round = (v, k) => Math.round(v * k) / k;
 
   // ホスト：今の状態を書き出す（小さく送れるよう、数字の配列にする）
   function snapshot() {
     return {
-      b: pieces().map((b) => [b.id, b.shape.file, round(b.position.x, 10), round(b.position.y - platformTop, 10), round(b.angle, 1000)]),
-      h: held && state === "aim" ? [held.shape.file, round(held.x, 10), round(held.angle, 1000)] : null,
+      b: pieces().map((b) => [b.id, b.shape.id, round(b.position.x, 10), round(b.position.y - platformTop, 10), round(b.angle, 1000)]),
+      h: held && state === "aim" ? [held.shape.id, round(held.x, 10), round(held.angle, 1000)] : null,
     };
   }
 
@@ -503,14 +507,16 @@ const Game = (() => {
     if (!remote) return;
     const seen = new Set();
     let top = platformTop;
-    for (const [id, file, x, yRel, a] of snap.b) {
-      seen.add(id);
+    for (const [id, charId, x, yRel, a] of snap.b) {
       const y = yRel + platformTop;
       let r = remoteBodies.get(id);
       if (!r) {
-        r = { shape: shapeByFile(file), x, y, angle: a };
+        const shape = shapeById(charId);
+        if (!shape) continue; // 知らないキャラは描かない
+        r = { shape, x, y, angle: a };
         remoteBodies.set(id, r);
       }
+      seen.add(id);
       r.tx = x;
       r.ty = y;
       r.ta = a;
@@ -530,8 +536,9 @@ const Game = (() => {
       return;
     }
     if (awaitingDrop) return; // 自分が落としたキャラが、まだホストで落ちていない
-    const [file, x, angle] = snap.h;
-    const shape = shapeByFile(file);
+    const [charId, x, angle] = snap.h;
+    const shape = shapeById(charId);
+    if (!shape) return; // 知らないキャラ
     if (myTurn) {
       // 自分の手番：最初の1回だけ受け取り、あとは自分の指で動かす
       if (!held || held.shape !== shape || state !== "aim") {
@@ -709,6 +716,9 @@ const Game = (() => {
     requestAnimationFrame(loop);
     moveClouds(Math.min(time - lastTime, 100) / 1000);
     stepTitleFx(Math.min(time - lastTime, 100) / 1000);
+    // オーラの粒を動かす（ポーズ中・フォトモード中は止める）
+    frameDt = engine && !paused ? Math.min(time - lastTime, 100) / 1000 : 0;
+    Aura.update(frameDt);
     if (engine && !paused) {
       // 画面のリフレッシュレート（60Hz/120Hz）に関係なく、一定の速さで物理演算を進める
       acc += Math.min(time - lastTime, 100);
@@ -881,14 +891,15 @@ const Game = (() => {
     drawPillar();
     drawPlatform();
 
-    // 積まれたキャラ（落ちている途中のレアキャラは光らせる）
+    // 積まれたキャラ（レアキャラは、落ちている途中は強く、積んだあとは控えめにオーラを出す）
+    if (withUI) Aura.drawSmoke(ctx); // 闇のオーラのもやは、キャラの後ろに
     if (engine) {
       for (const b of pieces()) {
-        const glow = state !== "demo" && b === dropped && !b.landed ? rareInfo(b.shape) : null;
-        drawSprite(b.shape, b.position.x, b.position.y, b.angle, 1, glow);
+        const falling = state !== "demo" && b === dropped && !b.landed;
+        drawSprite(b.shape, b.position.x, b.position.y, b.angle, 1, falling ? "strong" : "rest", withUI);
       }
       // ゲスト：ホストから届いた位置のキャラ
-      if (remote) for (const r of remoteBodies.values()) drawSprite(r.shape, r.x, r.y, r.angle, 1);
+      if (remote) for (const r of remoteBodies.values()) drawSprite(r.shape, r.x, r.y, r.angle, 1, "rest", withUI);
     }
     // 地面はキャラより手前に描く（落ちたキャラが地面の向こうに消えていくように）
     drawGround();
@@ -911,14 +922,12 @@ const Game = (() => {
       ctx.lineTo(held.x, platformTop);
       ctx.stroke();
       ctx.setLineDash([]);
-      const rare = rareInfo(held.shape);
-      drawSprite(held.shape, held.x, y, held.angle, 1, rare);
-      if (rare && rare.stars >= 3) addSparkles(held.x, y, held.shape); // スーパーレアはキラキラ
+      drawSprite(held.shape, held.x, y, held.angle, 1, "strong", true); // 持っている間は、オーラを強く
       if (debug) drawHeldDebug(held, y);
       drawTimer(held.x, y);
     }
 
-    drawSparkles();
+    Aura.drawFront(ctx); // オーラの粒（光の粒・もや・キラッ）と稲妻
     if (debug) drawDebug();
     ctx.restore();
     ctx = prevCtx;
@@ -1397,60 +1406,19 @@ const Game = (() => {
   }
 
   // 画像を、重心 (x, y) を中心に angle だけ回して描く
-  // glow にレア度の情報を渡すと、その色でキャラの形に沿って光らせる
-  function drawSprite(shape, x, y, angle, alpha, glow) {
+  // aura：レア度のオーラの強さ（"strong"＝持っている間・落ちている間 / "rest"＝積んだあと / null＝なし）。
+  // オーラの光は aura.js が、一度作った画像を貼るだけなので軽い。
+  // emit が true なら、オーラの粒（光の粒・もや・キラッ）も出す（ゲーム画面だけ。写真・画像には出さない）
+  function drawSprite(shape, x, y, angle, alpha, aura, emit) {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(x, y);
     ctx.rotate(angle);
-    if (glow) {
-      // 影をぼかして光に見せる。時間でふわふわ強さを変える
-      ctx.shadowColor = glow.color;
-      ctx.shadowBlur = 16 + 8 * Math.sin(performance.now() / 180);
-      // 画像の左上は「重心から com だけ左上」にある
-      ctx.drawImage(shape.img, -shape.com.x, -shape.com.y, shape.w, shape.h);
-      ctx.shadowBlur *= 0.5; // 2回重ねて、光を濃くする
-    }
+    if (aura) Aura.drawBack(ctx, shape, aura);
+    // 画像の左上は「重心から com だけ左上」にある
     ctx.drawImage(shape.img, -shape.com.x, -shape.com.y, shape.w, shape.h);
     ctx.restore();
-  }
-
-  // ---------- キラキラ（スーパーレアの演出） ----------
-  const sparkles = []; // { x, y, vx, vy, life, size }
-
-  // キャラのまわりに、キラキラを少しずつ出す
-  function addSparkles(x, y, shape) {
-    if (reducedMotion.matches || Math.random() > 0.35) return;
-    const r = Math.max(shape.w, shape.h) * 0.55;
-    const a = Math.random() * Math.PI * 2;
-    sparkles.push({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, vx: (Math.random() - 0.5) * 0.6, vy: -0.4 - Math.random() * 0.6, life: 1, size: 3 + Math.random() * 4 });
-  }
-
-  // キラキラを描く（少しずつ上に流れて、消えていく）
-  function drawSparkles() {
-    for (let i = sparkles.length - 1; i >= 0; i--) {
-      const s = sparkles[i];
-      s.x += s.vx;
-      s.y += s.vy;
-      s.life -= 0.02;
-      if (s.life <= 0) {
-        sparkles.splice(i, 1);
-        continue;
-      }
-      // 4つのとんがりがある星の形
-      ctx.save();
-      ctx.globalAlpha = s.life;
-      ctx.fillStyle = "#fff6c2";
-      ctx.translate(s.x, s.y);
-      ctx.beginPath();
-      for (let k = 0; k < 8; k++) {
-        const rr = k % 2 === 0 ? s.size : s.size * 0.3;
-        const ang = (k * Math.PI) / 4;
-        ctx.lineTo(Math.cos(ang) * rr, Math.sin(ang) * rr);
-      }
-      ctx.fill();
-      ctx.restore();
-    }
+    if (aura && emit) Aura.emit(shape, x, y, angle, aura, frameDt);
   }
 
   // デバッグ：当たり判定の線と重心を表示

@@ -174,7 +174,7 @@
         onLand: () => playSe("place"),
         onRare: (shape, info) => {
           showRareBanner(shape, info);
-          if (mode === "online") Online.send({ t: "rare", f: shape.file });
+          if (mode === "online") Online.send({ t: "rare", id: shape.id });
         },
         onSettled: onSettled,
         onSkyStage: showSkyStage,
@@ -212,7 +212,7 @@
     stacked++;
     maxHeight = Math.max(maxHeight, stats.height);
     Records.addPiece();
-    if (droppedShape) Dex.register(droppedShape.file);
+    if (droppedShape) Dex.register(droppedShape.id);
     Achievements.check(gameStatus()); // 「10体積んだ」などの実績を、ゲーム中に判定する
     if (isVs()) {
       player = player === 1 ? 2 : 1; // 手番を交代
@@ -220,7 +220,7 @@
     }
     // オンライン対戦（ホスト）：相手に手番の交代を知らせる
     if (mode === "online") {
-      sendImportant({ t: "turn", g: online.gameNo, p: player, n: stacked, h: maxHeight, f: droppedShape ? droppedShape.file : null });
+      sendImportant({ t: "turn", g: online.gameNo, p: player, n: stacked, h: maxHeight, id: droppedShape ? droppedShape.id : null });
     }
     Game.nextPiece();
     updateHud();
@@ -297,7 +297,7 @@
     setTimeout(() => Online.send(msg), 300);
     setTimeout(() => Online.send(msg), 900);
   }
-  let shapesByFile = {}; // ファイル名 → キャラの形（ゲストがレア演出を出すときに使う）
+  let shapesById = {}; // キャラの ID → キャラの形（ゲストがレア演出を出すときに使う）
   const click = (id, fn) => $(id).addEventListener("click", fn);
 
   // 相手の手番か
@@ -477,7 +477,7 @@
       stacked = Math.max(stacked, msg.n);
       maxHeight = Math.max(maxHeight, msg.h);
       Records.addPiece();
-      if (msg.f) Dex.register(msg.f);
+      if (msg.id) Dex.register(msg.id); // 知らない ID なら何もしない
       Achievements.check(gameStatus());
       updateHud();
     } else if (msg.t === "stamp") {
@@ -489,7 +489,7 @@
     } else if (msg.t === "se") {
       Sound.play(msg.name);
     } else if (msg.t === "rare") {
-      const shape = shapesByFile[msg.f];
+      const shape = shapesById[msg.id]; // 知らない ID なら出さない
       if (shape) showRareBanner(shape, CONFIG.rarity[shape.rarity]);
     } else if (msg.t === "over") {
       if (msg.g !== online.gameNo || online.overShown === msg.g) return; // 重ねて届いた
@@ -575,15 +575,24 @@
   }
 
   // レアキャラが出たときの「レア！」「スーパーレア！！」
+  // ★4（アルティメット）は、専用のバナーと、画面が一瞬光る演出と、専用の効果音
   function showRareBanner(shape, info) {
     const el = $("rare-banner");
-    el.innerHTML = `<span>${info.stars >= 3 ? "スーパーレア！！" : "レア！"}</span><small>${UI.escape(shape.name)}</small>`;
+    const ultimate = info.stars >= 4;
+    const label = ultimate ? "アルティメット！！！" : info.stars >= 3 ? "スーパーレア！！" : "レア！";
+    el.innerHTML = `<span>${label}</span><small>${UI.escape(shape.name)}</small>`;
     el.style.setProperty("--rare-color", info.color);
-    el.className = info.stars >= 3 ? "rare-banner super" : "rare-banner";
+    el.className = ultimate ? `rare-banner ultimate aura-${shape.aura || "light"}` : info.stars >= 3 ? "rare-banner super" : "rare-banner";
     el.style.animation = "none"; // アニメーションを最初から
     void el.offsetWidth;
     el.style.animation = "";
-    Sound.play("rare");
+    if (ultimate) {
+      const flash = $("flash");
+      flash.className = "";
+      void flash.offsetWidth;
+      flash.className = "on";
+    }
+    Sound.play(ultimate ? "ultimate" : "rare");
   }
 
   // 塔が高くなって、新しい背景に届いた（config.js の sky）
@@ -1006,12 +1015,20 @@ ${location.origin}${location.pathname}`), "image/png");
     $("loading-bar-fill").style.width = `${(done / total) * 100}%`;
   };
   showProgress();
+  // 同じ画像（★4のオーラ版など）の形は1回だけ作って、使い回す
+  const shapeCache = {};
   const results = await Promise.all(
     window.CHARACTERS.map(async (c) => {
       try {
-        const shape = await Shape.create(c.file, c.size || DEFAULT_SIZE, Shape.optionsFrom(c));
+        const options = Shape.optionsFrom(c);
+        const key = `${c.file}|${c.size || DEFAULT_SIZE}|${JSON.stringify(options)}`;
+        if (!shapeCache[key]) shapeCache[key] = Shape.create(c.file, c.size || DEFAULT_SIZE, options);
+        const shape = Object.assign({}, await shapeCache[key]);
+        shape.id = c.id; // キャラの ID（図鑑・スタンプ・オンライン対戦で、キャラを見分ける）
         shape.name = c.name;
-        shape.file = c.file; // タイトルのデモで、ファイル名からキャラを探すため
+        shape.file = c.file; // 画像の場所
+        shape.shared = c.shared; // 別のキャラの画像を使っているか（★4のオーラ版など）
+        shape.aura = c.aura && Aura.has(c.aura) ? c.aura : null; // オーラの種類（aura.js）
         shape.event = c.event || null; // 期間限定のキャラなら、イベントの id
         // レア度と出やすさ（characters.js の rarity・weight。無ければノーマル・config.js の値）
         shape.rarity = CONFIG.rarity[c.rarity] ? c.rarity : "N";
@@ -1044,7 +1061,7 @@ ${location.origin}${location.pathname}`), "image/png");
     $("notice").classList.remove("hidden");
   }
   Game.setShapes(shapes);
-  for (const s of shapes) shapesByFile[s.file] = s;
+  for (const s of shapes) shapesById[s.id] = s;
   shapesReady = true;
   if (UI.current === "title") Game.startDemo(CONFIG.titleDemo);
   $("btn-start").textContent = "スタート";

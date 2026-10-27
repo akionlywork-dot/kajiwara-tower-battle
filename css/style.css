@@ -2759,3 +2759,138 @@ select {
     animation: fade-in-out 1.2s ease forwards;
   }
 }
+
+/* =============================================
+   ★4（アルティメット）とオーラ
+   ============================================= */
+/* 出たときのバナー：光る帯が流れる、大きめの札 */
+.rare-banner.ultimate {
+  animation: rare-pop 2.2s ease-out forwards;
+}
+
+.rare-banner.ultimate span {
+  padding: 6px 26px;
+  font-size: 36px;
+  letter-spacing: 0.02em;
+  background: linear-gradient(100deg, #ff5ec8, #ffd34d 30%, #ffffff 45%, #ffd34d 60%, #8a3dff) 0 0 / 220% 100%;
+  box-shadow: 0 0 36px #ff5ec8, 0 0 70px rgba(255, 211, 77, 0.7);
+  animation: ultimate-shine 1s linear infinite;
+}
+
+.rare-banner.ultimate.aura-dark span {
+  background-image: linear-gradient(100deg, #2a0040, #8a3dff 30%, #e3ccff 45%, #8a3dff 60%, #14031f);
+  box-shadow: 0 0 36px #8a3dff, 0 0 70px rgba(20, 3, 31, 0.8);
+}
+
+@keyframes ultimate-shine {
+  from { background-position: 100% 0; }
+  to { background-position: -120% 0; }
+}
+
+/* 画面が一瞬、白く光る */
+#flash {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  background: radial-gradient(circle at 50% 30%, #ffffff, rgba(255, 245, 210, 0.85) 60%, rgba(255, 94, 200, 0.4));
+  opacity: 0;
+  pointer-events: none;
+}
+
+#flash.on {
+  animation: ultimate-flash 0.6s ease-out;
+}
+
+@keyframes ultimate-flash {
+  0% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+
+/* 図鑑のカードと詳細：★4のオーラを、キャラの後ろで動かす（opacity と transform だけ） */
+.aura-card {
+  position: relative;
+}
+
+.aura-card img {
+  position: relative;
+  z-index: 1;
+}
+
+.aura-card::before,
+.aura-card::after {
+  content: "";
+  position: absolute;
+  inset: 4% 12%;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* 光：白〜金の光が外へ広がる。光の粒が昇る */
+.aura-light::before {
+  background: radial-gradient(circle, rgba(255, 251, 232, 0.95) 0%, rgba(255, 201, 60, 0.55) 45%, transparent 70%);
+  animation: aura-light 1.8s ease-out infinite;
+}
+
+.aura-light::after {
+  z-index: 2;
+  background:
+    radial-gradient(circle, #fff 0 1.5px, transparent 2px) 20% 80% / 30% 40%,
+    radial-gradient(circle, #ffe9a3 0 1.5px, transparent 2px) 70% 60% / 35% 45%;
+  animation: aura-rise 2.4s linear infinite;
+}
+
+@keyframes aura-light {
+  0% { transform: scale(0.75); opacity: 1; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+
+@keyframes aura-rise {
+  0% { transform: translateY(20%); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: translateY(-30%); opacity: 0; }
+}
+
+/* 闇：紫〜黒のもやがゆらゆら。ときどき暗い光（稲妻）がはしる */
+.aura-dark::before {
+  background: radial-gradient(ellipse at 50% 60%, rgba(20, 3, 31, 0.85) 0%, rgba(138, 61, 255, 0.6) 40%, transparent 70%);
+  animation: aura-dark 2.6s ease-in-out infinite;
+}
+
+.aura-dark::after {
+  z-index: 2;
+  background: radial-gradient(ellipse, rgba(201, 164, 255, 0.7), transparent 60%);
+  opacity: 0;
+  animation: aura-bolt 3.2s steps(1) infinite;
+}
+
+@keyframes aura-dark {
+  0%, 100% { transform: scale(1, 1) translateY(0); opacity: 0.85; }
+  33% { transform: scale(1.08, 0.96) translateY(-4%); opacity: 1; }
+  66% { transform: scale(0.95, 1.08) translateY(-8%); opacity: 0.75; }
+}
+
+@keyframes aura-bolt {
+  0%, 70%, 76%, 100% { opacity: 0; }
+  72%, 78% { opacity: 1; }
+}
+
+/* 未登録のカード（シルエット）では、オーラは出さない */
+.dex-locked .aura-card::before,
+.dex-locked .aura-card::after {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rare-banner.ultimate span {
+    animation: none;
+  }
+
+  #flash.on {
+    animation: fade-in-out 0.6s ease;
+  }
+
+  .aura-card::before,
+  .aura-card::after {
+    animation: none;
+  }
+}

@@ -26,7 +26,8 @@
   async function render() {
     const grid = $("grid");
     grid.innerHTML = "";
-    for (const c of window.CHARACTERS) {
+    // ★4のオーラ版など、別のキャラの画像を使うキャラ（base）は、元のキャラと同じ形なので飛ばす
+    for (const c of window.CHARACTERS.filter((x) => !x.shared)) {
       // characters.js に設定が書いてあるキャラは、スライダーよりその値を優先
       const options = Object.assign(
         { tolerance: +$("tol").value, maxVertices: +$("maxv").value },
