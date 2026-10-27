@@ -64,7 +64,7 @@ const Themes = (() => {
   }
 
   // ---------- 選ぶ画面（プロフィール画面の中） ----------
-  // 見本を並べる。解放ずみはタップで選べる。未解放は鍵マークと解放条件
+  // 見本を3列に並べる。解放ずみはタップで選べる。未解放は鍵マークと解放条件（長いときは省略。タップで全文）
   function renderPicker(container, kind) {
     const now = current(kind);
     container.innerHTML = list(kind)
@@ -72,11 +72,8 @@ const Themes = (() => {
         const open = isUnlocked(def);
         return `
           <button class="theme-tile ${def.id === now.id ? "selected" : ""} ${open ? "" : "locked"}"
-                  data-kind="${kind}" data-id="${UI.escape(def.id)}" ${open ? "" : "disabled"}>
-            <span class="theme-preview" style="${previewStyle(kind, def)}">
-              ${kind === "platforms" ? `<i style="background:${def.body};border-top-color:${def.top}"></i>` : ""}
-              ${open ? "" : `<em>🔒</em>`}
-            </span>
+                  data-kind="${kind}" data-id="${UI.escape(def.id)}" aria-label="${UI.escape(def.name)}${open ? "" : "（" + UI.escape(conditionText(def)) + "）"}">
+            <span class="theme-preview"><img src="${previewImage(kind, def)}" alt="">${open ? "" : `<em>🔒</em>`}</span>
             <b>${UI.escape(def.name)}</b>
             ${open ? "" : `<small>${UI.escape(conditionText(def))}</small>`}
           </button>`;
@@ -84,13 +81,76 @@ const Themes = (() => {
       .join("");
   }
 
-  // 見本の見た目（背景は空のグラデーション、土台は空の上に台）
-  function previewStyle(kind, def) {
-    // 満月のある背景（ハロウィンの夜）は、見本にも月を描く
-    const moon = def.moon ? "radial-gradient(circle at 74% 26%, #fff4c8 0 13%, rgba(255,240,190,0.35) 14% 20%, transparent 21%), " : "";
-    if (kind === "backgrounds") return `background:${moon}linear-gradient(${def.top}, ${def.bottom} 70%, ${def.ground} 70%)`;
-    const bg = current("backgrounds");
-    return `background:linear-gradient(${bg.top}, ${bg.bottom})`;
+  // ---------- 見本の絵（ゲームと同じ描き方を小さくしたもの。1回作ったら使い回す） ----------
+  const PREVIEW_W = 160, PREVIEW_H = 90; // 見本の絵の大きさ（ピクセル。画面では小さく表示する）
+  const previews = new Map();
+
+  function previewImage(kind, def) {
+    const bg = kind === "backgrounds" ? def : current("backgrounds");
+    const key = `${kind}|${def.id}|${bg.id}`;
+    if (!previews.has(key)) {
+      const c = document.createElement("canvas");
+      c.width = PREVIEW_W;
+      c.height = PREVIEW_H;
+      const ctx = c.getContext("2d");
+      drawSkyPreview(ctx, bg, kind === "backgrounds");
+      if (kind === "platforms") drawPlatformPreview(ctx, def);
+      previews.set(key, c.toDataURL());
+    }
+    return previews.get(key);
+  }
+
+  // 空（グラデーション・星・月・雲）と地面。full が false なら、土台の見本の後ろ用に地面を低く
+  function drawSkyPreview(ctx, bg, full) {
+    const W = PREVIEW_W, H = PREVIEW_H;
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, bg.top);
+    g.addColorStop(1, bg.bottom);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    if (bg.stars) {
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      for (const [x, y] of [[14, 10], [40, 22], [70, 8], [104, 18], [130, 30], [150, 9], [24, 36]]) ctx.fillRect(x, y, 1.6, 1.6);
+    }
+    if (bg.moon) {
+      ctx.fillStyle = "rgba(255, 240, 190, 0.35)";
+      circle(ctx, 124, 24, 15);
+      ctx.fillStyle = "#fff4c8";
+      circle(ctx, 124, 24, 10);
+    }
+    ctx.fillStyle = bg.cloud;
+    for (const [x, y, s] of [[34, 26, 1], [96, 40, 0.8]]) {
+      circle(ctx, x, y, 8 * s);
+      circle(ctx, x - 8 * s, y + 3 * s, 6 * s);
+      circle(ctx, x + 9 * s, y + 2 * s, 6.5 * s);
+    }
+    // 地面（なだらかな丘）
+    const top = full ? H * 0.72 : H * 0.86;
+    ctx.fillStyle = bg.ground;
+    ctx.beginPath();
+    ctx.moveTo(0, top + 3);
+    ctx.quadraticCurveTo(W * 0.3, top - 4, W / 2, top);
+    ctx.quadraticCurveTo(W * 0.75, top + 3, W, top - 2);
+    ctx.lineTo(W, H);
+    ctx.lineTo(0, H);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 土台と柱（platform-art.js の絵を、そのまま小さくして貼る）
+  function drawPlatformPreview(ctx, def) {
+    const size = Game.platformSize;
+    const art = PlatformArt.build(def, size);
+    const s = 120 / size.w; // 土台の四角が、見本の横幅の 3/4 くらいになる倍率
+    const left = (PREVIEW_W - size.w * s) / 2, top = 34;
+    ctx.drawImage(art.pillar.canvas, PREVIEW_W / 2 - (art.pillar.w * s) / 2, top + size.h * s, art.pillar.w * s, art.pillar.h * s);
+    ctx.drawImage(art.platform.canvas, left + art.platform.x * s, top + art.platform.y * s, art.platform.w * s, art.platform.h * s);
+  }
+
+  function circle(ctx, x, y, r) {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   return { apply, select, renderPicker, notifyUnlocked };

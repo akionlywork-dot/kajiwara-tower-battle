@@ -1269,18 +1269,19 @@ select {
 /* 背景・土台を選ぶ見本 */
 .theme-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-s);
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
 }
 
 .theme-tile {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: var(--space-s);
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+  padding: 4px 4px 5px;
   border: 3px solid transparent;
-  border-radius: var(--radius-m);
+  border-radius: var(--radius-s);
   font-family: inherit;
   color: var(--color-text);
   background: var(--color-panel);
@@ -1288,7 +1289,7 @@ select {
   transition: transform var(--dur-press);
 }
 
-.theme-tile:active:not(:disabled) {
+.theme-tile:active {
   transform: scale(0.96);
 }
 
@@ -1296,49 +1297,55 @@ select {
   border-color: var(--color-gold);
 }
 
-.theme-tile.locked {
-  cursor: default;
-}
-
+/* 名前は1行（長いときは「…」） */
 .theme-tile b {
-  font-size: 14px;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
+/* 解放条件：見本の下に小さく1行。タップすると全文（.expanded） */
 .theme-tile small {
-  font-size: 10px;
+  overflow: hidden;
+  font-size: 9px;
   line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   opacity: 0.85;
 }
 
-/* 見本の絵（背景は空のグラデーション、土台は空の上に台） */
+.theme-tile.expanded small {
+  white-space: normal;
+}
+
+/* 見本の絵（ゲームと同じ描き方の土台・背景を、小さくした画像） */
 .theme-preview {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 64px;
-  border-radius: var(--radius-s);
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
   overflow: hidden;
 }
 
-.theme-preview i {
+.theme-preview img {
   position: absolute;
-  left: 20%;
-  right: 20%;
-  bottom: 14px;
-  height: 14px;
-  border-top: 5px solid;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 /* 未解放：見本を暗くして鍵マーク */
-.theme-tile.locked .theme-preview {
-  filter: grayscale(0.7) brightness(0.6);
+.theme-tile.locked .theme-preview img {
+  filter: grayscale(0.7) brightness(0.55);
 }
 
 .theme-preview em {
   position: relative;
-  font-size: 26px;
+  font-size: 18px;
   font-style: normal;
 }
 
@@ -3170,5 +3177,521 @@ select {
   .hw-bats span {
     left: auto;
     right: 12%;
+  }
+}
+
+/* =============================================
+   称号の枠（frames.js）
+   アイコンのまわりの枠（.frame-〇〇）と、称号の札（.title-badge.rank-〇〇）
+   bronze 銅 ／ silver 銀・角に飾り ／ gold 金・ときどき光が走る ／ legend 虹色 ／ event イベント専用
+   ============================================= */
+.avatar.frame {
+  position: relative;
+}
+
+/* 銅：細い銅色の枠 */
+.avatar.frame-bronze {
+  border-color: #cd8a4f;
+  box-shadow: 0 0 0 1.5px #7a4a22;
+}
+
+/* 銀：銀色の枠と、上下左右の小さなひし形 */
+.avatar.frame-silver {
+  border-color: #eef2f6;
+  box-shadow: 0 0 0 2px #9aa3ad;
+}
+
+.avatar.frame-silver::before,
+.avatar.frame-silver::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px #9aa3ad;
+  transform: rotate(45deg);
+}
+
+.avatar.frame-silver::before { top: -5px; left: calc(50% - 3.5px); }
+.avatar.frame-silver::after { bottom: -5px; left: calc(50% - 3.5px); }
+
+/* 金：金色の枠と、ときどき走る光（丸の中を、ななめの光が通る） */
+.avatar.frame-gold {
+  border-color: #ffd84d;
+  box-shadow: 0 0 0 2px #b8860b, 0 0 10px rgba(255, 216, 77, 0.65);
+}
+
+.avatar.frame-gold::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.75) 50%, transparent 60%) no-repeat;
+  background-size: 300% 100%;
+  background-position: 100% 0;
+  animation: frame-shine 4s ease-in-out infinite;
+}
+
+@keyframes frame-shine {
+  0%, 70% { background-position: 100% 0; }
+  100% { background-position: -50% 0; }
+}
+
+/* 伝説：虹色の輪が、ゆっくり回る（輪の形に切り抜いた虹を、回すだけ） */
+.avatar.frame-legend {
+  border-color: transparent;
+}
+
+.avatar.frame-legend::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: conic-gradient(#ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0, #ff5d73);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4.5px));
+  animation: frame-spin 6s linear infinite;
+}
+
+@keyframes frame-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* イベント（ハロウィン）：オレンジの枠と、かぼちゃ・こうもり */
+.avatar.frame-event {
+  border-color: #ff8a1f;
+  box-shadow: 0 0 0 2px #3b1458;
+}
+
+.avatar.frame-ev-halloween2026::before,
+.avatar.frame-ev-halloween2026::after {
+  position: absolute;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.avatar.frame-ev-halloween2026::before { content: "🎃"; right: -6px; bottom: -4px; }
+.avatar.frame-ev-halloween2026::after { content: "🦇"; left: -7px; top: -5px; }
+
+.avatar-xl.frame-ev-halloween2026::before,
+.avatar-xl.frame-ev-halloween2026::after {
+  font-size: 30px;
+}
+
+.avatar-xl.frame-silver::before,
+.avatar-xl.frame-silver::after {
+  width: 12px;
+  height: 12px;
+}
+
+.avatar-xl.frame-silver::before { top: -9px; left: calc(50% - 6px); }
+.avatar-xl.frame-silver::after { bottom: -9px; left: calc(50% - 6px); }
+
+/* 称号の札 */
+.title-badge {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  margin-top: 2px;
+  padding: 0 8px;
+  overflow: hidden;
+  border-radius: var(--radius-round);
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 1.6;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  color: var(--color-gold);
+}
+
+.title-badge.rank-bronze { color: #ffe6cc; background: #8a5428; box-shadow: inset 0 0 0 1px #cd8a4f; }
+.title-badge.rank-silver { color: #2b3a55; background: linear-gradient(#f6f8fb, #b8c0ca); box-shadow: inset 0 0 0 1px #ffffff; }
+.title-badge.rank-gold { color: #4a3500; background: linear-gradient(#ffe98a, #d4a019); }
+.title-badge.rank-legend {
+  color: #ffffff;
+  background: linear-gradient(90deg, #ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0, #ff5d73) 0 0 / 300% 100%;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  animation: badge-rainbow 6s linear infinite;
+}
+.title-badge.rank-event { color: #ffb15c; background: #3b1458; box-shadow: inset 0 0 0 1px #ff8a1f; }
+.title-badge.rank-ev-halloween2026::before { content: "🎃 "; }
+
+/* 金の札：ときどき光が走る */
+.title-badge.rank-gold::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.8) 50%, transparent 60%) no-repeat;
+  background-size: 300% 100%;
+  background-position: 100% 0;
+  animation: frame-shine 4s ease-in-out infinite;
+}
+
+@keyframes badge-rainbow {
+  to { background-position: 300% 0; }
+}
+
+/* タイトル画面左上・リザルトのバッジでは、札の上下を少しつめる */
+.profile-chip-text .title-badge,
+.player-badge .title-badge {
+  display: block;
+  width: fit-content;
+  margin-top: 2px;
+  font-size: 10px;
+}
+
+/* プロフィール画面：アイコンの下に称号の札 */
+.profile-avatar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-s);
+  max-width: 150px;
+}
+
+.profile-title-badge .title-badge {
+  font-size: 12px;
+}
+
+/* オンライン対戦のリザルト：相手の名前と称号の枠 */
+.opponent-badge {
+  margin-top: var(--space-m);
+}
+
+.opponent-badge > small {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.opponent-badge .player-badge {
+  margin-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar.frame-gold::after,
+  .avatar.frame-legend::before,
+  .title-badge.rank-legend,
+  .title-badge.rank-gold::after {
+    animation: none;
+  }
+}
+
+/* =============================================
+   オンライン対戦の、試合の前の対戦カード（vs-intro.js）
+   相手のカード（赤）は右上から、自分のカード（青）は左下から、ななめにすべり込む。
+   --vs-slide：すべり込む時間 / --vs-exit：抜けて消える時間（config.js の online から）
+   ============================================= */
+#vs-intro {
+  position: absolute;
+  inset: 0;
+  z-index: 36;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+#vs-intro .vs-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 16, 34, 0.74);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+#vs-intro.show .vs-dim {
+  opacity: 1;
+}
+
+#vs-intro.out .vs-dim {
+  opacity: 0;
+  transition-duration: var(--vs-exit);
+}
+
+#vs-intro.closed {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.vs-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-m);
+  padding: var(--space-m);
+}
+
+/* ---------- カード ---------- */
+.vs-card {
+  position: relative;
+  width: min(88%, 340px);
+  padding: 22px 14px 12px;
+  border: 3px solid rgba(255, 255, 255, 0.85);
+  border-radius: var(--radius-m);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+}
+
+.vs-card.vs-them {
+  align-self: flex-end;
+  background: linear-gradient(135deg, #ff6f82, #c2364b);
+}
+
+.vs-card.vs-me {
+  align-self: flex-start;
+  background: linear-gradient(135deg, #4f9bff, #2459a8);
+}
+
+/* 「あなた」「相手」の札 */
+.vs-side {
+  position: absolute;
+  top: -12px;
+  left: 14px;
+  padding: 1px 12px;
+  border-radius: var(--radius-round);
+  background: #fff;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 1.6;
+}
+
+.vs-them .vs-side {
+  color: #c2364b;
+}
+
+.vs-me .vs-side {
+  color: #2459a8;
+}
+
+.vs-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vs-avatar {
+  width: 52px;
+  height: 52px;
+  border-width: 3px;
+  font-size: 22px;
+}
+
+/* 名前と称号（長い称号は折り返す。切らない） */
+.vs-who {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.vs-who b {
+  font-size: 19px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.vs-who .title-badge {
+  white-space: normal;
+  text-align: left;
+}
+
+.vs-stats {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vs-stats li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  font-size: 13px;
+}
+
+.vs-stats li span {
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.vs-stats li b {
+  font-size: 15px;
+  text-align: right;
+}
+
+.vs-stats li small {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: normal;
+  opacity: 0.9;
+}
+
+/* ---------- 真ん中の「VS」 ---------- */
+.vs-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.vs-mark {
+  font-size: 76px;
+  line-height: 1;
+  font-style: italic;
+  color: var(--color-gold);
+  -webkit-text-stroke: 3px #5a3b00;
+  text-shadow: 0 5px 0 rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: scale(0);
+}
+
+.vs-mark.vs-round {
+  font-size: 54px;
+  font-style: normal;
+}
+
+.vs-note,
+.vs-names {
+  max-width: 100%;
+  padding: 2px 14px;
+  border-radius: var(--radius-round);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--color-text-dark);
+  font-size: 14px;
+  font-weight: bold;
+  overflow-wrap: anywhere;
+  opacity: 0;
+}
+
+.vs-names {
+  background: transparent;
+  color: #fff;
+  font-size: 16px;
+}
+
+.vs-names em {
+  font-style: normal;
+}
+
+.vs-name-me {
+  color: #8ec0ff;
+}
+
+.vs-name-them {
+  color: #ff9aa8;
+}
+
+/* ---------- 動き ---------- */
+/* すべり込む（勢いよく入って、少し行きすぎてから止まる） */
+#vs-intro.show .vs-them {
+  animation: vs-in-them var(--vs-slide) cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+#vs-intro.show .vs-me {
+  animation: vs-in-me var(--vs-slide) cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+@keyframes vs-in-them {
+  0% { opacity: 1; transform: translate(120%, -180%) rotate(8deg); }
+  70% { opacity: 1; transform: translate(-5%, 8%) rotate(-2deg); }
+  100% { opacity: 1; transform: translate(0, 0) rotate(0); }
+}
+
+@keyframes vs-in-me {
+  0% { opacity: 1; transform: translate(-120%, 180%) rotate(8deg); }
+  70% { opacity: 1; transform: translate(5%, -8%) rotate(-2deg); }
+  100% { opacity: 1; transform: translate(0, 0) rotate(0); }
+}
+
+/* VS が弾む・画面が少し揺れる */
+#vs-intro.hit .vs-mark {
+  animation: vs-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) forwards;
+}
+
+#vs-intro.hit .vs-note,
+#vs-intro.hit .vs-names {
+  animation: vs-fade 0.3s 0.15s ease forwards;
+}
+
+#vs-intro.hit .vs-stage {
+  animation: vs-shake 0.35s ease-out;
+}
+
+@keyframes vs-pop {
+  0% { opacity: 0; transform: scale(2.4); }
+  55% { opacity: 1; transform: scale(0.85); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes vs-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes vs-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-7px, 4px); }
+  40% { transform: translate(6px, -5px); }
+  60% { transform: translate(-4px, 3px); }
+  80% { transform: translate(2px, -1px); }
+}
+
+/* 来た方向へ抜けて消える */
+#vs-intro.out .vs-them {
+  opacity: 1;
+  animation: vs-out-them var(--vs-exit) ease-in forwards;
+}
+
+#vs-intro.out .vs-me {
+  opacity: 1;
+  animation: vs-out-me var(--vs-exit) ease-in forwards;
+}
+
+#vs-intro.out .vs-center {
+  opacity: 0;
+  transition: opacity var(--vs-exit) ease;
+}
+
+@keyframes vs-out-them {
+  from { transform: translate(0, 0); }
+  to { transform: translate(120%, -180%); }
+}
+
+@keyframes vs-out-me {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-120%, 180%); }
+}
+
+/* 「視差効果を減らす」が ON：すべり込みと揺れをやめて、フェードだけ */
+@media (prefers-reduced-motion: reduce) {
+  #vs-intro.show .vs-them,
+  #vs-intro.show .vs-me {
+    animation: vs-fade var(--vs-slide) ease forwards;
+  }
+
+  #vs-intro.hit .vs-mark {
+    transform: none;
+    animation: vs-fade 0.3s ease forwards;
+  }
+
+  .vs-mark {
+    transform: none;
+  }
+
+  #vs-intro.hit .vs-stage {
+    animation: none;
+  }
+
+  #vs-intro.out .vs-them,
+  #vs-intro.out .vs-me {
+    animation: vs-fade var(--vs-exit) ease reverse forwards;
   }
 }

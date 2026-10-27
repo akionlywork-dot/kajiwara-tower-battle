@@ -4,6 +4,7 @@
       "id": "first_stack",
       "name": "はじめの一歩",
       "title": "見習い",
+      "rank": "bronze",
       "description": "初めてキャラを積んだ",
       "condition": {
         "type": "count",
@@ -15,6 +16,7 @@
       "id": "versus_win1",
       "name": "初勝利",
       "title": "勝負師",
+      "rank": "bronze",
       "description": "2人対戦で初めて勝った（プレイヤー1）",
       "condition": {
         "type": "versusWins",
@@ -26,6 +28,7 @@
       "id": "stack10",
       "name": "10体積み",
       "title": "積み上げ名人",
+      "rank": "bronze",
       "description": "1回のゲームで10体積んだ",
       "condition": {
         "type": "count",
@@ -37,6 +40,7 @@
       "id": "stack20",
       "name": "20体積み",
       "title": "塔の職人",
+      "rank": "silver",
       "description": "1回のゲームで20体積んだ",
       "category": "積む",
       "condition": {
@@ -48,6 +52,7 @@
       "id": "stack30",
       "name": "30体積み",
       "title": "塔の神",
+      "rank": "legend",
       "description": "1回のゲームで30体積んだ",
       "category": "積む",
       "condition": {
@@ -59,6 +64,7 @@
       "id": "height3",
       "name": "高さ3m",
       "title": "高所の住人",
+      "rank": "bronze",
       "description": "タワーの高さが3mに届いた",
       "condition": {
         "type": "height",
@@ -70,6 +76,7 @@
       "id": "height5",
       "name": "高さ5m達成",
       "title": "天空の塔",
+      "rank": "silver",
       "description": "タワーの高さが5mに届いた",
       "condition": {
         "type": "height",
@@ -81,6 +88,7 @@
       "id": "height9",
       "name": "宇宙到達",
       "title": "宇宙飛行士",
+      "rank": "gold",
       "description": "タワーの高さが9m（宇宙）に届いた",
       "category": "高さ",
       "condition": {
@@ -92,6 +100,7 @@
       "id": "score1000",
       "name": "1000点突破",
       "title": "スコアラー",
+      "rank": "bronze",
       "description": "ひとりモードで1000点以上をとった",
       "condition": {
         "type": "score",
@@ -103,6 +112,7 @@
       "id": "score2000",
       "name": "2000点突破",
       "title": "ハイスコアラー",
+      "rank": "silver",
       "description": "ひとりモードで2000点以上をとった",
       "category": "スコア",
       "condition": {
@@ -114,6 +124,7 @@
       "id": "score3000",
       "name": "3000点突破",
       "title": "伝説のスコアラー",
+      "rank": "legend",
       "description": "ひとりモードで3000点以上をとった",
       "category": "スコア",
       "condition": {
@@ -125,6 +136,7 @@
       "id": "rule_all500",
       "name": "ルール制覇",
       "title": "オールラウンダー",
+      "rank": "gold",
       "description": "全部の特殊ルールで500点以上をとった",
       "category": "特殊ルール",
       "condition": {
@@ -137,6 +149,7 @@
       "id": "rule_wind1500",
       "name": "嵐を越えて",
       "title": "風使い",
+      "rank": "silver",
       "description": "特殊ルール「風」で1500点以上をとった",
       "category": "特殊ルール",
       "condition": {
@@ -149,6 +162,7 @@
       "id": "versus_win10",
       "name": "対戦10勝",
       "title": "対戦王",
+      "rank": "silver",
       "description": "2人対戦で10勝した（プレイヤー1）",
       "condition": {
         "type": "versusWins",
@@ -160,6 +174,7 @@
       "id": "cpu_hard_win",
       "name": "強敵撃破",
       "title": "挑戦者",
+      "rank": "silver",
       "description": "CPU「つよい」に勝った",
       "category": "CPU",
       "condition": {
@@ -172,6 +187,7 @@
       "id": "cpu_hard_streak3",
       "name": "無敗の王",
       "title": "CPUキラー",
+      "rank": "gold",
       "description": "CPU「つよい」に3連勝した",
       "category": "CPU",
       "condition": {
@@ -184,6 +200,7 @@
       "id": "online_win1",
       "name": "オンライン初勝利",
       "title": "ネットの勝負師",
+      "rank": "bronze",
       "description": "オンライン対戦で勝った",
       "category": "オンライン",
       "condition": {
@@ -195,6 +212,7 @@
       "id": "online_win10",
       "name": "オンライン10勝",
       "title": "全国区",
+      "rank": "gold",
       "description": "オンライン対戦で10勝した",
       "category": "オンライン",
       "condition": {
@@ -206,6 +224,7 @@
       "id": "rare_sr",
       "name": "レアハンター",
       "title": "幸運の持ち主",
+      "rank": "silver",
       "description": "★3（めっちゃレア）のキャラを積んだ",
       "category": "レア",
       "condition": {
@@ -218,6 +237,7 @@
       "id": "aura_both",
       "name": "光と闇",
       "title": "選ばれし者",
+      "rank": "gold",
       "description": "光と闇の★4（激レア）のキャラを、両方積んだ",
       "category": "レア",
       "condition": {
@@ -232,6 +252,7 @@
       "id": "dex_half",
       "name": "図鑑 半分",
       "title": "コレクター",
+      "rank": "bronze",
       "description": "図鑑に6体登録した",
       "condition": {
         "type": "dexCount",
@@ -243,6 +264,7 @@
       "id": "dex_complete",
       "name": "図鑑コンプリート",
       "title": "図鑑マスター",
+      "rank": "legend",
       "description": "図鑑のキャラを全部登録した",
       "condition": {
         "type": "dexComplete"
@@ -253,6 +275,7 @@
       "id": "plays10",
       "name": "10回プレイ",
       "title": "常連さん",
+      "rank": "bronze",
       "description": "ゲームを10回遊んだ",
       "condition": {
         "type": "plays",
@@ -264,6 +287,7 @@
       "id": "total100",
       "name": "合計100体",
       "title": "積み職人",
+      "rank": "bronze",
       "description": "これまでに合計100体積んだ",
       "condition": {
         "type": "totalPieces",
@@ -275,6 +299,7 @@
       "id": "plays100",
       "name": "100回プレイ",
       "title": "古参",
+      "rank": "silver",
       "description": "ゲームを合計100回遊んだ",
       "category": "累計",
       "condition": {
@@ -286,6 +311,7 @@
       "id": "total1000",
       "name": "合計1000体",
       "title": "積みの求道者",
+      "rank": "gold",
       "description": "これまでに合計1000体積んだ",
       "category": "累計",
       "condition": {
@@ -297,6 +323,7 @@
       "id": "no_rotate15",
       "name": "回さず勝負",
       "title": "真っ直ぐな心",
+      "rank": "gold",
       "description": "ひとりモードで、回転を使わずに15体積んだ",
       "category": "隠し",
       "hidden": true,
@@ -309,6 +336,7 @@
       "id": "quick10",
       "name": "早業",
       "title": "電光石火",
+      "rank": "gold",
       "description": "ひとりモードで、1手3秒以内で10体続けて積んだ",
       "category": "隠し",
       "hidden": true,
@@ -322,6 +350,7 @@
       "id": "edge_landing",
       "name": "崖っぷち",
       "title": "綱渡り",
+      "rank": "gold",
       "description": "土台の端ギリギリ（端から5%以内）に着地させて、積めた",
       "category": "隠し",
       "hidden": true,
@@ -334,6 +363,7 @@
       "id": "pumpkin_king",
       "name": "かぼちゃの王",
       "title": "パンプキンキング",
+      "rank": "event",
       "description": "ハロウィンイベントのおばけ屋敷で、CPU「つよい」に3勝した",
       "category": "イベント",
       "event": "halloween2026",

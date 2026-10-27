@@ -56,6 +56,11 @@ const Profile = (() => {
       $(id).addEventListener("click", (e) => {
         const tile = e.target.closest("[data-kind]");
         if (!tile) return;
+        // まだ使えないものは、タップで解放条件の全文を出す（もう一度タップで戻す）
+        if (tile.classList.contains("locked")) {
+          tile.classList.toggle("expanded");
+          return;
+        }
         Themes.select(tile.dataset.kind, tile.dataset.id);
         renderThemes();
       });
@@ -109,7 +114,32 @@ const Profile = (() => {
     applyAvatar($("profile-avatar"), p.icon, Save.playerName(1));
     applyAvatar($("chip-avatar"), p.icon, Save.playerName(1));
     $("chip-name").textContent = Save.playerName(1);
-    $("chip-title").textContent = titleText(p.titleId);
+    // 称号の枠（アイコンのまわりと、称号の札。frames.js）
+    const frame = Frames.ofTitleId(p.titleId);
+    Frames.applyAvatar($("profile-avatar"), frame);
+    Frames.applyAvatar($("chip-avatar"), frame);
+    $("chip-title").innerHTML = Frames.titleHTML(titleText(p.titleId), frame);
+    $("profile-title-badge").innerHTML = Frames.titleHTML(titleText(p.titleId), frame);
+  }
+
+  // 写真アイコンを小さくしたもの（64px の JPEG の文字列）。ランキングとオンライン対戦の相手に送るときに使う。
+  // 同じ写真なら作りなおさない
+  const SMALL_ICON_SIZE = 64;
+  let iconCache = { src: null, small: "" };
+  function smallIcon(src) {
+    if (iconCache.src === src) return Promise.resolve(iconCache.small);
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = c.height = SMALL_ICON_SIZE;
+        c.getContext("2d").drawImage(img, 0, 0, SMALL_ICON_SIZE, SMALL_ICON_SIZE);
+        iconCache = { src, small: c.toDataURL("image/jpeg", 0.7) };
+        resolve(iconCache.small);
+      };
+      img.onerror = () => resolve("");
+      img.src = src;
+    });
   }
 
   // アイコンを表示する。写真が無ければ、名前の1文字目を丸の中に出す
@@ -125,15 +155,19 @@ const Profile = (() => {
     }
   }
 
-  // リザルト画面などに入れる「アイコン＋名前＋称号」の HTML
+  // リザルト画面などに入れる「アイコン＋名前＋称号」の HTML（自分）
   function badgeHTML() {
     const p = Save.data.profile;
-    const name = UI.escape(Save.playerName(1));
-    const title = UI.escape(titleText(p.titleId));
-    const avatar = p.icon
-      ? `<span class="avatar" style="background-image:url(${p.icon})"></span>`
-      : `<span class="avatar avatar-empty">${UI.escape([...Save.playerName(1)][0])}</span>`;
-    return `<div class="player-badge">${avatar}<span><b>${name}</b>${title ? `<small>${title}</small>` : ""}</span></div>`;
+    return badgeOf({ name: Save.playerName(1), icon: p.icon, title: titleText(p.titleId), frame: Frames.ofTitleId(p.titleId) });
+  }
+
+  // 「アイコン＋名前＋称号」の HTML（オンライン対戦の相手にも使う）。frame：称号の枠（無ければ null）
+  function badgeOf({ name, icon, title, frame }) {
+    const cls = Frames.avatarClass(frame);
+    const avatar = icon
+      ? `<span class="avatar ${cls}" style="background-image:url(${icon})"></span>`
+      : `<span class="avatar avatar-empty ${cls}">${UI.escape([...name][0] || "?")}</span>`;
+    return `<div class="player-badge">${avatar}<span><b>${UI.escape(name)}</b>${Frames.titleHTML(title, frame)}</span></div>`;
   }
 
   // ---------- アイコンの切り抜き ----------
@@ -263,5 +297,5 @@ const Profile = (() => {
     UI.show("profile");
   }
 
-  return { init, refresh, applyAvatar, titleText, badgeHTML };
+  return { init, refresh, applyAvatar, titleText, badgeHTML, badgeOf, smallIcon };
 })();

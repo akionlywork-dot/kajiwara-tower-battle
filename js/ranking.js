@@ -15,7 +15,6 @@ const Ranking = (() => {
   const $ = (id) => document.getElementById(id);
   const MEDALS = { 1: "gold", 2: "silver", 3: "bronze" }; // 上位3位の色
   const TIMEOUT = 10000; // 通信を待つ時間（ミリ秒）
-  const ICON_SIZE = 64; // ランキングに送る写真アイコンの大きさ（px）
   // ランキングに表示してよい写真アイコンの形（小さな JPEG だけ）
   const ICON_PATTERN = /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/;
 
@@ -37,6 +36,41 @@ const Ranking = (() => {
       Save.write();
     }
     return mem().id;
+  }
+
+  // ランキングに参加しているか（オンラインのランキングを使っていて、設定で ON）
+  function joined() {
+    return isOnline() && !!Settings.get("ranking");
+  }
+
+  // オンライン対戦の相手に送る「この端末の目印」。
+  // ランキングの番号そのものを送ると、相手がその番号でランキングに書きこめてしまうので、
+  // 番号から作った別の値（SHA-256 の頭の32文字）を送る。同じ端末なら、いつも同じ値になる
+  let opponentKeyCache = null;
+  async function opponentKey() {
+    if (opponentKeyCache) return opponentKeyCache;
+    const text = "vs:" + playerId();
+    try {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+      opponentKeyCache = Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+    } catch (e) {
+      // crypto.subtle が使えないとき（https でないページなど）は、簡単な計算で作る
+      let h1 = 0x811c9dc5, h2 = 0x01000193;
+      for (let i = 0; i < text.length; i++) {
+        h1 = Math.imul(h1 ^ text.charCodeAt(i), 16777619) >>> 0;
+        h2 = Math.imul(h2 ^ text.charCodeAt(i), 2246822519) >>> 0;
+      }
+      opponentKeyCache = (h1.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0")).slice(0, 16);
+    }
+    return opponentKeyCache;
+  }
+
+  // 最後に分かった自分の順位を残しておく（オンライン対戦の対戦カードに出す）
+  function rememberRank(rank) {
+    const n = Number(rank);
+    if (!Number.isInteger(n) || n < 1 || mem().lastRank === n) return;
+    mem().lastRank = n;
+    Save.write();
   }
 
   // 時間切れのある fetch
@@ -83,6 +117,7 @@ const Ranking = (() => {
         : isOnline()
         ? `<div class="coming-soon"><span>🏆</span><b>まだ記録がありません</b><p>ひとりモードで遊ぶと、ハイスコアがここに載ります。</p></div>`
         : `<div class="coming-soon"><span>🏆</span><b>ランキングは準備中です</b><p>お楽しみに！<br>まずはハイスコアを目指して遊んでみてください。</p></div>`);
+    if (json.me) rememberRank(json.me.rank);
     renderMine(json.me || null);
   }
 
@@ -92,16 +127,19 @@ const Ranking = (() => {
     const height = Number(r.height);
     const name = String(r.name || "");
     const icon = ICON_PATTERN.test(String(r.icon || "")) ? r.icon : null;
+    // 称号の枠：サーバーには称号の文字しか無いので、その文字から実績を探して決める（見つからなければ枠なし）
+    const frame = Frames.ofTitleText(String(r.title || ""));
+    const fc = Frames.avatarClass(frame);
     const avatar = icon
-      ? `<span class="avatar rank-avatar" style="background-image:url(${icon})"></span>`
-      : `<span class="avatar avatar-empty rank-avatar">${UI.escape([...name][0] || "?")}</span>`;
+      ? `<span class="avatar rank-avatar ${fc}" style="background-image:url(${icon})"></span>`
+      : `<span class="avatar avatar-empty rank-avatar ${fc}">${UI.escape([...name][0] || "?")}</span>`;
     return `
       <div class="rank-row ${medal ? "rank-" + medal : ""} ${r.me ? "rank-me" : ""}">
         <span class="rank-num">${Number(r.rank)}</span>
         ${avatar}
         <span class="rank-main">
           <b>${UI.escape(name)}${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
-          ${r.title ? `<span class="rank-title">${UI.escape(r.title)}</span>` : ""}
+          ${r.title ? Frames.titleHTML(String(r.title), frame) : ""}
           <small>${Number(r.count)}体・${isNaN(height) ? "-" : height.toFixed(2)}m・${UI.escape(r.date || "")}</small>
         </span>
         <span class="rank-score">${Number(r.score)}<small>点</small></span>
@@ -179,24 +217,6 @@ const Ranking = (() => {
   }
 
   // ---------- 送る ----------
-  // 写真アイコンを小さくしたもの（JPEG の文字列）。同じ写真なら作りなおさない
-  let iconCache = { src: null, small: "" };
-  function smallIcon(src) {
-    if (iconCache.src === src) return Promise.resolve(iconCache.small);
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const c = document.createElement("canvas");
-        c.width = c.height = ICON_SIZE;
-        c.getContext("2d").drawImage(img, 0, 0, ICON_SIZE, ICON_SIZE);
-        iconCache = { src, small: c.toDataURL("image/jpeg", 0.7) };
-        resolve(iconCache.small);
-      };
-      img.onerror = () => resolve("");
-      img.src = src;
-    });
-  }
-
   // 文字列の短い目印（写真が変わったかを見分けるため）
   function digest(text) {
     let h = 0;
@@ -212,7 +232,7 @@ const Ranking = (() => {
     const p = Save.data.profile;
     const name = Save.playerName(1);
     const title = Profile.titleText(p.titleId);
-    const icon = Settings.get("rankingIcon") && p.icon ? await smallIcon(p.icon) : "";
+    const icon = Settings.get("rankingIcon") && p.icon ? await Profile.smallIcon(p.icon) : "";
     const profileKey = `${name}\n${title}\n${digest(icon)}`;
     if (best.score <= mem().sentScore && profileKey === mem().sentProfile) return;
     try {
@@ -227,6 +247,7 @@ const Ranking = (() => {
       mem().sentScore = best.score;
       mem().sentProfile = profileKey;
       Save.write();
+      if (res.rank) rememberRank(res.rank);
       if (improved && res.rank) UI.toast(`🏆 ランキング <b>${Number(res.rank)}位</b>（${Number(res.total)}人中）`);
     } catch (e) {
       // 続けて送りすぎて断られたときは、少し待ってから送りなおす（写真を外したときなど、すぐ反映させたいので）。
@@ -236,5 +257,5 @@ const Ranking = (() => {
     }
   }
 
-  return { init, atStartup, afterSoloGame, submitBest };
+  return { init, atStartup, afterSoloGame, submitBest, joined, opponentKey };
 })();

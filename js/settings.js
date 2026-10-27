@@ -19,6 +19,7 @@ const Settings = (() => {
     ranking: false, // ハイスコアをランキングに自動で送るか（最初に1回だけ聞く）
     eventPreview: false, // 管理者モード：イベント期間中として表示する（確認用）
     rankingIcon: false, // ランキングに写真アイコンも載せるか（写真を設定している人に、1回だけ聞く）
+    onlineIcon: false, // オンライン対戦の相手に、写真アイコンを見せるか（初めは見せない）
   };
 
   // localStorage は、プライベートモードなどで使えないことがあるので try で囲む

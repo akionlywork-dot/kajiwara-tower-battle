@@ -97,6 +97,7 @@
     challenge = null; // タイトルに戻ったら、挑戦状はおしまい
     showThinking(false);
     if (online) leaveOnline(); // オンライン対戦中なら、接続を切る
+    VsIntro.cancel();
     if (mode === "online") mode = "solo";
     Game.stop();
     UI.clearConfetti();
@@ -150,7 +151,8 @@
   // ---------- ゲーム開始 ----------
   // newRuleId: 特殊ルールの名前（config.js の rules の名前）。ふつうのルールなら null
   // newCpu: CPU対戦の強さ。人どうしの対戦や1人モードなら null
-  function startGame(newMode, newRuleId = null, newCpu = null) {
+  // first: 先攻（1 か 2）。オンライン対戦のホストが、演出の前に決めておいた先攻。null なら、ここでランダムに決める
+  function startGame(newMode, newRuleId = null, newCpu = null, first = null) {
     mode = newMode;
     ruleId = newRuleId;
     cpuLevel = newCpu;
@@ -158,7 +160,7 @@
     showThinking(false);
     Game.setInputEnabled(true);
     // 対戦の先攻は毎回ランダム（1人モードはいつもプレイヤー1）
-    player = isVs() ? randomFirst() : 1;
+    player = isVs() ? first || randomFirst() : 1;
     lastDropper = player;
     stacked = 0;
     maxHeight = 0;
@@ -374,9 +376,11 @@
         $("online-wait-state").textContent = `待ち受け：直接 ${label[st.direct]} ／ 中継 ${label[st.relay]}`;
       },
       onConnected: () => {
-        online = { role, me: role === "host" ? 1 : 2, names: { 1: "", 2: "" } };
+        // profiles：対戦カードに出すプロフィール（vs-intro.js の形）。record：この部屋での自分の [勝, 敗]
+        online = { role, me: role === "host" ? 1 : 2, names: { 1: "", 2: "" }, profiles: {}, record: [0, 0] };
         online.names[online.me] = Save.playerName(1);
-        Online.send({ t: "hello", name: Save.playerName(1) });
+        sendHello(online);
+        if (role === "host") measureRtt(); // 届くまでの時間を測っておく（演出を2台で同時に始めるため）
         $(role === "host" ? "online-host-status" : "online-join-status").textContent =
           Online.kind === "relay" ? "つながりました！（中継サーバー経由）" : "つながりました！";
       },
@@ -394,10 +398,88 @@
     };
   }
 
+  // あいさつ（hello）：名前と、対戦カードに出すプロフィール（vs-intro.js）を送る。
+  // 写真アイコンを小さくするのに少し時間がかかることがあるので、できてから送る
+  function sendHello(conn) {
+    const name = Save.playerName(1);
+    const send = (profile) => {
+      if (online !== conn) return; // 待っているあいだに切れた
+      online.profiles[online.me] = VsIntro.cleanProfile(name, profile);
+      Online.send({ t: "hello", name, profile });
+    };
+    VsIntro.myProfile().then(send, () => send(null));
+  }
+
+  // 相手のあいさつ（hello）を受け取る。古いバージョンの相手からは profile が届かないので、名前だけのカードにする
+  function receiveHello(msg, n) {
+    online.names[n] = String(msg.name || `プレイヤー${n}`).slice(0, 10);
+    online.profiles[n] = VsIntro.cleanProfile(online.names[n], msg.profile);
+    online.peerIntro = !!msg.profile; // 相手も演出に対応している（対応していない相手とは、今までどおりすぐ始める）
+  }
+
+  // ホスト：届くまでの時間（往復）を測る。{ t: "rtt", s } を送り、ゲストがそのまま { t: "rtt-ack", s } で返す。
+  // 何回か送って一番短いものを使う（たまたま遅れたものに引っぱられないように）
+  function measureRtt() {
+    if (!online) return;
+    online.rttRound = [];
+    [0, 250, 500].forEach((wait) => setTimeout(() => online && Online.send({ t: "rtt", s: performance.now() }), wait));
+  }
+
+  function onRttAck(msg) {
+    const rtt = performance.now() - Number(msg.s);
+    if (!(rtt >= 0 && rtt < 10000) || !online.rttRound) return;
+    online.rttRound.push(rtt);
+    online.rtt = Math.min(...online.rttRound);
+  }
+
+  // 往復の時間（まだ測れていなければ、つながり方ごとのおおよその値）
+  function roundTrip() {
+    return online.rtt != null ? online.rtt : Online.kind === "relay" ? 600 : 160;
+  }
+
+  // ---------- 試合の前の演出（vs-intro.js） ----------
+  // 2台で同じ時刻に演出を始め、演出が終わったら試合を始める。
+  // wait：演出を始めるまで（ミリ秒）、begin：試合を始める関数。
+  // 演出のあいだに通信が切れたり、タイトルに戻ったりしたら、試合は始めない
+  function scheduleOnlineStart(wait, g, begin) {
+    const short = g >= 2;
+    const total = VsIntro.duration(short);
+    const token = { g };
+    online.pending = token;
+    const alive = () => online && online.pending === token;
+    // 「始める」が遅れて届いた（wait がマイナス）ときは、遅れた分だけ演出を短くして、始める時刻をそろえる
+    setTimeout(() => alive() && VsIntro.play(introData(g, short), total + Math.min(0, wait)), Math.max(0, wait));
+    setTimeout(() => {
+      if (!alive()) return;
+      online.pending = null;
+      VsIntro.cancel();
+      begin();
+    }, Math.max(0, wait + total));
+  }
+
+  // 演出に出すもの
+  function introData(g, short) {
+    const other = online.me === 1 ? 2 : 1;
+    const me = Object.assign({}, online.profiles[online.me] || VsIntro.cleanProfile("", null), { name: Save.playerName(1) });
+    const them = Object.assign({}, online.profiles[other] || VsIntro.cleanProfile("", null), { name: online.names[other] || `プレイヤー${other}` });
+    // この相手との成績（相手の目印が届かない古いバージョンの相手には出さない）
+    const rec = Records.opponentRecord(them.id);
+    const note = !them.id ? "" : rec ? `この相手に ${rec.w}勝${rec.l}敗` : "はじめての対戦";
+    return { short, me, them, note, gameNo: g, room: online.record.slice() };
+  }
+
   // 接続が切れた
   function onDisconnected() {
     const wasPlaying = !!online;
+    const starting = !!(online && online.pending); // 試合の前の演出のあいだ（リザルトからの再戦も）
     online = null;
+    VsIntro.cancel();
+    if (starting) {
+      clearInterval(sendTimer);
+      $("btn-online-connect").disabled = false;
+      UI.alert("接続が切れました").then(goTitle);
+      return;
+    }
     clearInterval(sendTimer);
     $("btn-online-connect").disabled = false;
     // 対戦が終わってリザルト（カード・フォトモードも）にいるときは、タイトルに戻さず
@@ -415,6 +497,7 @@
   function leaveOnline() {
     Online.leave();
     online = null;
+    VsIntro.cancel();
     clearInterval(sendTimer);
   }
 
@@ -422,8 +505,12 @@
   function hostMessage(msg) {
     if (!online) return;
     if (msg.t === "hello") {
-      online.names[2] = String(msg.name || "プレイヤー2").slice(0, 10);
+      if (online.helloSeen) return; // 重ねて届いた（念のため）
+      online.helloSeen = true;
+      receiveHello(msg, 2);
       setTimeout(startOnlineHost, 800); // 「つながりました！」を少し見せてから始める
+    } else if (msg.t === "rtt-ack") {
+      onRttAck(msg);
     } else if (msg.t === "pose" && isRemoteTurn()) {
       Game.setHeldPose(msg.x, msg.a); // 相手が動かしているキャラ
     } else if (msg.t === "drop" && isRemoteTurn()) {
@@ -438,11 +525,36 @@
 
   // ホスト：オンライン対戦を始める
   function startOnlineHost() {
-    if (!online) return;
+    if (!online || online.pending) return;
     online.gameNo = (online.gameNo || 0) + 1; // 何回目のゲームか（前のゲームのメッセージと区別する）
-    startGame("online"); // ここで先攻が決まる
-    // 先攻（p）もゲストに知らせる
-    sendImportant({ t: "start", g: online.gameNo, names: online.names, p: player });
+    const g = online.gameNo;
+    const first = randomFirst(); // 先攻は、演出の前に決めておく（p でゲストにも知らせる）
+    // 演出に対応していない古いバージョンの相手とは、今までどおりすぐに始める
+    if (!online.peerIntro) {
+      sendImportant({ t: "start", g, names: online.names, p: first });
+      return beginOnlineHost(first);
+    }
+    // 「in ミリ秒後に演出を始めて」と送る（届くまでの片道の時間を差し引く）。
+    // 取りこぼしに備えて3回送るので、あとから送る分は、送るのを待った時間も差し引く
+    const lead = Math.round((Number(CONFIG.online.introLead) || 0.7) * 1000);
+    const oneWay = roundTrip() / 2;
+    const sentAt = performance.now();
+    const sendStart = () => {
+      if (!online || online.gameNo !== g) return;
+      const passed = performance.now() - sentAt;
+      Online.send({ t: "start", g, names: online.names, p: first, in: Math.round(lead - passed - oneWay) });
+    };
+    sendStart();
+    setTimeout(sendStart, 300);
+    setTimeout(sendStart, 900);
+    // ホストは、演出が終わるまで最初の手番を始めない
+    scheduleOnlineStart(lead, g, () => beginOnlineHost(first));
+  }
+
+  // ホスト：試合を始める（演出が終わってから）
+  function beginOnlineHost(first) {
+    if (!online) return;
+    startGame("online", null, null, first);
     Game.setInputEnabled(!isRemoteTurn()); // 相手が先攻なら、相手の番が終わるまで操作できない
     // 状態をゲストに送る。直接つながっていれば1秒に20回、
     // 中継サーバー経由なら1秒に10回（公開サーバーに負担をかけすぎないように）
@@ -456,13 +568,19 @@
   function guestMessage(msg) {
     if (!online) return;
     if (msg.t === "hello") {
-      online.names[1] = String(msg.name || "プレイヤー1").slice(0, 10);
+      receiveHello(msg, 1);
+    } else if (msg.t === "rtt") {
+      Online.send({ t: "rtt-ack", s: msg.s }); // ホストが届くまでの時間を測っている
     } else if (msg.t === "start") {
       if (msg.g === online.gameNo) return; // 同じ開始の知らせが重ねて届いた
       online.gameNo = msg.g;
       online.names = Object.assign(online.names, msg.names, { 2: Save.playerName(1) });
-      startOnlineGuest(msg.p);
-    } else if (msg.t === "s" && mode === "online") {
+      online.names[1] = String(online.names[1] || "プレイヤー1").slice(0, 10);
+      // in：演出を始めるまでの時間（ミリ秒）。古いバージョンのホストからは届かないので、そのときはすぐに始める
+      const wait = Number(msg.in);
+      if (typeof msg.in === "number" && isFinite(wait)) scheduleOnlineStart(Math.min(wait, 3000), msg.g, () => startOnlineGuest(msg.p));
+      else startOnlineGuest(msg.p);
+    } else if (msg.t === "s" && mode === "online" && !online.pending) {
       if (msg.g !== online.gameNo) return; // 前のゲームの状態
       // 積んだ数・高さ・手番は、状態のメッセージでも受け取る（「turn」を取りこぼしても合うように）
       if (msg.n > stacked) {
@@ -475,7 +593,7 @@
       }
       updateHud();
       Game.applySnapshot(msg.d, player === online.me);
-    } else if (msg.t === "turn" && mode === "online") {
+    } else if (msg.t === "turn" && mode === "online" && !online.pending) {
       // 1体積めて、手番が交代した（重ねて届いたものは、積んだ数で見分けて1回だけ処理する）
       if (msg.g !== online.gameNo || msg.n <= online.countedTurns) return;
       online.countedTurns = msg.n;
@@ -669,7 +787,15 @@
         clearInterval(sendTimer);
         // ホストは、ゲストにも結果を知らせる
         if (online && online.role === "host") sendImportant({ t: "over", g: online.gameNo, loser, n: stacked, h: maxHeight });
-        if (online) Records.addOnlineResult(winner === online.me);
+        if (online) {
+          const won = winner === online.me;
+          const other = online.me === 1 ? 2 : 1;
+          Records.addOnlineResult(won);
+          // この相手との成績・この部屋での勝敗（次の試合の演出に出す）
+          Records.addOpponentResult((online.profiles[other] || {}).id, nameOf(other), won);
+          online.record[won ? 0 : 1]++;
+          if (online.role === "host") measureRtt(); // 次の試合のために、届くまでの時間を測りなおす
+        }
       } else if (cpuLevel && Halloween.isStageCpu(cpuLevel)) {
         // イベントのステージ（おばけ屋敷）：ふつうの CPU 対戦とは別に記録し、勝つたびにごほうび
         const n = Records.addEventResult(Halloween.EVENT_ID, winner === 1);
@@ -680,6 +806,12 @@
 
       // オンライン対戦では「あなたの勝ち／負け」も出す
       const youText = mode === "online" && online ? (winner === online.me ? "あなたの勝ち！" : "あなたの負け…") : "";
+      // オンライン対戦：相手の名前と称号の枠
+      if (mode === "online" && online) {
+        const other = online.me === 1 ? 2 : 1;
+        const t = online.profiles[other] || {};
+        stageNote += `<div class="opponent-badge"><small>対戦相手</small>${Profile.badgeOf({ name: nameOf(other), icon: t.icon || null, title: t.title, frame: t.frame })}</div>`;
+      }
       box.innerHTML =
         (youText ? `<p class="result-you">${youText}</p>` : "") +
         `<div class="winner p${winner}"><span class="winner-name">${UI.escape(nameOf(winner))}</span><small>の勝ち！</small></div>` +
@@ -821,6 +953,7 @@
     Card.open({
       name: solo ? Save.playerName(1) : nameOf(lastResult.winner),
       titleText: solo ? Profile.titleText(p.titleId) : "",
+      frame: solo ? Frames.ofTitleId(p.titleId) : null, // 称号の枠
       icon: solo ? p.icon : null, // 対戦の勝者が自分とはかぎらないので、写真は載せない
       modeName: modeName(),
       score: solo ? lastResult.score : null,

@@ -7,7 +7,7 @@ window.GAME_CONFIG = {
   achievementsEpoch: 2,
 
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v1.8.0",
+  version: "v1.10.0",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -110,15 +110,18 @@ window.GAME_CONFIG = {
       // unlock に { event, wins } を書くと、そのイベントの勝利数で解放される（イベントが終わっても使える）
       { id: "halloween_night", name: "ハロウィンの夜", unlock: { event: "halloween2026", wins: 1 }, top: "#1c0b33", bottom: "#5b2a86", cloud: "#4a2d6b", ground: "#2e1f3a", groundDark: "#1d1426", stars: true, moon: true, bats: true },
     ],
+    // 土台：body（正面）・top（上の面）・pillar（柱）の色と、style（描き方。js/platform-art.js）
+    //   style："wood"（木）/ "stone"（石積み）/ "ice"（氷・つらら）/ "gold"（金・彫り模様・光が走る）/ "crystal"（宝石）/ "pumpkin"（かぼちゃ）
+    //   style を書かないと、色だけの四角になる。当たり判定は、どの style でも同じ四角
     platforms: [
-      { id: "wood", name: "木の台", unlock: null, body: "#8a5a3b", top: "#6fbf4a", pillar: "#a39587" },
-      { id: "stone", name: "石の台", unlock: "first_stack", body: "#7d808c", top: "#b3b7c2", pillar: "#6b6e78" },
-      { id: "ice", name: "氷の台", unlock: "plays10", body: "#7ec4e8", top: "#e3f6ff", pillar: "#6aa9c9" },
-      { id: "gold", name: "金の台", unlock: "dex_complete", body: "#d4a019", top: "#ffe27a", pillar: "#b3861a" },
+      { id: "wood", name: "木の台", unlock: null, style: "wood", body: "#8a5a3b", top: "#6fbf4a", pillar: "#9a6b45" },
+      { id: "stone", name: "石の台", unlock: "first_stack", style: "stone", body: "#7d808c", top: "#b3b7c2", pillar: "#6b6e78" },
+      { id: "ice", name: "氷の台", unlock: "plays10", style: "ice", body: "#7ec4e8", top: "#e3f6ff", pillar: "#6aa9c9" },
+      { id: "gold", name: "金の台", unlock: "dex_complete", style: "gold", body: "#d4a019", top: "#ffe27a", pillar: "#b3861a" },
       // むずかしい実績で解放：無敗の王（CPU「つよい」に3連勝）→ ダイヤの台
-      { id: "diamond", name: "ダイヤの台", unlock: "cpu_hard_streak3", body: "#7fd6f2", top: "#f2fdff", pillar: "#6ab3cf" },
-      // ハロウィンイベントのごほうび（2勝目）。pumpkin: 台の正面に、くり抜いた顔の模様を描く
-      { id: "pumpkin", name: "かぼちゃの台", unlock: { event: "halloween2026", wins: 2 }, body: "#f07b14", top: "#4f8a2b", pillar: "#7a5a3a", pumpkin: true },
+      { id: "diamond", name: "ダイヤの台", unlock: "cpu_hard_streak3", style: "crystal", body: "#7fd6f2", top: "#f2fdff", pillar: "#6ab3cf" },
+      // ハロウィンイベントのごほうび（2勝目）
+      { id: "pumpkin", name: "かぼちゃの台", unlock: { event: "halloween2026", wins: 2 }, body: "#f07b14", top: "#4f8a2b", style: "pumpkin", pillar: "#7a5a3a" },
     ],
   },
 
@@ -180,6 +183,14 @@ window.GAME_CONFIG = {
     directTimeout: 6, // 直接つながるのを待つ時間（秒）
     // 中継サーバー（上から順に試す。ホストとゲストが同じサーバーを使う必要がある）
     relayBrokers: ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt"],
+    // 試合の前の対戦カードの演出（秒）。1戦目 ＝ introSlide ＋ introTime ＋ introExit（約3秒）
+    introSlide: 0.5, // カードがすべり込む時間（止まったところで「VS」が出る）
+    introTime: 2, // そのまま見せる時間
+    introExit: 0.45, // カードが抜けて消える時間
+    rematchIntroTime: 1, // 2戦目からの短い版（「第2戦」と、この部屋での勝敗）
+    // 「始める」を送ってから演出を始めるまでのゆとり。2台で同じ時刻に始めるため、
+    // 届くまでの時間（つないだときに測る）を差し引いて、相手に「〇秒後に始めて」と伝える
+    introLead: 0.7,
   },
 
   // 特殊ルール（モード選択の「特殊ルール」から選ぶ。1人モードで遊ぶ）
@@ -275,6 +286,7 @@ window.GAME_CONFIG = {
     click: "", // メニューのボタンを押したとき
     stamp: "", // スタンプを送った・届いたとき
     ultimate: "", // ★4（激レア）が出たとき
+    vs: "", // オンライン対戦の、試合の前の「VS」
     bgm: "", // BGM（くり返し再生される）
   },
 };

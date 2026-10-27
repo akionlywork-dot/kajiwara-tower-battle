@@ -1342,74 +1342,58 @@ const Game = (() => {
     return platformTop + GROUND_BELOW_PLATFORM;
   }
 
-  // 土台を支える石の柱
-  function drawPillar() {
-    const w = 70;
-    const x = WORLD_W / 2 - w / 2;
-    const top = platformTop + PLATFORM_H;
-    ctx.fillStyle = platTheme.pillar;
-    ctx.fillRect(x, top, w, groundY() - top + 10);
-    ctx.fillStyle = "rgba(0,0,0,0.12)"; // 右側に影
-    ctx.fillRect(x + w - 16, top, 16, groundY() - top + 10);
-    ctx.strokeStyle = "rgba(0,0,0,0.15)"; // 石の継ぎ目
-    ctx.lineWidth = 2;
-    for (let y = top + 30; y < groundY(); y += 30) {
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + w, y);
-      ctx.stroke();
-    }
+  // 土台と柱の大きさ（絵を作るときに使う。当たり判定は createWorld の四角）
+  const PILLAR_W = 70;
+  const platformSize = { w: PLATFORM_W, h: PLATFORM_H, pillarW: PILLAR_W, pillarH: GROUND_BELOW_PLATFORM - PLATFORM_H + 10 };
+
+  // 今の土台の絵（platform-art.js。テーマごとに1回だけ描いて、あとは使い回す）
+  function platformArt() {
+    return PlatformArt.build(platTheme, platformSize);
   }
 
-  // 土台（デモで傾いているときも、その角度で描く）
+  // 土台を支える柱（土台の style に合わせた絵を貼る。下の端は地面に隠れる）
+  function drawPillar() {
+    const p = platformArt().pillar;
+    ctx.drawImage(p.canvas, WORLD_W / 2 - p.w / 2, platformTop + PLATFORM_H, p.w, p.h);
+  }
+
+  // 土台（デモで傾いているときも、その角度で絵を回して貼る）。見た目だけで、当たり判定は四角のまま
   function drawPlatform() {
     const x = platform && engine ? platform.position.x : WORLD_W / 2;
     const y = platform && engine ? platform.position.y : platformTop + PLATFORM_H / 2;
     const angle = platform && engine ? platform.angle : 0;
+    const p = platformArt().platform;
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
-    ctx.fillStyle = platTheme.body;
-    ctx.fillRect(-PLATFORM_W / 2, -PLATFORM_H / 2, PLATFORM_W, PLATFORM_H);
-    ctx.fillStyle = "rgba(0,0,0,0.15)";
-    ctx.fillRect(-PLATFORM_W / 2, PLATFORM_H / 2 - 8, PLATFORM_W, 8);
-    ctx.fillStyle = platTheme.top; // 上の面（木の台なら芝生）
-    ctx.fillRect(-PLATFORM_W / 2, -PLATFORM_H / 2, PLATFORM_W, 8);
-    if (platTheme.pumpkin) drawPumpkinFace();
+    ctx.drawImage(p.canvas, -PLATFORM_W / 2 + p.x, -PLATFORM_H / 2 + p.y, p.w, p.h);
+    if (platTheme.style === "gold") drawGoldShine();
     ctx.restore();
   }
 
-  // かぼちゃの台：たてのすじと、くり抜いた顔（中から光っている）。ctx は土台の真ん中に合わせてある
-  function drawPumpkinFace() {
-    ctx.strokeStyle = "rgba(120, 50, 0, 0.35)";
-    ctx.lineWidth = 2;
-    for (let i = -3; i <= 3; i++) {
-      ctx.beginPath();
-      ctx.moveTo(i * 40, -PLATFORM_H / 2 + 8);
-      ctx.quadraticCurveTo(i * 40 + (i < 0 ? -6 : 6), 0, i * 40, PLATFORM_H / 2 - 8);
-      ctx.stroke();
-    }
-    ctx.fillStyle = "#ffd23a";
-    const tri = (x1, y1, x2, y2, x3, y3) => {
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.lineTo(x3, y3);
-      ctx.closePath();
-      ctx.fill();
-    };
-    tri(-62, 6, -46, -10, -30, 6); // 左の目
-    tri(30, 6, 46, -10, 62, 6); // 右の目
-    tri(-7, 8, 0, -1, 7, 8); // 鼻
-    // ギザギザの口
+  // 金の台：ときどき、光が横に走る（4.5秒ごとに0.9秒。ctx は土台の真ん中に合わせてある）
+  function drawGoldShine() {
+    if (reducedMotion.matches) return;
+    const t = (performance.now() / 1000) % 4.5;
+    if (t > 0.9) return;
+    const cx = -PLATFORM_W / 2 - 40 + (t / 0.9) * (PLATFORM_W + 80);
+    ctx.save();
     ctx.beginPath();
-    ctx.moveTo(-40, 10);
-    const teeth = [[-30, 15], [-20, 10], [-10, 15], [0, 10], [10, 15], [20, 10], [30, 15], [40, 10]];
-    for (const [tx, ty] of teeth) ctx.lineTo(tx, ty);
-    ctx.lineTo(30, 16);
-    ctx.quadraticCurveTo(0, 22, -30, 16);
+    ctx.rect(-PLATFORM_W / 2, -PLATFORM_H / 2, PLATFORM_W, PLATFORM_H);
+    ctx.clip();
+    const g = ctx.createLinearGradient(cx - 24, 0, cx + 24, 0);
+    g.addColorStop(0, "rgba(255,255,255,0)");
+    g.addColorStop(0.5, "rgba(255,255,240,0.75)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(cx - 14, -PLATFORM_H / 2);
+    ctx.lineTo(cx + 24, -PLATFORM_H / 2);
+    ctx.lineTo(cx + 14, PLATFORM_H / 2);
+    ctx.lineTo(cx - 24, PLATFORM_H / 2);
     ctx.closePath();
     ctx.fill();
+    ctx.restore();
   }
 
   // ---------- ハロウィンの夜（背景 moon・bats） ----------
@@ -1698,6 +1682,7 @@ const Game = (() => {
 
   return {
     init, start, stop, startDemo, setTitleFx, towerImage, enterPhoto, exitPhoto, photoImage, setForcedShape, setDemoCeiling, setTheme, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
+    get platformSize() { return platformSize; }, // 土台と柱の大きさ（プロフィールの見本の絵に使う）
     get state() { return state; },
     get rotations() { return rotations; }, // このゲームで回転を使った回数
     get paused() { return paused; },

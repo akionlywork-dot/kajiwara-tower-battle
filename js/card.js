@@ -36,7 +36,7 @@ const Card = (() => {
   }
 
   // カードの画面を開く
-  // data: { name, titleText, icon, modeName, score（無ければ null）, headline（スコアの代わりの文字）, count, height }
+  // data: { name, titleText, frame（称号の枠。frames.js）, icon, modeName, score（無ければ null）, headline（スコアの代わりの文字）, count, height }
   function open(data) {
     info = data;
     UI.show("card");
@@ -145,11 +145,7 @@ const Card = (() => {
       ctx.fillText([...info.name][0] || "?", x + r, y + r + 2);
     }
     ctx.restore();
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(x + r, y + r, r, 0, Math.PI * 2);
-    ctx.stroke();
+    drawFrameRing(ctx, x + r, y + r, r, info.frame);
 
     const tx = x + size + 24;
     const tw = w - size - 24;
@@ -159,7 +155,9 @@ const Card = (() => {
     ctx.font = `bold ${fitFont(ctx, info.name, tw, 46)}px ${FONT}`;
     ctx.fillText(info.name, tx, y + (info.titleText ? 2 : r - 26));
     if (info.titleText) {
-      pill(ctx, info.titleText, tx, y + 58, 24, COLOR.gold, "#2b3a55");
+      // 称号の札（称号の枠の色。枠なしなら、前と同じ金色）
+      const f = info.frame && FRAME_COLORS[info.frame.rank];
+      pill(ctx, info.titleText, tx, y + 58, 24, f ? f.pill(ctx, tx, y + 58) : COLOR.gold, f ? f.text : "#2b3a55");
     }
     // モードは、アイコンの下に
     pill(ctx, info.modeName, x, y + size + 20, 24, "rgba(142,92,240,0.9)", "#fff");
@@ -244,6 +242,79 @@ const Card = (() => {
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
+  }
+
+  // ---------- 称号の枠（frames.js の rank。画面の CSS と同じ色合いを、キャンバスに描く） ----------
+  //   ring：アイコンのまわりの輪の色、pill：称号の札の塗り、text：札の文字の色
+  const FRAME_COLORS = {
+    bronze: { ring: () => "#cd8a4f", pill: () => "#8a5428", text: "#ffe6cc" },
+    silver: { ring: () => "#e6ebf1", pill: (ctx, x, y) => gradient(ctx, x, y, ["#f6f8fb", "#b8c0ca"]), text: "#2b3a55" },
+    gold: { ring: () => "#ffd84d", pill: (ctx, x, y) => gradient(ctx, x, y, ["#ffe98a", "#d4a019"]), text: "#4a3500" },
+    legend: {
+      ring: (ctx, cx, cy) => rainbow(ctx, cx, cy),
+      pill: (ctx, x, y) => gradient(ctx, x, y, ["#ff5d73", "#ffc21a", "#4cd964", "#3d8bff", "#b65cf0"]),
+      text: "#ffffff",
+    },
+    event: { ring: () => "#ff8a1f", pill: () => "#3b1458", text: "#ffb15c" },
+  };
+
+  function gradient(ctx, x, y, colors) {
+    const g = ctx.createLinearGradient(x, y, x + 260, y + 40);
+    colors.forEach((c, i) => g.addColorStop(i / (colors.length - 1), c));
+    return g;
+  }
+
+  // 虹色の輪（対応していないブラウザでは、ななめの虹色）
+  function rainbow(ctx, cx, cy) {
+    const colors = ["#ff5d73", "#ffc21a", "#4cd964", "#3d8bff", "#b65cf0", "#ff5d73"];
+    const g = ctx.createConicGradient ? ctx.createConicGradient(0, cx, cy) : ctx.createLinearGradient(cx - 60, cy - 60, cx + 60, cy + 60);
+    colors.forEach((c, i) => g.addColorStop(i / (colors.length - 1), c));
+    return g;
+  }
+
+  // アイコンのまわりの輪（枠なしなら、前と同じ白い輪）
+  function drawFrameRing(ctx, cx, cy, r, frame) {
+    const f = frame && FRAME_COLORS[frame.rank];
+    if (frame && frame.rank === "gold") {
+      // 金：外側に光のにじみ
+      ctx.save();
+      ctx.shadowColor = "rgba(255, 216, 77, 0.9)";
+      ctx.shadowBlur = 16;
+      ring(ctx, cx, cy, r, "#ffd84d", 6);
+      ctx.restore();
+    }
+    ring(ctx, cx, cy, r, f ? f.ring(ctx, cx, cy) : "#fff", f ? 6 : 4);
+    if (frame && frame.rank === "silver") {
+      // 銀：角（上下左右）に小さなひし形の飾り
+      ctx.fillStyle = "#ffffff";
+      for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) diamond(ctx, cx + dx * r, cy + dy * r, 7);
+    }
+    if (frame && frame.rank === "event" && frame.event === "halloween2026") {
+      // ハロウィン：かぼちゃとこうもり
+      ctx.font = `${Math.round(r * 0.6)}px ${FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("🎃", cx + r * 0.75, cy + r * 0.75);
+      ctx.fillText("🦇", cx - r * 0.8, cy - r * 0.8);
+    }
+  }
+
+  function ring(ctx, cx, cy, r, style, width) {
+    ctx.strokeStyle = style;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  function diamond(ctx, x, y, s) {
+    ctx.beginPath();
+    ctx.moveTo(x, y - s);
+    ctx.lineTo(x + s, y);
+    ctx.lineTo(x, y + s);
+    ctx.lineTo(x - s, y);
+    ctx.closePath();
+    ctx.fill();
   }
 
   // 丸い札（称号・モード）

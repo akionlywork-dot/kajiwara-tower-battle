@@ -71,6 +71,31 @@ const Records = (() => {
     Save.write();
   }
 
+  // オンライン対戦の、この相手との成績を記録する（id：相手の目印。古いバージョンの相手は届かないので記録しない）
+  const OPPONENTS_MAX = 200; // 覚えておく相手の数（多すぎたら、長く対戦していない相手から消す）
+  function addOpponentResult(id, name, won) {
+    if (!id) return;
+    const all = (Save.data.opponents = Save.data.opponents || {});
+    const r = all[id] || { w: 0, l: 0 };
+    if (won) r.w++;
+    else r.l++;
+    r.name = name;
+    r.at = Date.now();
+    all[id] = r;
+    const ids = Object.keys(all);
+    if (ids.length > OPPONENTS_MAX) {
+      ids.sort((a, b) => (all[a].at || 0) - (all[b].at || 0));
+      for (const old of ids.slice(0, ids.length - OPPONENTS_MAX)) delete all[old];
+    }
+    Save.write();
+  }
+
+  // この相手との成績 { w, l }（初めての相手なら null）
+  function opponentRecord(id) {
+    const r = id && (Save.data.opponents || {})[id];
+    return r ? { w: r.w || 0, l: r.l || 0 } : null;
+  }
+
   // イベントのステージ（おばけ屋敷など）の対戦が終わった（won: プレイヤーが勝ったか）。
   // ふつうの CPU 対戦の戦績・実績には数えない。勝ったあとの勝利数を返す
   function addEventResult(eventId, won) {
@@ -162,5 +187,5 @@ const Records = (() => {
     return rows ? `<h3 class="section-title">イベント</h3><div class="stat-grid">${rows}</div>` : "";
   }
 
-  return { init, addPiece, addEventResult, eventWins, addSoloResult, addRuleResult, addCpuResult, addOnlineResult, addVersusResult };
+  return { init, addPiece, addEventResult, eventWins, addSoloResult, addRuleResult, addCpuResult, addOnlineResult, addOpponentResult, opponentRecord, addVersusResult };
 })();

@@ -25,6 +25,7 @@
 // そのほかの項目：
 //   category … 実績画面の分類（見出し）。同じ分類の実績をまとめて表示する
 //   hidden   … true にすると、達成するまで名前・説明・称号を「？？？」で表示する（隠し実績）
+//   rank     … 称号の枠の種類："bronze" / "silver" / "gold" / "legend" / "event"（frames.js）
 //   event    … イベントの id を書くと期間限定の実績になる。期間中・達成ずみならふつうに表示し、
 //              期間外で未達成なら「期間限定（終了）」と表示して、全体の達成数（〇 / 〇）に数えない
 // =============================================
@@ -156,6 +157,19 @@ const Achievements = (() => {
     return (defs || []).find((a) => a.id === id) || null;
   }
 
+  // 称号の文字から実績を探す（ランキングの称号の枠を決めるのに使う）。無ければ null
+  function findByTitle(title) {
+    return (defs || []).find((a) => a.title === title) || null;
+  }
+
+  // 達成した数と全体の数 { got, total }（実績画面と同じく、もう取れない期間限定の実績は数えない）。
+  // 読み込めていなければ null
+  function counts() {
+    if (!defs) return null;
+    const counted = defs.filter((a) => !closed(a));
+    return { got: counted.filter((a) => unlocked()[a.id]).length, total: counted.length };
+  }
+
   // 達成した実績の一覧 [{ id, title }]（プロフィールの称号の選択肢に使う）
   function unlockedList() {
     return (defs || []).filter((a) => unlocked()[a.id]).map((a) => ({ id: a.id, title: a.title }));
@@ -172,9 +186,8 @@ const Achievements = (() => {
       return;
     }
     // 期間が終わって、もう取れない期間限定の実績は、全体の数に入れない
-    const counted = defs.filter((a) => !closed(a));
-    const got = counted.filter((a) => unlocked()[a.id]).length;
-    $("achievements-count").textContent = `${got} / ${counted.length}`;
+    const c = counts();
+    $("achievements-count").textContent = `${c.got} / ${c.total}`;
     // 分類ごとにまとめる（json に書いた順番のまま）
     const groups = new Map();
     for (const a of defs) {
@@ -241,5 +254,5 @@ const Achievements = (() => {
     if (typeof Profile !== "undefined") Profile.refresh();
   }
 
-  return { init, load, check, unlockedList, find, setAll };
+  return { init, load, check, counts, unlockedList, find, findByTitle, setAll };
 })();
