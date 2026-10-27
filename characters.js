@@ -21,7 +21,7 @@ window.CHARACTERS = [
   { file: "images/chara03.webp", name: "体育座り", rarity: "N", description: "ジャージ姿で手を組み、どっしり構える。" },
   { file: "images/chara04.webp", name: "ヤンチャ坊主", rarity: "SR", description: "がに股で水鉄砲を構える。横に広いので土台向き？" },
   { file: "images/chara05.webp", name: "台湾案内人", rarity: "N", description: "旗を持って首をかしげる。" },
-  { file: "images/chara06.webp", name: "文明の利器を知らないエイリアン", rarity: "N", description: "メガネで、手に持ったものをのぞきこむ。" },
+  { file: "images/chara06.webp", name: "ブンリキエイリアン", rarity: "N", description: "メガネで、手に持ったものをのぞきこむ。" },
   { file: "images/chara07.webp", name: "篠笛教師", rarity: "N", description: "白シャツで棒をかかげる、先生風のポーズ。" },
   { file: "images/chara08.webp", name: "篠笛マスター", rarity: "R", description: "サングラスで前かがみ。何かを吹いている？" },
   { file: "images/chara09.webp", name: "片足バランス", rarity: "N", description: "片足で前のめりにバランスをとる。積むと一番グラグラするかも。" },
