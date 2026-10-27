@@ -141,6 +141,8 @@ const Game = (() => {
     });
 
     camY = camTargetY = 0;
+    peakHeight = skyHeight = 0;
+    skyStage = 0;
     simTime = 0;
     paused = false;
     dropped = null;
@@ -150,9 +152,15 @@ const Game = (() => {
   // ---------- ゲーム開始 ----------
   // cb: 出来事を main.js に知らせる関数たち
   //   { onDrop, onLand, onSettled(stats), onFall, onGameOver(stats), dropOnRelease() }
-  // opts: { turnTimeLimit: 1手の制限時間（秒）。0 なら制限なし }
+  // opts: { turnTimeLimit: 1手の制限時間（秒）。0 なら制限なし,
+  //         seed: キャラの出る順番を決める番号（挑戦状で使う）。省略するとランダム }
   function start(cb, opts) {
     callbacks = cb || {};
+    // 乱数は「キャラを選ぶ用」と「特殊ルール用（風の向きなど）」で分ける。
+    // 1つにすると、風が吹いた回数でキャラの順番がずれてしまうため
+    const seed = (opts && opts.seed) || Math.floor(Math.random() * 4294967295) + 1;
+    pieceRandom = seededRandom(seed);
+    ruleRandom = seededRandom(seed ^ 0x5bd1e995);
     demo = null;
     remote = false;
     remoteBodies = new Map();
@@ -177,6 +185,7 @@ const Game = (() => {
     get simTime() { return simTime; },
     get worldW() { return WORLD_W; },
     get worldH() { return worldH; },
+    random: () => ruleRandom(), // 0 以上 1 未満の乱数（Math.random の代わりに使う）
     Body,
     bodies: () => bodies(),
     setPlatformAngle: (angle) => Body.setAngle(platform, angle),
@@ -203,6 +212,8 @@ const Game = (() => {
     remoteBodies = new Map();
     state = "idle";
     paused = false;
+    peakHeight = skyHeight = 0;
+    skyStage = 0;
     platformTop = worldH - DEMO_PLATFORM_FROM_BOTTOM;
   }
 
@@ -379,11 +390,29 @@ const Game = (() => {
     if (rareInfo(held.shape) && callbacks.onRare) callbacks.onRare(held.shape, rareInfo(held.shape));
   }
 
+  // 乱数（start で、シード値から作りなおす）
+  let pieceRandom = Math.random; // キャラを選ぶ用
+  let ruleRandom = Math.random; // 特殊ルール用
+
+  // シード値から乱数を作る（同じシード値なら、毎回同じ順番の数が出る。mulberry32 という方法）
+  function seededRandom(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
   // キャラを選ぶ。出やすさ（weight）に合わせて、くじ引きのように選ぶ（同じキャラが2回続かないように）
   function randomShape() {
-    const pool = shapes.length > 1 ? shapes.filter((s) => s !== lastShape) : shapes;
+    // 期間限定のキャラは、イベントの期間中だけ出る（events.js）
+    const open = shapes.filter((s) => LimitedEvents.available(s));
+    const pool = open.length > 1 ? open.filter((s) => s !== lastShape) : open.length ? open : shapes;
     const total = pool.reduce((sum, s) => sum + (s.weight || 1), 0);
-    let r = Math.random() * total; // 0〜合計 のどこかに当たりを置き、
+    let r = pieceRandom() * total; // 0〜合計 のどこかに当たりを置き、
     let shape = pool[pool.length - 1];
     for (const s of pool) {
       r -= s.weight || 1; // 出やすいキャラほど「幅」が広いので当たりやすい
@@ -474,6 +503,7 @@ const Game = (() => {
     }
     for (const id of [...remoteBodies.keys()]) if (!seen.has(id)) remoteBodies.delete(id);
     camTargetY = Math.min(0, top - (HOLD_Y + 240));
+    reachHeight((platformTop - top) / UNITS_PER_METER);
 
     // 持っているキャラ
     if (!snap.h) {
@@ -678,6 +708,8 @@ const Game = (() => {
       if (remote) smoothRemote();
       // カメラをなめらかに目標へ近づける
       camY += (camTargetY - camY) * 0.08;
+      // 空の様子も、なめらかに今の高さへ近づける
+      skyHeight += (peakHeight - skyHeight) * 0.03;
     }
     lastTime = time;
     draw();
@@ -756,6 +788,7 @@ const Game = (() => {
     if (stillFrames > 30 || timeout) {
       state = "settled";
       updateCamera();
+      reachHeight(getStats().height);
       if (callbacks.onSettled) callbacks.onSettled(getStats());
       else nextPiece();
     }
@@ -793,17 +826,36 @@ const Game = (() => {
   }
 
   // ---------- 描画 ----------
+  // 「どこを写すか」を view で表す：{ left, top, w, h } … 写すゲーム内の範囲（左上と、幅・高さ）
+  // ふだんはカメラの位置の、画面ちょうどの範囲。フォトモードでは指で動かした範囲
+  let view = { left: 0, top: 0, w: WORLD_W, h: 800 };
+  // フォトモードの状態 { view: 写している範囲 }。フォトモードでなければ null
+  let photo = null;
+
   function draw() {
     const dpr = window.devicePixelRatio || 1;
-    // ゲーム座標で描けるように、拡大率をセットする
-    ctx.setTransform(viewScale * dpr, 0, 0, viewScale * dpr, 0, 0);
+    if (photo) photo.view.h = photo.view.w * (canvas.height / canvas.width); // 画面の形が変わっても合わせる
+    const v = photo ? photo.view : { left: 0, top: camY, w: WORLD_W, h: worldH };
+    renderScene(ctx, v, (canvas.width / v.w), !photo);
+    // 特殊ルールの表示（風の筋など。画面の座標で描く）
+    if (!photo && rule && rule.draw) {
+      ctx.setTransform(viewScale * dpr, 0, 0, viewScale * dpr, 0, 0);
+      rule.draw(ctx, ruleAPI, rule.params, rule.state);
+    }
+  }
+
+  // 範囲 v を、キャンバス c に描く。scale: ゲーム内の 1 が何ピクセルか
+  // withUI: 持っているキャラ・目盛り・制限時間なども描くか（写真や画像を作るときは描かない）
+  function renderScene(c, v, scale, withUI) {
+    const prevCtx = ctx;
+    ctx = c;
+    view = v;
+    // ゲーム内の座標のまま描けるように、拡大と位置をセットする
+    ctx.setTransform(scale, 0, 0, scale, -v.left * scale, -v.top * scale);
     drawBackground();
 
-    // ここから先はカメラの位置に合わせてずらして描く
     ctx.save();
-    ctx.translate(0, -camY);
-
-    if (engine && state !== "demo") drawHeightMarks();
+    if (withUI && engine && state !== "demo") drawHeightMarks();
     drawPillar();
     drawPlatform();
 
@@ -818,8 +870,9 @@ const Game = (() => {
     }
     // 地面はキャラより手前に描く（落ちたキャラが地面の向こうに消えていくように）
     drawGround();
-    if (!engine) {
+    if (!engine || !withUI) {
       ctx.restore();
+      ctx = prevCtx;
       return;
     }
 
@@ -845,8 +898,120 @@ const Game = (() => {
     drawSparkles();
     if (debug) drawDebug();
     ctx.restore();
-    // 特殊ルールの表示（風の筋など。画面の座標で描く）
-    if (rule && rule.draw) rule.draw(ctx, ruleAPI, rule.params, rule.state);
+    ctx = prevCtx;
+  }
+
+  // ---------- 画像を作る（リザルトカード・フォトモード） ----------
+  // 塔全体（土台と、積まれたキャラ）が入る範囲 { minX, maxX, minY, maxY }
+  function sceneBounds() {
+    const b = { minX: WORLD_W / 2 - PLATFORM_W / 2, maxX: WORLD_W / 2 + PLATFORM_W / 2, minY: platformTop, maxY: groundY() + 30 };
+    const add = (x1, y1, x2, y2) => {
+      b.minX = Math.min(b.minX, x1);
+      b.maxX = Math.max(b.maxX, x2);
+      b.minY = Math.min(b.minY, y1);
+    };
+    if (engine) {
+      for (const p of pieces()) {
+        if (p.position.y > groundY()) continue; // 地面の下まで落ちたキャラは入れない
+        add(p.bounds.min.x, p.bounds.min.y, p.bounds.max.x, p.bounds.max.y);
+      }
+    }
+    for (const r of remoteBodies.values()) {
+      const s = Math.max(r.shape.w, r.shape.h) / 2;
+      add(r.x - s, r.y - s, r.x + s, r.y + s);
+    }
+    return b;
+  }
+
+  // 範囲 b が全部入る、縦横比 aspect（幅÷高さ）の view を作る。まわりに少し余白をとる
+  function fitView(aspect, b, margin = 0.08) {
+    let w = (b.maxX - b.minX) * (1 + margin * 2);
+    let h = (b.maxY - b.minY) * (1 + margin * 2);
+    if (w / h < aspect) w = h * aspect;
+    else h = w / aspect;
+    const cx = (b.minX + b.maxX) / 2;
+    // 下は地面ぎりぎりにそろえる（空を広く写す）
+    return { left: cx - w / 2, top: b.maxY - h, w, h };
+  }
+
+  // 範囲 v を、幅 pxW × 高さ pxH の画像（キャンバス）にする
+  function renderImage(pxW, pxH, v) {
+    const c = document.createElement("canvas");
+    c.width = pxW;
+    c.height = pxH;
+    renderScene(c.getContext("2d"), v, pxW / v.w, false);
+    return c;
+  }
+
+  // 塔全体を写した画像
+  function towerImage(pxW, pxH) {
+    return renderImage(pxW, pxH, fitView(pxW / pxH, sceneBounds()));
+  }
+
+  // ---------- フォトモード ----------
+  // 物理演算を止めて、塔全体が画面に収まるように縮小する。指でドラッグ・ピンチして構図を変えられる
+  const PHOTO_MIN_W = 150; // 一番拡大したときに写す幅（ゲーム内の単位）
+
+  function enterPhoto() {
+    if (photo) return;
+    const aspect = canvas.width / canvas.height;
+    const fit = fitView(aspect, sceneBounds(), 0.06);
+    // 塔が低いときも、ふだんの画面より拡大はしない（下の端はそのままで、幅を画面と同じにする）
+    if (fit.w < WORLD_W) {
+      const bottom = fit.top + fit.h;
+      fit.left = fit.left + fit.w / 2 - WORLD_W / 2;
+      fit.w = WORLD_W;
+      fit.h = WORLD_W / aspect;
+      fit.top = bottom - fit.h;
+    }
+    photo = { view: fit, fitW: fit.w, wasPaused: paused };
+    paused = true;
+  }
+
+  function exitPhoto() {
+    if (!photo) return;
+    paused = photo.wasPaused;
+    photo = null;
+  }
+
+  // 画面上で dx, dy ピクセル動かした（写す範囲を、指と同じ向きに動かす）
+  function photoPan(dx, dy) {
+    const k = photo.view.w / canvas.clientWidth;
+    photo.view.left -= dx * k;
+    photo.view.top -= dy * k;
+    clampPhoto();
+  }
+
+  // 画面上の点 (sx, sy) を中心に、factor 倍に拡大する（1 より大きいと拡大）
+  function photoZoom(factor, sx, sy) {
+    const v = photo.view;
+    const maxW = Math.max(photo.fitW * 1.5, WORLD_W * 1.5);
+    const newW = Math.max(PHOTO_MIN_W, Math.min(maxW, v.w / factor));
+    const k = v.w / canvas.clientWidth;
+    const k2 = newW / canvas.clientWidth;
+    const wx = v.left + sx * k, wy = v.top + sy * k; // 指の下にあるゲーム内の点は、拡大しても指の下のまま
+    v.left = wx - sx * k2;
+    v.top = wy - sy * k2;
+    v.w = newW;
+    v.h = newW * (canvas.height / canvas.width);
+    clampPhoto();
+  }
+
+  // 塔から離れすぎないようにする（写す範囲の真ん中が、いつも塔の範囲の中にあるように）
+  function clampPhoto() {
+    const v = photo.view;
+    const b = sceneBounds();
+    const cx = Math.max(b.minX, Math.min(b.maxX, v.left + v.w / 2));
+    const cy = Math.max(b.minY, Math.min(b.maxY, v.top + v.h / 2));
+    v.left = cx - v.w / 2;
+    v.top = cy - v.h / 2;
+  }
+
+  // 今写している範囲の画像（横 1080 ピクセル以上）
+  function photoImage() {
+    if (!photo) return null;
+    const w = Math.max(1080, canvas.width);
+    return renderImage(w, Math.round((w * canvas.height) / canvas.width), photo.view);
   }
 
   // ---------- 背景と土台の色（themes.js で選んだもの） ----------
@@ -862,25 +1027,81 @@ const Game = (() => {
   // 空に散らばる星（星空の背景のとき）。位置は画面の割合
   const stars = Array.from({ length: 50 }, () => ({ x: Math.random(), y: Math.random() * 0.7, r: 0.6 + Math.random() * 1.2 }));
 
-  // 空のグラデーション（高く登るほど濃い青に）
+  // ---------- 高さで変わる背景（config.js の sky） ----------
+  // このゲームで一番高く積めた高さ（m）と、背景に使っている高さ（なめらかに追いかける）
+  let peakHeight = 0;
+  let skyHeight = 0;
+  let skyStage = 0; // 到達した背景の番号（「〇〇に到達！」を1回だけ出すため）
+
+  // 背景の段階の一覧。1つ目（地上）は、プロフィールで選んだ背景の色にする。
+  // 書いていない色などは、1つ前の段階と同じにする
+  function skyStages() {
+    const conf = window.GAME_CONFIG.sky;
+    const list = conf && conf.stages && conf.stages.length ? conf.stages : [{ height: 0, name: "" }];
+    const result = [];
+    list.forEach((s, i) => result.push(Object.assign({}, i === 0 ? Object.assign({ clouds: 1 }, bgTheme) : result[i - 1], s)));
+    return result;
+  }
+
+  // 塔が高くなった：新しい背景に届いたら知らせる（main.js が「〇〇に到達！」を出す）
+  function reachHeight(h) {
+    if (state === "demo" || !(h > peakHeight)) return;
+    peakHeight = h;
+    const stages = skyStages();
+    let i = 0;
+    while (i + 1 < stages.length && h >= stages[i + 1].height) i++;
+    if (i > skyStage) {
+      skyStage = i;
+      if (callbacks.onSkyStage) callbacks.onSkyStage(stages[i]);
+    }
+  }
+
+  // 高さ h（m）での空の様子 { top, bottom, cloud, clouds, stars }。
+  // 次の背景の blend m 手前から、少しずつ次の背景の色に変えていく
+  function skyAt(h) {
+    const stages = skyStages();
+    const blend = Math.max(0.01, (window.GAME_CONFIG.sky && window.GAME_CONFIG.sky.blend) || 1);
+    let i = 0;
+    while (i + 1 < stages.length && h >= stages[i + 1].height) i++;
+    const cur = stages[i];
+    const next = stages[i + 1] || cur;
+    const t = next === cur ? 0 : Math.max(0, Math.min(1, (h - (next.height - blend)) / blend));
+    const num = (s, key, def) => (typeof s[key] === "number" ? s[key] : def);
+    return {
+      top: mix(cur.top, next.top, t),
+      bottom: mix(cur.bottom, next.bottom, t),
+      cloud: mix(cur.cloud, next.cloud, t),
+      clouds: num(cur, "clouds", 1) * (1 - t) + num(next, "clouds", 1) * t,
+      stars: (cur.stars ? 1 : 0) * (1 - t) + (next.stars ? 1 : 0) * t,
+    };
+  }
+
+  // 空のグラデーション（塔が高くなるほど、config.js の sky のとおりに変わる）
+  // 空・雲・星は「遠くにある」ので、写す範囲いっぱいに、画面上の大きさを変えずに描く
+  // （k：ふだんの画面に比べて、何倍の範囲を写しているか）
   function drawBackground() {
-    const t = Math.min(1, -camY / 3000);
-    const g = ctx.createLinearGradient(0, 0, 0, worldH);
-    g.addColorStop(0, mix(bgTheme.top, "#1d2b64", t));
-    g.addColorStop(1, mix(bgTheme.bottom, "#4a6fb5", t));
+    const k = view.w / WORLD_W;
+    const sky = skyAt(skyHeight);
+    const g = ctx.createLinearGradient(0, view.top, 0, view.top + view.h);
+    g.addColorStop(0, sky.top);
+    g.addColorStop(1, sky.bottom);
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, WORLD_W, worldH);
-    if (bgTheme.stars) {
+    ctx.fillRect(view.left, view.top, view.w, view.h);
+    if (sky.stars > 0) {
       ctx.fillStyle = "#ffffff";
       for (const s of stars) {
-        ctx.globalAlpha = 0.5 + 0.5 * Math.sin(performance.now() / 700 + s.x * 40); // ちかちか
+        ctx.globalAlpha = sky.stars * (0.5 + 0.5 * Math.sin(performance.now() / 700 + s.x * 40)); // ちかちか
         ctx.beginPath();
-        ctx.arc(s.x * WORLD_W, s.y * worldH, s.r, 0, Math.PI * 2);
+        ctx.arc(view.left + s.x * view.w, view.top + s.y * view.h, s.r * k, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.globalAlpha = 1;
     }
-    drawClouds();
+    if (sky.clouds > 0) {
+      ctx.globalAlpha = Math.min(1, sky.clouds);
+      drawClouds(k, sky.cloud);
+      ctx.globalAlpha = 1;
+    }
   }
 
   // ---------- 雲 ----------
@@ -896,13 +1117,13 @@ const Game = (() => {
   // 雲の形：楕円を4つ重ねて、もこもこにする [中心x, 中心y, 横半径, 縦半径]
   const CLOUD_PUFFS = [[0, 0, 34, 16], [-26, 5, 22, 12], [28, 4, 24, 13], [4, -10, 20, 14]];
 
-  function drawClouds() {
-    ctx.fillStyle = bgTheme.cloud;
+  function drawClouds(k, color) {
+    ctx.fillStyle = color;
     for (const c of clouds) {
       // カメラが上に行くと、雲は少しだけ下に流れる（遠くにある感じを出す）
-      const x = c.x * WORLD_W;
-      const y = c.y * worldH - camY * 0.15;
-      const s = c.scale;
+      const x = view.left + c.x * view.w;
+      const y = view.top + c.y * view.h - camY * 0.15 * k;
+      const s = c.scale * k;
       for (const [dx, dy, rx, ry] of CLOUD_PUFFS) {
         ctx.beginPath(); // 1つずつ塗る（まとめて塗ると、重なった部分が抜けてしまう）
         ctx.ellipse(x + dx * s, y + dy * s, rx * s, ry * s, 0, 0, Math.PI * 2);
@@ -953,19 +1174,25 @@ const Game = (() => {
   }
 
   // 地面（なだらかな丘）
+  // 写す範囲が画面より広いとき（フォトモードで縮小したとき）は、左右にまっすぐのばす
   function drawGround() {
     const top = groundY();
+    const left = Math.min(-10, view.left - 10);
+    const right = Math.max(WORLD_W + 10, view.left + view.w + 10);
+    const bottom = Math.max(top + 3000, view.top + view.h + 10);
     ctx.fillStyle = bgTheme.ground;
     ctx.beginPath();
-    ctx.moveTo(-10, top + 14);
+    ctx.moveTo(left, top + 14);
+    ctx.lineTo(-10, top + 14);
     ctx.quadraticCurveTo(WORLD_W * 0.25, top - 10, WORLD_W / 2, top);
     ctx.quadraticCurveTo(WORLD_W * 0.75, top + 10, WORLD_W + 10, top - 6);
-    ctx.lineTo(WORLD_W + 10, top + 3000);
-    ctx.lineTo(-10, top + 3000);
+    ctx.lineTo(right, top - 6);
+    ctx.lineTo(right, bottom);
+    ctx.lineTo(left, bottom);
     ctx.closePath();
     ctx.fill();
     ctx.fillStyle = bgTheme.groundDark; // 少し下に濃い色の帯
-    ctx.fillRect(-10, top + 40, WORLD_W + 20, 3000);
+    ctx.fillRect(left, top + 40, right - left, bottom - top - 40);
   }
 
   // 2つの色を t の割合で混ぜる
@@ -983,8 +1210,8 @@ const Game = (() => {
     ctx.lineWidth = 1;
     for (let m = 1; m < 100; m++) {
       const y = platformTop - m * UNITS_PER_METER;
-      if (y < camY + 90) break; // 画面の上の方はスコア表示と重なるので描かない
-      if (y > camY + worldH) continue;
+      if (y < view.top + 90) break; // 画面の上の方はスコア表示と重なるので描かない
+      if (y > view.top + view.h) continue;
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(30, y);
@@ -1121,8 +1348,25 @@ const Game = (() => {
     let lastX = 0;
     let dragging = false;
     let moved = 0; // ドラッグした距離（タップとドラッグを区別するため）
+    // フォトモード：画面にふれている指（id → 位置）と、2本指の間の距離
+    const fingers = new Map();
+    let pinchDist = 0;
+    const fingerDist = () => {
+      const [a, b] = [...fingers.values()];
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
+    const local = (e) => {
+      const r = canvas.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
 
     canvas.addEventListener("pointerdown", (e) => {
+      if (photo) {
+        canvas.setPointerCapture(e.pointerId);
+        fingers.set(e.pointerId, local(e));
+        if (fingers.size === 2) pinchDist = fingerDist();
+        return;
+      }
       if (paused || state !== "aim" || !inputEnabled) return;
       dragging = true;
       moved = 0;
@@ -1130,6 +1374,22 @@ const Game = (() => {
       canvas.setPointerCapture(e.pointerId);
     });
     canvas.addEventListener("pointermove", (e) => {
+      if (photo) {
+        if (!fingers.has(e.pointerId)) return;
+        const prev = fingers.get(e.pointerId);
+        const now = local(e);
+        fingers.set(e.pointerId, now);
+        if (fingers.size === 1) photoPan(now.x - prev.x, now.y - prev.y);
+        else if (fingers.size === 2) {
+          // 2本指：つまんだ幅に合わせて拡大し、2本の指の真ん中の動きで移動する
+          const d = fingerDist();
+          const [a, b] = [...fingers.values()];
+          photoPan((now.x - prev.x) / 2, (now.y - prev.y) / 2);
+          if (pinchDist > 0) photoZoom(d / pinchDist, (a.x + b.x) / 2, (a.y + b.y) / 2);
+          pinchDist = d;
+        }
+        return;
+      }
       if (!dragging || paused) return;
       const dx = (e.clientX - lastX) / viewScale;
       lastX = e.clientX;
@@ -1143,6 +1403,23 @@ const Game = (() => {
       if (callbacks.dropOnRelease && callbacks.dropOnRelease() && moved > 5) drop();
     });
     canvas.addEventListener("pointercancel", () => (dragging = false));
+    const release = (e) => {
+      fingers.delete(e.pointerId);
+      pinchDist = fingers.size === 2 ? fingerDist() : 0;
+    };
+    canvas.addEventListener("pointerup", release);
+    canvas.addEventListener("pointercancel", release);
+    // パソコン：マウスのホイールで拡大・縮小
+    canvas.addEventListener(
+      "wheel",
+      (e) => {
+        if (!photo) return;
+        e.preventDefault();
+        const p = local(e);
+        photoZoom(Math.exp(-e.deltaY * 0.0015), p.x, p.y);
+      },
+      { passive: false }
+    );
   }
 
   function setDebug(on) {
@@ -1153,13 +1430,13 @@ const Game = (() => {
     shapes = list;
   }
 
-  // 今のゲーム画面のキャンバス（将来、SNS共有でタワーの画像を作るときに使う予定）
+  // 今のゲーム画面のキャンバス（タワーの画像は towerImage・photoImage で作る）
   function getCanvas() {
     return canvas;
   }
 
   return {
-    init, start, stop, startDemo, setForcedShape, setDemoCeiling, setTheme, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
+    init, start, stop, startDemo, towerImage, enterPhoto, exitPhoto, photoImage, setForcedShape, setDemoCeiling, setTheme, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
     get state() { return state; },
     get paused() { return paused; },
     get heldX() { return held ? held.x : WORLD_W / 2; }, // 持っているキャラの位置

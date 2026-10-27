@@ -36,7 +36,7 @@
   <!-- アプリとしてインストールするための設定（PWA） -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="css/style.css?v=1.2.1">
+  <link rel="stylesheet" href="css/style.css?v=1.3.0">
 </head>
 <body>
   <div id="app">
@@ -228,6 +228,7 @@
         <div class="menu">
           <button id="btn-resume" class="btn btn-big btn-primary">つづける</button>
           <button id="btn-restart" class="btn btn-big btn-sub">最初からやり直す</button>
+          <button class="btn btn-big btn-sub" data-photo>📷 フォトモード</button>
           <button id="btn-pause-settings" class="btn btn-big btn-sub">設定</button>
           <button id="btn-pause-title" class="btn btn-big btn-sub">タイトルへ</button>
         </div>
@@ -296,8 +297,44 @@
         <div id="result-content"></div>
         <div class="menu">
           <button id="btn-retry" class="btn btn-big btn-primary">もう一度</button>
+          <!-- 挑戦状：1人モード（特殊ルールも）のときだけ表示 -->
+          <button id="btn-challenge" class="btn btn-big btn-p2 hidden">挑戦状を送る<small>同じ順番のキャラで勝負！</small></button>
+          <button id="btn-card" class="btn btn-big btn-special">結果を画像でシェア<small>リザルトカードを作る</small></button>
+          <button class="btn btn-big btn-sub" data-photo>📷 フォトモード</button>
           <button id="btn-result-title" class="btn btn-big btn-sub">タイトルへ</button>
-          <!-- 将来、SNS共有ボタンはここに追加する -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== フォトモード（ボタンなどを消して、背景とタワーだけを写す） ===== -->
+    <!-- この画面自体は透明で、指の操作は後ろのキャンバスに届く（ドラッグで移動・ピンチで拡大） -->
+    <section id="screen-photo" class="screen screen-photo">
+      <p class="photo-hint">ドラッグで移動・ピンチで拡大</p>
+      <div class="photo-bar">
+        <button id="btn-photo-close" class="btn btn-icon" aria-label="フォトモードを終わる">✕</button>
+        <button id="btn-photo-shoot" class="btn btn-photo-shoot btn-primary" aria-label="撮影">📷 撮影</button>
+      </div>
+      <div id="photo-flash" class="photo-flash"></div>
+    </section>
+
+    <!-- ===== リザルトカード（結果を画像にして共有） ===== -->
+    <section id="screen-card" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <button class="btn btn-icon" data-back="result" aria-label="もどる">‹</button>
+          <h2>リザルトカード</h2>
+        </header>
+        <div class="page-body card-body">
+          <div class="card-preview"><img id="card-img" class="card-img" alt="リザルトカードの見本"></div>
+          <div class="seg" role="group" aria-label="画像の形">
+            <button class="seg-btn" data-card-size="landscape">横長<small>1200×630</small></button>
+            <button class="seg-btn" data-card-size="portrait">縦長<small>1080×1350</small></button>
+          </div>
+          <div id="card-icon-row" class="setting-row">
+            <span>写真アイコンを載せる<small>オフのときは、名前の1文字目が入ります</small></span>
+            <button id="toggle-card-icon" class="toggle" role="switch" aria-label="写真アイコンを載せる"></button>
+          </div>
+          <button id="btn-card-share" class="btn btn-big btn-primary">シェア<small>共有できない端末では、画像を保存します</small></button>
         </div>
       </div>
     </section>
@@ -453,6 +490,30 @@
     </div>
 
     <!-- ===== 未読のお知らせのポップアップ（起動時） ===== -->
+    <!-- 挑戦状を受け取ったとき（URL に ?seed=… が付いていたとき） -->
+    <div id="challenge-popup" class="dialog">
+      <div class="dialog-box challenge-box">
+        <p class="challenge-label">挑戦状</p>
+        <div id="challenge-popup-content"></div>
+        <div class="dialog-buttons">
+          <button id="challenge-later" class="btn btn-sub">やめておく</button>
+          <button id="challenge-accept" class="btn btn-primary">挑戦する</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 共有メニューが使えないときの、URL をコピーするダイアログ -->
+    <div id="share-dialog" class="dialog">
+      <div class="dialog-box">
+        <p>このURLを送ってください</p>
+        <input id="share-url" class="share-url" type="text" readonly>
+        <div class="dialog-buttons">
+          <button id="share-close" class="btn btn-sub">閉じる</button>
+          <button id="share-copy" class="btn btn-primary">コピー</button>
+        </div>
+      </div>
+    </div>
+
     <div id="news-popup" class="dialog">
       <div class="dialog-box news-popup-box">
         <div id="news-popup-content"></div>
@@ -560,34 +621,37 @@
 
   <!-- ?v= のあとの番号：更新したら config.js の version と一緒に上げる（スマホに古いファイルが残らないように） -->
   <!-- ライブラリ（lib/ に同梱） -->
-  <script src="lib/decomp.min.js?v=1.2.1"></script>
-  <script src="lib/matter.min.js?v=1.2.1"></script>
-  <script src="lib/peerjs.min.js?v=1.2.1"></script>
-  <script src="lib/mqtt.min.js?v=1.2.1"></script>
+  <script src="lib/decomp.min.js?v=1.3.0"></script>
+  <script src="lib/matter.min.js?v=1.3.0"></script>
+  <script src="lib/peerjs.min.js?v=1.3.0"></script>
+  <script src="lib/mqtt.min.js?v=1.3.0"></script>
   <!-- 設定ファイル -->
-  <script src="config.js?v=1.2.1"></script>
-  <script src="characters.js?v=1.2.1"></script>
+  <script src="config.js?v=1.3.0"></script>
+  <script src="characters.js?v=1.3.0"></script>
   <!-- ゲーム本体 -->
-  <script src="js/settings.js?v=1.2.1"></script>
-  <script src="js/save.js?v=1.2.1"></script>
-  <script src="js/audio.js?v=1.2.1"></script>
-  <script src="js/shape.js?v=1.2.1"></script>
-  <script src="js/game.js?v=1.2.1"></script>
-  <script src="js/rules.js?v=1.2.1"></script>
-  <script src="js/cpu.js?v=1.2.1"></script>
-  <script src="js/online.js?v=1.2.1"></script>
-  <script src="js/ui.js?v=1.2.1"></script>
-  <script src="js/themes.js?v=1.2.1"></script>
-  <script src="js/profile.js?v=1.2.1"></script>
-  <script src="js/data-file.js?v=1.2.1"></script>
-  <script src="js/news.js?v=1.2.1"></script>
-  <script src="js/ranking.js?v=1.2.1"></script>
-  <script src="js/records.js?v=1.2.1"></script>
-  <script src="js/dex.js?v=1.2.1"></script>
-  <script src="js/achievements.js?v=1.2.1"></script>
-  <script src="js/backup.js?v=1.2.1"></script>
-  <script src="js/admin.js?v=1.2.1"></script>
-  <script src="js/pwa.js?v=1.2.1"></script>
-  <script src="js/main.js?v=1.2.1"></script>
+  <script src="js/settings.js?v=1.3.0"></script>
+  <script src="js/save.js?v=1.3.0"></script>
+  <script src="js/audio.js?v=1.3.0"></script>
+  <script src="js/shape.js?v=1.3.0"></script>
+  <script src="js/game.js?v=1.3.0"></script>
+  <script src="js/rules.js?v=1.3.0"></script>
+  <script src="js/cpu.js?v=1.3.0"></script>
+  <script src="js/challenge.js?v=1.3.0"></script>
+  <script src="js/card.js?v=1.3.0"></script>
+  <script src="js/online.js?v=1.3.0"></script>
+  <script src="js/ui.js?v=1.3.0"></script>
+  <script src="js/themes.js?v=1.3.0"></script>
+  <script src="js/profile.js?v=1.3.0"></script>
+  <script src="js/data-file.js?v=1.3.0"></script>
+  <script src="js/news.js?v=1.3.0"></script>
+  <script src="js/events.js?v=1.3.0"></script>
+  <script src="js/ranking.js?v=1.3.0"></script>
+  <script src="js/records.js?v=1.3.0"></script>
+  <script src="js/dex.js?v=1.3.0"></script>
+  <script src="js/achievements.js?v=1.3.0"></script>
+  <script src="js/backup.js?v=1.3.0"></script>
+  <script src="js/admin.js?v=1.3.0"></script>
+  <script src="js/pwa.js?v=1.3.0"></script>
+  <script src="js/main.js?v=1.3.0"></script>
 </body>
 </html>

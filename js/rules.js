@@ -11,6 +11,7 @@
 //        shapeScale(p)             … キャラの大きさの倍率
 //        start(game, p, state)     … ゲーム開始のとき
 //        step(game, p, state)      … 物理演算の1ステップ（60分の1秒）ごと
+//                                    （乱数は Math.random ではなく game.random() を使う。挑戦状で同じ展開にするため）
 //        draw(ctx, game, p, state) … 画面に何か描く（画面の座標で描く）
 //      p は config.js の数値、state はそのルールが自由に使える入れ物、
 //      game はゲーム本体の情報（下の Game.ruleAPI を参照）
@@ -30,7 +31,7 @@ const Rules = (() => {
       step(game, p, s) {
         const t = game.simTime;
         if (s.dir === 0 && t >= s.nextAt) {
-          s.dir = Math.random() < 0.5 ? -1 : 1;
+          s.dir = game.random() < 0.5 ? -1 : 1;
           s.endAt = t + p.duration * 1000;
         } else if (s.dir !== 0 && t >= s.endAt) {
           s.dir = 0;
@@ -99,10 +100,11 @@ const Rules = (() => {
   };
 
   // 遊べるルールの一覧（config.js にあって、動きも書いてあるもの）
+  // 特殊ルールの一覧（期間限定のルールは、イベントの期間中だけ入る。events.js）
   function list() {
     const conf = window.GAME_CONFIG.rules || {};
     return Object.keys(conf)
-      .filter((id) => BEHAVIORS[id])
+      .filter((id) => BEHAVIORS[id] && LimitedEvents.available(conf[id]))
       .map((id) => get(id));
   }
 

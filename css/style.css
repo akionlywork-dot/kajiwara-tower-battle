@@ -2129,3 +2129,217 @@ select {
   flex-shrink: 0;
   white-space: nowrap;
 }
+
+/* =============================================
+   挑戦状
+   ============================================= */
+/* 受け取ったときのポップアップ */
+.challenge-label {
+  display: inline-block;
+  padding: 2px 14px;
+  border-radius: var(--radius-round);
+  color: #fff;
+  background: var(--color-p2);
+  font-size: var(--font-size-s) !important;
+  letter-spacing: 0.2em;
+}
+
+.challenge-from {
+  margin-top: var(--space-s);
+}
+
+.challenge-score {
+  font-size: 44px;
+  font-weight: bold;
+  line-height: 1.2;
+  color: var(--color-primary);
+}
+
+.challenge-score small {
+  font-size: var(--font-size-m);
+}
+
+.challenge-box .rule-tag {
+  color: #fff;
+}
+
+.challenge-note {
+  margin-top: var(--space-s);
+  font-size: var(--font-size-s) !important;
+  font-weight: normal !important;
+  opacity: 0.7;
+}
+
+/* ゲーム中の「〇〇さんの 1270点 に挑戦中」 */
+.hud-challenge {
+  font-size: 13px;
+}
+
+/* リザルトの勝ち負け */
+.challenge-result {
+  display: inline-block;
+  margin-bottom: var(--space-s);
+  padding: var(--space-xs) var(--space-l);
+  border-radius: var(--radius-m);
+  font-size: var(--font-size-l);
+  font-weight: bold;
+  background: var(--color-panel);
+  animation: pop 0.5s ease-out both;
+}
+
+.challenge-result.win { color: var(--color-text-dark); background: var(--color-gold); }
+.challenge-result.lose { background: rgba(0, 0, 0, 0.3); }
+
+.challenge-result small {
+  display: block;
+  font-size: var(--font-size-s);
+  font-weight: normal;
+}
+
+/* 共有できないときの URL 欄 */
+.share-url {
+  width: 100%;
+  margin-top: var(--space-s);
+  padding: var(--space-s);
+  border: 2px solid #dde3ec;
+  border-radius: var(--radius-s);
+  font-family: inherit;
+  font-size: var(--font-size-s);
+  color: var(--color-text-dark);
+}
+
+/* =============================================
+   リザルトカード
+   ============================================= */
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+}
+
+.card-preview {
+  display: flex;
+  justify-content: center;
+}
+
+.card-img {
+  display: block;
+  max-width: 100%;
+  border-radius: var(--radius-s);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+/* 縦長は画面からはみ出さないよう、高さで抑える */
+.card-img.portrait {
+  max-height: 46vh;
+}
+
+/* 2つから選ぶボタン（横長・縦長） */
+.seg {
+  display: flex;
+  gap: var(--space-s);
+}
+
+.seg-btn {
+  flex: 1;
+  padding: var(--space-s);
+  border: 2px solid transparent;
+  border-radius: var(--radius-m);
+  color: var(--color-text);
+  background: var(--color-panel);
+  font-family: inherit;
+  font-size: var(--font-size-m);
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.seg-btn small {
+  display: block;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.seg-btn.selected {
+  border-color: var(--color-gold);
+  background: rgba(255, 216, 77, 0.2);
+}
+
+/* 「雲の上に到達！」（高さで変わる背景） */
+.toast-sky {
+  font-size: var(--font-size-s);
+}
+
+/* =============================================
+   フォトモード
+   ============================================= */
+/* 画面は透明。指の操作は後ろのキャンバスに通し、ボタンだけ押せるようにする */
+.screen.screen-photo,
+.screen.screen-photo.active {
+  align-items: flex-end;
+  background: none;
+  pointer-events: none;
+}
+
+.screen-photo .btn {
+  pointer-events: auto;
+}
+
+.photo-hint {
+  position: absolute;
+  top: calc(var(--space-m) + var(--safe-top));
+  left: 0;
+  right: 0;
+  font-size: var(--font-size-s);
+  font-weight: bold;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  animation: photo-hint 3s ease forwards;
+}
+
+@keyframes photo-hint {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.photo-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-l);
+  width: 100%;
+}
+
+.btn-photo-shoot {
+  min-width: 160px;
+  height: 64px;
+  border-radius: var(--radius-round);
+  font-size: 22px;
+}
+
+/* 撮影したときに、画面が一瞬白く光る */
+.photo-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.photo-flash.on {
+  animation: photo-flash 0.4s ease-out;
+}
+
+@keyframes photo-flash {
+  from { opacity: 0.8; }
+  to { opacity: 0; }
+}
+
+/* 期間限定（イベントの特殊ルール） */
+.limited-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: var(--radius-round);
+  color: var(--color-text-dark);
+  background: var(--color-gold);
+  font-size: 11px;
+  vertical-align: middle;
+}

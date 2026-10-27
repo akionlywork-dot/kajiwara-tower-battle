@@ -7,7 +7,7 @@
 //   （番号が変わると、新しいファイルを保存しなおし、古いものは消す）
 // =============================================
 
-const VERSION = "1.2.1";
+const VERSION = "1.3.0";
 const CACHE = `kajiwara-tb-${VERSION}`;
 
 // バージョン番号（?v=）を付けて読み込んでいるファイル（index.html と同じもの）
@@ -16,8 +16,8 @@ const VERSIONED = [
   "lib/decomp.min.js", "lib/matter.min.js", "lib/peerjs.min.js", "lib/mqtt.min.js",
   "config.js", "characters.js",
   "js/settings.js", "js/save.js", "js/audio.js", "js/shape.js", "js/game.js", "js/rules.js",
-  "js/cpu.js", "js/online.js", "js/ui.js", "js/themes.js", "js/profile.js", "js/data-file.js",
-  "js/news.js", "js/ranking.js", "js/records.js", "js/dex.js", "js/achievements.js",
+  "js/cpu.js", "js/challenge.js", "js/card.js", "js/online.js", "js/ui.js", "js/themes.js", "js/profile.js", "js/data-file.js",
+  "js/news.js", "js/events.js", "js/ranking.js", "js/records.js", "js/dex.js", "js/achievements.js",
   "js/backup.js", "js/admin.js", "js/pwa.js", "js/main.js",
 ].map((p) => `${p}?v=${VERSION}`);
 

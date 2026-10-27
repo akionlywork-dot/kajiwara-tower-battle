@@ -6,7 +6,10 @@
 
 const Dex = (() => {
   const $ = (id) => document.getElementById(id);
-  const chars = () => window.CHARACTERS;
+  // 図鑑に並べるキャラ。期間限定のキャラ（characters.js の event）は、登録ずみか、イベントの期間中だけ出す
+  const chars = () => window.CHARACTERS.filter((c) => !c.event || registered()[c.file] || LimitedEvents.isActive(c.event));
+  // 「図鑑コンプリート」に数えるキャラ（期間限定のキャラは数えない。期間が終わると集められなくなるため）
+  const regular = () => window.CHARACTERS.filter((c) => !c.event);
   const registered = () => Save.data.dex; // ファイル名 → 登録した日時
 
   function init() {
@@ -24,18 +27,18 @@ const Dex = (() => {
     if (!file || registered()[file]) return false;
     registered()[file] = new Date().toISOString();
     Save.write();
-    const c = chars().find((x) => x.file === file);
+    const c = window.CHARACTERS.find((x) => x.file === file);
     UI.toast(`<img class="toast-img" src="${file}" alt="">図鑑に登録：<b>${UI.escape(c ? c.name : "")}</b>`);
     return true;
   }
 
-  // 登録数（今の characters.js にあるキャラだけを数える）
+  // 登録数（今の characters.js にある、期間限定でないキャラだけを数える）
   function count() {
-    return chars().filter((c) => registered()[c.file]).length;
+    return regular().filter((c) => registered()[c.file]).length;
   }
 
   function total() {
-    return chars().length;
+    return regular().length;
   }
 
   // ---------- 図鑑画面 ----------

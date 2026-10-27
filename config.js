@@ -3,7 +3,7 @@
 // =============================================
 window.GAME_CONFIG = {
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v1.2.1",
+  version: "v1.3.0",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -75,6 +75,27 @@ window.GAME_CONFIG = {
       { id: "stone", name: "石の台", unlock: "first_stack", body: "#7d808c", top: "#b3b7c2", pillar: "#6b6e78" },
       { id: "ice", name: "氷の台", unlock: "plays10", body: "#7ec4e8", top: "#e3f6ff", pillar: "#6aa9c9" },
       { id: "gold", name: "金の台", unlock: "dex_complete", body: "#d4a019", top: "#ffe27a", pillar: "#b3861a" },
+    ],
+  },
+
+  // 高さで変わる背景（タワーが高くなるほど、空の様子が変わる）
+  //   stages : 上から順に、高さの低いものから並べる。行を足すと背景が増える
+  //     height : この高さ（m）に届いたら、この背景になる
+  //     name   : 届いたときに「〇〇に到達！」と表示する名前
+  //     icon   : 名前の前に出す絵文字
+  //     top / bottom : 空の上・下の色、cloud : 雲の色（"#" から始まる6桁の色の番号）
+  //     clouds : 雲の濃さ（0 で雲なし、1 でふつう。省略すると 1）
+  //     stars  : true にすると星を出す
+  //   1つ目（height: 0）は地上。色はプロフィールで選んだ背景（下の themes.backgrounds）を使うので、名前だけ書く
+  //   blend : 何 m かけて、次の背景の色に変わっていくか（大きいほどゆっくり変わる）
+  sky: {
+    blend: 1,
+    stages: [
+      { height: 0, name: "草原", icon: "🌱" },
+      { height: 2, name: "空", icon: "🕊️", top: "#2f86e0", bottom: "#9fd6f7", cloud: "#ffffff" },
+      { height: 4, name: "雲の上", icon: "☁️", top: "#5b9be6", bottom: "#f2f8ff", cloud: "#ffffff", clouds: 0.6 },
+      { height: 6, name: "夕焼け", icon: "🌇", top: "#4a3a8c", bottom: "#ff9a5c", cloud: "#ffc7a3" },
+      { height: 9, name: "宇宙", icon: "🚀", top: "#03051a", bottom: "#1b2156", cloud: "#1b2156", clouds: 0, stars: true },
     ],
   },
 

@@ -14,6 +14,8 @@ const Settings = (() => {
     timer: false, // 1手ごとの制限時間
     release: false, // 指を離したら落とす
     debug: false, // 当たり判定を表示（確認用）
+    cardSize: "landscape", // リザルトカードの形（"landscape"=横長 / "portrait"=縦長）
+    cardIcon: false, // リザルトカードに写真アイコンを載せるか（初めは載せない）
   };
 
   // localStorage は、プライベートモードなどで使えないことがあるので try で囲む

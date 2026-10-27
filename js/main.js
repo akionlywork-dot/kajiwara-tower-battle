@@ -30,8 +30,12 @@
   let settingsReturnTo = "title"; // 設定画面を閉じたときに戻る画面
   let shapesReady = false; // キャラの読み込みが終わったか
 
-  // 最後のゲームの結果（将来、SNS共有でスコアを投稿するときに使う）
+  // 最後のゲームの結果（リザルトカード・挑戦状で使う）
   let lastResult = null;
+  // キャラの出る順番を決める番号（ゲームごとに変わる。挑戦状に入れて、相手も同じ順番にする）
+  let seed = 0;
+  // 受け取った挑戦状 { seed, rule, score, name }。挑戦中でなければ null
+  let challenge = null;
 
   // ---------- 音 ----------
   // 最初に画面をさわったときに、音を使えるようにする（スマホのブラウザの制限への対策）
@@ -83,6 +87,7 @@
   // ---------- 各画面へ ----------
   function goTitle() {
     gameToken++; // CPU が考え中なら、やめさせる
+    challenge = null; // タイトルに戻ったら、挑戦状はおしまい
     showThinking(false);
     if (online) leaveOnline(); // オンライン対戦中なら、接続を切る
     if (mode === "online") mode = "solo";
@@ -149,6 +154,8 @@
     stacked = 0;
     maxHeight = 0;
     droppedShape = null;
+    // 挑戦中は挑戦状と同じ順番、そうでなければ新しい順番
+    seed = challenge && mode === "solo" && ruleId === challenge.rule ? challenge.seed : Challenge.newSeed();
     UI.clearConfetti();
     UI.show(null);
     Game.start(
@@ -165,11 +172,12 @@
           if (mode === "online") Online.send({ t: "rare", f: shape.file });
         },
         onSettled: onSettled,
+        onSkyStage: showSkyStage,
         onFall: () => playSe("fall"),
         onGameOver: showResult,
       },
       // オンライン対戦では制限時間を使わない
-      { turnTimeLimit: mode === "online" ? 0 : turnTimeLimit(), rule: Rules.get(ruleId) }
+      { turnTimeLimit: mode === "online" ? 0 : turnTimeLimit(), rule: Rules.get(ruleId), seed }
     );
     applySettings();
     Sound.startBgm();
@@ -482,6 +490,7 @@
       dropOnRelease: () => Settings.get("release"),
       // 自分の手番で「落とす」を押したら、位置と角度をホストに送る
       onRemoteDrop: (x, a) => sendImportant({ t: "drop", x, a }),
+      onSkyStage: showSkyStage,
     });
     Game.setInputEnabled(true);
     Sound.startBgm();
@@ -527,7 +536,10 @@
   function updateHud() {
     const sub = `${stacked}体 ／ ${maxHeight.toFixed(2)}m`;
     if (mode === "solo") {
-      $("hud-info").innerHTML = `<span class="big">${calcScore()}</span> 点 ${ruleTag()}<br>${sub}`;
+      const target = challenge
+        ? `<br><span class="hud-challenge">🎯 ${UI.escape(challenge.name)}さんの ${challenge.score}点 に挑戦中</span>`
+        : "";
+      $("hud-info").innerHTML = `<span class="big">${calcScore()}</span> 点 ${ruleTag()}<br>${sub}${target}`;
     } else {
       $("hud-info").innerHTML = `<span class="player-tag p${player}">${UI.escape(nameOf(player))} の番</span><br>${sub}`;
     }
@@ -543,6 +555,11 @@
     void el.offsetWidth;
     el.style.animation = "";
     Sound.play("rare");
+  }
+
+  // 塔が高くなって、新しい背景に届いた（config.js の sky）
+  function showSkyStage(stage) {
+    UI.toast(`<span class="toast-sky">${stage.icon || ""} <b>${UI.escape(stage.name)}</b>に到達！</span>`);
   }
 
   // 「〇〇 の番」を大きく表示する
@@ -569,9 +586,10 @@
         ? Records.addRuleResult(ruleId, score, stacked, maxHeight)
         : Records.addSoloResult(score, stacked, maxHeight);
       const best = ruleId ? Save.data.stats.ruleBest[ruleId] : Save.data.stats.best;
-      lastResult = { mode, rule: ruleId, score, count: stacked, height: maxHeight, isNewRecord: isNew };
+      lastResult = { mode, rule: ruleId, seed, score, count: stacked, height: maxHeight, isNewRecord: isNew };
 
       box.innerHTML =
+        challengeResultHTML(score) +
         Profile.badgeHTML() +
         (ruleId ? `<div class="result-rule">${ruleTag()}</div>` : "") +
         (isNew ? `<div class="new-record">NEW RECORD!</div>` : `<h2 class="result-heading">ゲームオーバー</h2>`) +
@@ -615,9 +633,75 @@
       const color = winner === 1 ? "#ff5d73" : "#3d8bff";
       UI.confetti([color, "#ffffff", "#ffd84d"]);
     }
+    // 挑戦状のボタン（1人モードのときだけ。挑戦中なら「送り返す」）
+    $("btn-challenge").classList.toggle("hidden", mode !== "solo");
+    $("btn-challenge").firstChild.textContent = challenge ? "挑戦状を送り返す" : "挑戦状を送る";
     // 戦績を記録したあとで、実績を判定する（「10回プレイ」「対戦で10勝」など）
     Achievements.check(gameStatus());
     UI.show("result");
+  }
+
+  // ---------- リザルトカード ----------
+  // モードの名前（カードに載せる）
+  function modeName() {
+    const r = Rules.get(ruleId);
+    if (mode === "solo") return challenge ? `挑戦状（${challenge.name}さん ${challenge.score}点）` : r ? `特殊ルール「${r.params.name}」` : "スコアアタック";
+    if (mode === "online") return "オンライン対戦";
+    return cpuLevel ? `CPU対戦（${CONFIG.cpu[cpuLevel].name}）` : "ふたりで対戦";
+  }
+
+  function openCard() {
+    if (!lastResult) return;
+    const p = Save.data.profile;
+    const solo = lastResult.mode === "solo";
+    Card.open({
+      name: solo ? Save.playerName(1) : nameOf(lastResult.winner),
+      titleText: solo ? Profile.titleText(p.titleId) : "",
+      icon: solo ? p.icon : null, // 対戦の勝者が自分とはかぎらないので、写真は載せない
+      modeName: modeName(),
+      score: solo ? lastResult.score : null,
+      headline: solo ? "" : `${nameOf(lastResult.winner)} の勝ち！`,
+      count: lastResult.count,
+      height: lastResult.height,
+    });
+  }
+
+  // ---------- 挑戦状 ----------
+  // リザルトの「〇〇さんに勝ち！」（挑戦中でなければ ""）
+  function challengeResultHTML(score) {
+    if (!challenge) return "";
+    const who = `${UI.escape(challenge.name)}さん（${challenge.score}点）`;
+    if (score > challenge.score) return `<div class="challenge-result win">勝ち！<small>${who}に勝ちました</small></div>`;
+    if (score < challenge.score) return `<div class="challenge-result lose">負け…<small>${who}に届きませんでした</small></div>`;
+    return `<div class="challenge-result">引き分け<small>${who}と同じ点数</small></div>`;
+  }
+
+  // 挑戦状を送る（送り返す）：同じ順番・同じルールで、自分のスコアを入れた URL を共有する
+  function sendChallenge() {
+    if (!lastResult || lastResult.mode !== "solo") return;
+    const name = Save.playerName(1);
+    const url = Challenge.makeUrl({ seed: lastResult.seed, rule: lastResult.rule, score: lastResult.score, name });
+    const r = Rules.get(lastResult.rule);
+    const text = `${name}から挑戦状！かじわらタワーバトル${r ? `（${r.params.name}）` : ""}で ${lastResult.score}点 を超えられる？`;
+    Share.url(text, url);
+  }
+
+  // URL で受け取った挑戦状を表示する
+  function showChallengePopup(c) {
+    const r = Rules.get(c.rule);
+    $("challenge-popup-content").innerHTML =
+      `<p class="challenge-from">${UI.escape(c.name)}さんからの挑戦状</p>` +
+      `<div class="challenge-score">${c.score}<small> 点</small></div>` +
+      (r ? `<span class="rule-tag">${r.params.icon || ""} ${UI.escape(r.params.name)}</span>` : "") +
+      `<p class="challenge-note">同じ順番でキャラが出てきます。この点数を超えたら勝ち！</p>`;
+    $("challenge-popup").classList.add("active");
+    $("challenge-accept").onclick = () => {
+      $("challenge-popup").classList.remove("active");
+      if (!shapesReady) return; // キャラの画像を読み込めなかった
+      challenge = c;
+      startGame("solo", c.rule);
+    };
+    $("challenge-later").onclick = () => $("challenge-popup").classList.remove("active");
   }
 
   // ---------- ボタン ----------
@@ -679,7 +763,7 @@
           <button class="list-row rule-row" data-rule="${r.id}">
             <span class="rule-icon">${r.params.icon || ""}</span>
             <span class="rule-main">
-              <b>${UI.escape(r.params.name)}</b>
+              <b>${UI.escape(r.params.name)}${r.params.event ? ` <span class="limited-tag">期間限定</span>` : ""}</b>
               <small>${UI.escape(r.params.description || "")}</small>
             </span>
             <span class="rule-best">${best ? `ハイスコア<b>${best.score}</b>` : ""}</span>
@@ -692,6 +776,33 @@
     if (row) startGame("solo", row.dataset.rule);
   });
   on("btn-result-title", goTitle);
+  on("btn-challenge", sendChallenge);
+  on("btn-card", openCard);
+  // フォトモード（ポーズ画面・リザルト画面の data-photo ボタン）
+  let photoReturn = null; // フォトモードを終わったときに戻る画面
+  for (const btn of document.querySelectorAll("[data-photo]")) {
+    btn.addEventListener("click", () => {
+      photoReturn = UI.current;
+      Game.enterPhoto();
+      UI.show("photo");
+      UI.replayAnimations("photo"); // 「ドラッグで移動・ピンチで拡大」をもう一度出す
+    });
+  }
+  on("btn-photo-close", () => {
+    Game.exitPhoto();
+    UI.show(photoReturn);
+  });
+  on("btn-photo-shoot", () => {
+    const img = Game.photoImage();
+    if (!img) return;
+    // 撮った感じを出す（画面が白く光る）
+    const flash = $("photo-flash");
+    flash.classList.remove("on");
+    void flash.offsetWidth;
+    flash.classList.add("on");
+    img.toBlob((blob) => Share.image(blob, "kajiwara-tower-photo.png", `かじわらタワーバトル
+${location.origin}${location.pathname}`), "image/png");
+  });
 
   // ---------- 起動 ----------
   // 1. スプラッシュ画面（会社名）を出す。その裏でタイトル画面を用意し、キャラを読み込む
@@ -719,12 +830,21 @@
   Achievements.init();
   Backup.init();
   PWA.init(); // アプリとしてインストールできるようにする
+  Share.init();
+  Card.init();
+  // キャラの読み込みが終わったら進む Promise（挑戦状は、キャラがそろってから始める）
+  let resolveShapesLoaded;
+  const shapesLoaded = new Promise((resolve) => (resolveShapesLoaded = resolve));
+  // URL に挑戦状が付いていたら読み取る（値がおかしければ、ふつうに始める）
+  const received = Challenge.parse(location.search);
+  if (received) Challenge.clearUrl();
   // 実績の定義を読み込んだら、称号の表示を最新にし、すでに条件を満たしている実績を達成にする
   Achievements.load().then(() => {
     Profile.refresh();
     Achievements.check(null);
   });
   News.load(); // お知らせを裏で読み込んでおく（未読の赤い点のため）
+  LimitedEvents.load(); // 期間限定イベント（今は空。data/events.json）
   Game.init($("game-canvas"), []);
   Themes.apply(); // 選んでいる背景・土台
   goTitle();
@@ -732,7 +852,14 @@
   const splashDone = CONFIG.splash.enabled
     ? UI.splash(CONFIG.splash.text, CONFIG.splash.displayTime).then(() => UI.replayAnimations("title"))
     : Promise.resolve();
-  splashDone.then(() => News.popupIfUnread());
+  // 挑戦状があれば、キャラを読み込み終わってから挑戦状を出す（お知らせはそのあと、次に開いたときに出る）
+  splashDone.then(async () => {
+    if (received === "invalid") UI.toast("挑戦状のURLが正しくないため、ふつうに始めます");
+    if (received && received !== "invalid") {
+      await shapesLoaded;
+      showChallengePopup(received);
+    } else News.popupIfUnread();
+  });
 
   // characters.js に書いたキャラを全部読み込み、形（当たり判定）を作る
   // 全員を同時に読み込み始めて、1体終わるごとに読み込み中の表示を進める
@@ -749,6 +876,7 @@
         const shape = await Shape.create(c.file, c.size || DEFAULT_SIZE, Shape.optionsFrom(c));
         shape.name = c.name;
         shape.file = c.file; // タイトルのデモで、ファイル名からキャラを探すため
+        shape.event = c.event || null; // 期間限定のキャラなら、イベントの id
         // レア度と出やすさ（characters.js の rarity・weight。無ければノーマル・config.js の値）
         shape.rarity = CONFIG.rarity[c.rarity] ? c.rarity : "N";
         shape.weight = typeof c.weight === "number" ? c.weight : CONFIG.rarity[shape.rarity].weight;
@@ -763,6 +891,7 @@
     })
   );
   const shapes = results.filter(Boolean); // 読み込めたキャラだけ（characters.js の順番のまま）
+  resolveShapesLoaded();
 
   // 読み込み中の表示を消す
   $("loading").classList.add("done");
