@@ -10,11 +10,16 @@
 //   score / count / height … スコア・積んだ数・高さ（m）
 //   date   … 記録した日
 //   hidden … ここに何か書くと（例：x）、その人はランキングに出なくなる（変な名前・不正なスコア用）
+//   title  … 称号
+//   icon   … 写真アイコン（小さな JPEG を文字にしたもの）。本人が「載せる」を選んだときだけ入る
 // =============================================
 
 const SHEET_NAME = "ranking";
 const TOP = 100; // ランキングに出す人数
 const NAME_MAX = 10; // 名前の最大文字数（ゲームのプロフィールと同じ）
+const TITLE_MAX = 20; // 称号の最大文字数
+const ICON_MAX = 12000; // 写真アイコンの最大の長さ（文字数。1つのセルに入る量より十分小さく）
+const HEADERS = ["id", "name", "score", "count", "height", "date", "hidden", "title", "icon"];
 // スコアの計算（config.js の score と同じにする）：積んだ数 × PER_PIECE ＋ 高さ(m) × PER_METER
 const PER_PIECE = 100;
 const PER_METER = 100;
@@ -31,7 +36,8 @@ function doGet(e) {
     updated: Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd HH:mm"),
     total: list.length,
     ranking: list.slice(0, TOP).map((r) => {
-      const row = { rank: r.rank, name: r.name, score: r.score, count: r.count, height: r.height, date: r.date };
+      const row = { rank: r.rank, name: r.name, title: r.title, score: r.score, count: r.count, height: r.height, date: r.date };
+      if (r.icon) row.icon = r.icon;
       if (mine && r.id === me) row.me = true;
       return row;
     }),
@@ -40,7 +46,7 @@ function doGet(e) {
 }
 
 // ---------- スコアを受け取る（ゲームが自動で送ってくる） ----------
-// 本文（JSON）：{ id, name, score, count, height }
+// 本文（JSON）：{ id, name, title, icon, score, count, height }
 function doPost(e) {
   let d;
   try {
@@ -51,6 +57,8 @@ function doPost(e) {
   const id = String(d.id || "");
   if (!/^[0-9a-zA-Z-]{16,64}$/.test(id)) return json_({ ok: false, error: "bad id" });
   const name = cleanName_(d.name);
+  const title = cleanText_(d.title, TITLE_MAX);
+  const icon = cleanIcon_(d.icon);
   const count = Number(d.count);
   const height = Math.round(Number(d.height) * 100) / 100;
   const score = Number(d.score);
@@ -75,10 +83,11 @@ function doPost(e) {
     const today = Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd");
     const found = rows.find((r) => r.id === id);
     if (!found) {
-      sh.appendRow([text_(id), text_(name), score, count, height, text_(today), ""]);
+      sh.appendRow([text_(id), text_(name), score, count, height, text_(today), "", title ? text_(title) : "", icon]);
     } else {
-      // 名前はいつも新しいものに。スコアは前より高いときだけ書きかえる（hidden はそのまま）
+      // 名前・称号・アイコンはいつも新しいものに。スコアは前より高いときだけ書きかえる（hidden はそのまま）
       sh.getRange(found.row, 2).setValue(text_(name));
+      sh.getRange(found.row, 8, 1, 2).setValues([[title ? text_(title) : "", icon]]);
       if (score > found.score) sh.getRange(found.row, 3, 1, 4).setValues([[score, count, height, text_(today)]]);
     }
     SpreadsheetApp.flush();
@@ -96,8 +105,11 @@ function sheet_() {
   let sh = ss.getSheetByName(SHEET_NAME);
   if (!sh) {
     sh = ss.insertSheet(SHEET_NAME);
-    sh.appendRow(["id", "name", "score", "count", "height", "date", "hidden"]);
+    sh.appendRow(HEADERS);
     sh.setFrozenRows(1);
+  } else if (String(sh.getRange(1, HEADERS.length).getValue()) !== HEADERS[HEADERS.length - 1]) {
+    // 前のバージョンで作ったシート：あとから増えた列（title・icon）の見出しを足す
+    sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
   }
   return sh;
 }
@@ -115,6 +127,8 @@ function readRows_() {
     height: Number(v[4]) || 0,
     date: v[5] instanceof Date ? Utilities.formatDate(v[5], TZ, "yyyy-MM-dd") : String(v[5]),
     hidden: String(v[6]).trim() !== "",
+    title: String(v[7] || ""),
+    icon: String(v[8] || ""),
   }));
 }
 
@@ -127,8 +141,18 @@ function ranked_(rows) {
 
 // 名前：見えない文字を取りのぞき、前後の空白を消して、最大 NAME_MAX 文字
 function cleanName_(v) {
-  const s = Array.from(String(v || "").replace(/[\u0000-\u001f\u007f]/g, "").trim()).slice(0, NAME_MAX).join("");
-  return s || "プレイヤー";
+  return cleanText_(v, NAME_MAX) || "プレイヤー";
+}
+
+// 文字：見えない文字を取りのぞき、前後の空白を消して、最大 max 文字
+function cleanText_(v, max) {
+  return Array.from(String(v || "").replace(/[\u0000-\u001f\u007f]/g, "").trim()).slice(0, max).join("");
+}
+
+// 写真アイコン：小さな JPEG の画像（data:image/jpeg;base64,...）だけ受け付ける。それ以外は「なし」
+function cleanIcon_(v) {
+  const s = String(v || "");
+  return s.length <= ICON_MAX && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(s) ? s : "";
 }
 
 // 文字のままシートに書く（「=」などで始まる名前が、計算式や日付として扱われないように）

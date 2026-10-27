@@ -2372,3 +2372,255 @@ select {
 .my-rank b {
   color: var(--color-gold);
 }
+
+/* ランキング：アイコンと称号 */
+.rank-avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.rank-title {
+  display: inline-block;
+  margin: 2px 0;
+  padding: 0 8px;
+  border-radius: var(--radius-round);
+  color: var(--color-text-dark);
+  background: var(--color-gold);
+  font-size: 11px;
+  font-weight: bold;
+}
+
+/* =============================================
+   スタンプ（オンライン対戦のリザルト）
+   ============================================= */
+/* プロフィール画面の4つの枠 */
+.section-title small {
+  margin-left: var(--space-s);
+  font-size: 11px;
+  font-weight: normal;
+  opacity: 0.8;
+}
+
+.stamp-slots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-s);
+}
+
+.stamp-slot {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 1;
+  padding: 6px;
+  border: 2px dashed rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-m);
+  background: var(--color-panel);
+  cursor: pointer;
+}
+
+.stamp-slot img,
+.stamp-choice img,
+.stamp-send img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.stamp-slot small {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 0 6px;
+  border-radius: var(--radius-round);
+  color: var(--color-text-dark);
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 10px;
+  font-weight: bold;
+}
+
+/* キャラを選ぶダイアログ */
+.dialog-box.stamp-picker-box {
+  max-width: 360px;
+}
+
+.stamp-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  max-height: 46vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  margin-top: var(--space-s);
+}
+
+.stamp-choice {
+  min-width: 0;
+  aspect-ratio: 1;
+  padding: 4px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-s);
+  background: #eef1f6;
+  cursor: pointer;
+}
+
+.stamp-choice.selected {
+  border-color: var(--color-primary);
+}
+
+/* まだ図鑑にいないキャラは、黒いシルエットで選べない */
+.stamp-choice.locked {
+  cursor: default;
+}
+
+.stamp-choice.locked img {
+  filter: brightness(0) opacity(0.35);
+}
+
+.dialog-box .stamp-picker-note {
+  margin-top: var(--space-s);
+  font-size: 12px;
+  font-weight: normal;
+  opacity: 0.6;
+}
+
+/* リザルト画面の下の、送るボタンの欄 */
+.screen.with-stamps {
+  padding-bottom: calc(120px + var(--safe-bottom));
+}
+
+.stamp-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 12;
+  padding: var(--space-s) var(--space-m) calc(var(--space-m) + var(--safe-bottom));
+  background: linear-gradient(transparent, rgba(10, 15, 30, 0.6) 30%);
+}
+
+.stamp-status {
+  min-height: 1.2em;
+  margin-bottom: var(--space-xs);
+  font-size: var(--font-size-s);
+  font-weight: bold;
+  text-align: center;
+}
+
+.stamp-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-s);
+}
+
+.stamp-send {
+  position: relative;
+  height: 72px;
+  padding: 4px;
+  border: none;
+  border-radius: var(--radius-m);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 0 var(--color-sub-shadow);
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform var(--dur-press);
+}
+
+.stamp-send:active:not(:disabled) {
+  transform: translateY(3px) scale(0.94);
+}
+
+.stamp-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* 送ったあとの「待ち」：ボタンの下に、残り時間の帯がのびる */
+.stamp-bar.cooling .stamp-send::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  background: var(--color-primary);
+  animation: stamp-cool 1.5s linear forwards;
+}
+
+@keyframes stamp-cool {
+  from { width: 100%; }
+  to { width: 0; }
+}
+
+/* 出てきたスタンプ（自分は右、相手は左） */
+.stamp-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 13;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.stamp-pop {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 120px;
+  padding: var(--space-s);
+  border-radius: var(--radius-l);
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  animation: stamp-pop 2.6s ease forwards;
+}
+
+.stamp-pop.me {
+  right: var(--space-m);
+  transform-origin: bottom right;
+  border-bottom-right-radius: 4px;
+}
+
+.stamp-pop.them {
+  left: var(--space-m);
+  transform-origin: bottom left;
+  border-bottom-left-radius: 4px;
+}
+
+.stamp-pop img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+}
+
+.stamp-pop small {
+  max-width: 100%;
+  overflow: hidden;
+  color: #fff;
+  font-size: 11px;
+  font-weight: bold;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 0 8px;
+  border-radius: var(--radius-round);
+}
+
+.stamp-pop.me small { background: var(--color-primary); }
+.stamp-pop.them small { background: var(--color-p2); }
+
+/* ポンッと弾んで出て、少しのあいだ止まり、フッと消える */
+@keyframes stamp-pop {
+  0% { transform: scale(0); opacity: 0; }
+  12% { transform: scale(1.18); opacity: 1; }
+  20% { transform: scale(0.94); }
+  27% { transform: scale(1); }
+  85% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.9) translateY(-10px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp-pop {
+    animation: fade-in-out 2.6s ease forwards;
+  }
+}

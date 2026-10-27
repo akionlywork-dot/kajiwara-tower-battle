@@ -79,6 +79,7 @@ const Profile = (() => {
     }
     select.value = p.titleId || "";
     renderThemes();
+    Stamps.renderSlots();
     refresh();
   }
 

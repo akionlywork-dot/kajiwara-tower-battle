@@ -49,9 +49,12 @@ const Save = (() => {
       ranking: {
         id: null, // この端末の番号（ランダム。ランキングで自分の行を見分ける）
         asked: false, // 「ランキングに送りますか？」を聞いたか
+        iconAsked: false, // 「写真アイコンも載せますか？」を聞いたか
         sentScore: 0, // 最後に送ったスコア（これより高くなったら、また送る）
-        sentName: "", // 最後に送った名前（名前を変えたら、また送る）
+        sentProfile: "", // 最後に送った名前・称号・アイコンの目印（変えたら、また送る）
       },
+      // スタンプ（オンライン対戦のリザルトで使う4つ）：キャラの ID（例 "chara03"）。null の枠は初期スタンプ
+      stamps: [null, null, null, null],
       // 選んでいる背景と土台（config.js の themes の id）
       cosmetics: { background: "sky", platform: "wood" },
     };

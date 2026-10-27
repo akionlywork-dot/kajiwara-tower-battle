@@ -13,6 +13,7 @@ const UI = (() => {
   }
   let current = "title";
   const listeners = {}; // 画面が開いたときに呼ぶ関数（画面の名前 → 関数）
+  const changeListeners = []; // どの画面に切りかわっても呼ぶ関数
 
   // 画面を切りかえる。name に null を渡すとゲーム画面（画面を全部閉じて HUD を出す）
   // 実際のアニメーションは CSS の .screen / .screen.active に書いてある
@@ -27,6 +28,12 @@ const UI = (() => {
     }
     current = name;
     if (listeners[name]) listeners[name]();
+    for (const fn of changeListeners) fn(name);
+  }
+
+  // 画面が切りかわるたびに呼ぶ関数を登録する（name は新しい画面の名前。ゲーム画面なら null）
+  function onChange(fn) {
+    changeListeners.push(fn);
   }
 
   // 画面が開いたときに、中身を最新にする処理を登録する
@@ -189,7 +196,7 @@ const UI = (() => {
   );
 
   return {
-    show, onShow, replayAnimations, splash, confetti, clearConfetti, countUp, confirm, alert, toast, escape,
+    show, onShow, onChange, replayAnimations, splash, confetti, clearConfetti, countUp, confirm, alert, toast, escape,
     get current() { return current; },
   };
 })();

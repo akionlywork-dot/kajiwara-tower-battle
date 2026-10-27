@@ -36,7 +36,7 @@
   <!-- アプリとしてインストールするための設定（PWA） -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="css/style.css?v=1.4.1">
+  <link rel="stylesheet" href="css/style.css?v=1.5.0">
 </head>
 <body>
   <div id="app">
@@ -160,6 +160,13 @@
       </div>
     </section>
 
+    <!-- スタンプ（オンライン対戦のリザルト画面の上に重ねる。stamps.js） -->
+    <div id="stamp-layer" class="stamp-layer"></div>
+    <div id="stamp-bar" class="stamp-bar hidden">
+      <p id="stamp-status" class="stamp-status"></p>
+      <div id="stamp-buttons" class="stamp-buttons"></div>
+    </div>
+
     <!-- レアキャラが出たときの表示 -->
     <div id="rare-banner" class="hidden"></div>
 
@@ -259,8 +266,12 @@
           </div>
           <!-- ランキングに参加（config.js の ranking.url を設定したときだけ表示） -->
           <div id="setting-ranking-row" class="setting-row hidden">
-            <span>ランキングに参加<small>ハイスコアと名前を自動で送る（写真は送らない）</small></span>
+            <span>ランキングに参加<small>ハイスコア・名前・称号を自動で送る</small></span>
             <button class="toggle" data-setting="ranking" role="switch" aria-label="ランキングに参加"></button>
+          </div>
+          <div id="setting-ranking-icon-row" class="setting-row hidden">
+            <span>ランキングに写真アイコンを載せる<small>オフのときは、名前の1文字目が出る</small></span>
+            <button class="toggle" data-setting="rankingIcon" role="switch" aria-label="ランキングに写真アイコンを載せる"></button>
           </div>
           <!-- アプリとしてインストール（インストールできるときだけ表示。pwa.js） -->
           <div id="setting-install-row" class="setting-row hidden">
@@ -377,7 +388,10 @@
           <div id="theme-backgrounds" class="theme-grid"></div>
           <h3 class="section-title">土台</h3>
           <div id="theme-platforms" class="theme-grid"></div>
-          <p class="page-note">写真と名前はこの端末の中だけに保存され、どこにも送信されません。</p>
+          <!-- スタンプ（中身は stamps.js が作る） -->
+          <h3 class="section-title">スタンプ<small>オンライン対戦のリザルトで送れる。枠をタップして変える</small></h3>
+          <div id="stamp-slots" class="stamp-slots"></div>
+          <p class="page-note">写真と名前はこの端末の中に保存されます。名前はオンライン対戦の相手に、ランキングに参加したときは名前・称号（と、選んだ人は写真）がランキングに送られます。</p>
         </div>
       </div>
     </section>
@@ -507,6 +521,19 @@
       </div>
     </div>
 
+    <!-- スタンプに使うキャラを選ぶ（図鑑に登録したキャラだけ選べる） -->
+    <div id="stamp-picker" class="dialog">
+      <div class="dialog-box stamp-picker-box">
+        <p id="stamp-picker-title"></p>
+        <div id="stamp-picker-grid" class="stamp-picker-grid"></div>
+        <p class="stamp-picker-note">図鑑に登録したキャラを選べます</p>
+        <div class="dialog-buttons">
+          <button id="stamp-picker-default" class="btn btn-sub">初期にもどす</button>
+          <button id="stamp-picker-close" class="btn btn-primary">閉じる</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 共有メニューが使えないときの、URL をコピーするダイアログ -->
     <div id="share-dialog" class="dialog">
       <div class="dialog-box">
@@ -626,37 +653,38 @@
 
   <!-- ?v= のあとの番号：更新したら config.js の version と一緒に上げる（スマホに古いファイルが残らないように） -->
   <!-- ライブラリ（lib/ に同梱） -->
-  <script src="lib/decomp.min.js?v=1.4.1"></script>
-  <script src="lib/matter.min.js?v=1.4.1"></script>
-  <script src="lib/peerjs.min.js?v=1.4.1"></script>
-  <script src="lib/mqtt.min.js?v=1.4.1"></script>
+  <script src="lib/decomp.min.js?v=1.5.0"></script>
+  <script src="lib/matter.min.js?v=1.5.0"></script>
+  <script src="lib/peerjs.min.js?v=1.5.0"></script>
+  <script src="lib/mqtt.min.js?v=1.5.0"></script>
   <!-- 設定ファイル -->
-  <script src="config.js?v=1.4.1"></script>
-  <script src="characters.js?v=1.4.1"></script>
+  <script src="config.js?v=1.5.0"></script>
+  <script src="characters.js?v=1.5.0"></script>
   <!-- ゲーム本体 -->
-  <script src="js/settings.js?v=1.4.1"></script>
-  <script src="js/save.js?v=1.4.1"></script>
-  <script src="js/audio.js?v=1.4.1"></script>
-  <script src="js/shape.js?v=1.4.1"></script>
-  <script src="js/game.js?v=1.4.1"></script>
-  <script src="js/rules.js?v=1.4.1"></script>
-  <script src="js/cpu.js?v=1.4.1"></script>
-  <script src="js/challenge.js?v=1.4.1"></script>
-  <script src="js/card.js?v=1.4.1"></script>
-  <script src="js/online.js?v=1.4.1"></script>
-  <script src="js/ui.js?v=1.4.1"></script>
-  <script src="js/themes.js?v=1.4.1"></script>
-  <script src="js/profile.js?v=1.4.1"></script>
-  <script src="js/data-file.js?v=1.4.1"></script>
-  <script src="js/news.js?v=1.4.1"></script>
-  <script src="js/events.js?v=1.4.1"></script>
-  <script src="js/ranking.js?v=1.4.1"></script>
-  <script src="js/records.js?v=1.4.1"></script>
-  <script src="js/dex.js?v=1.4.1"></script>
-  <script src="js/achievements.js?v=1.4.1"></script>
-  <script src="js/backup.js?v=1.4.1"></script>
-  <script src="js/admin.js?v=1.4.1"></script>
-  <script src="js/pwa.js?v=1.4.1"></script>
-  <script src="js/main.js?v=1.4.1"></script>
+  <script src="js/settings.js?v=1.5.0"></script>
+  <script src="js/save.js?v=1.5.0"></script>
+  <script src="js/audio.js?v=1.5.0"></script>
+  <script src="js/shape.js?v=1.5.0"></script>
+  <script src="js/game.js?v=1.5.0"></script>
+  <script src="js/rules.js?v=1.5.0"></script>
+  <script src="js/cpu.js?v=1.5.0"></script>
+  <script src="js/challenge.js?v=1.5.0"></script>
+  <script src="js/card.js?v=1.5.0"></script>
+  <script src="js/stamps.js?v=1.5.0"></script>
+  <script src="js/online.js?v=1.5.0"></script>
+  <script src="js/ui.js?v=1.5.0"></script>
+  <script src="js/themes.js?v=1.5.0"></script>
+  <script src="js/profile.js?v=1.5.0"></script>
+  <script src="js/data-file.js?v=1.5.0"></script>
+  <script src="js/news.js?v=1.5.0"></script>
+  <script src="js/events.js?v=1.5.0"></script>
+  <script src="js/ranking.js?v=1.5.0"></script>
+  <script src="js/records.js?v=1.5.0"></script>
+  <script src="js/dex.js?v=1.5.0"></script>
+  <script src="js/achievements.js?v=1.5.0"></script>
+  <script src="js/backup.js?v=1.5.0"></script>
+  <script src="js/admin.js?v=1.5.0"></script>
+  <script src="js/pwa.js?v=1.5.0"></script>
+  <script src="js/main.js?v=1.5.0"></script>
 </body>
 </html>

@@ -74,7 +74,8 @@
       Settings.set(name, !Settings.get(name));
       updateToggles();
       applySettings();
-      if (name === "ranking" && Settings.get("ranking")) Ranking.submitBest(); // 参加したら、今のハイスコアを送る
+      // ランキングに参加した・写真アイコンを載せる／外したら、今のハイスコアとプロフィールを送る
+      if (name === "ranking" || name === "rankingIcon") Ranking.submitBest();
       Sound.play("click");
     });
   }
@@ -94,6 +95,7 @@
     if (mode === "online") mode = "solo";
     Game.stop();
     UI.clearConfetti();
+    Stamps.end();
     $("turn-banner").className = "hidden";
     $("rare-banner").className = "hidden"; // ゲーム中に出た「レア！」が残らないように
     updateBestCard();
@@ -159,6 +161,7 @@
     // 挑戦中は挑戦状と同じ順番、そうでなければ新しい順番
     seed = challenge && mode === "solo" && ruleId === challenge.rule ? challenge.seed : Challenge.newSeed();
     UI.clearConfetti();
+    Stamps.end(); // スタンプはリザルトのあいだだけ
     UI.show(null);
     Game.start(
       {
@@ -388,6 +391,12 @@
     online = null;
     clearInterval(sendTimer);
     $("btn-online-connect").disabled = false;
+    // 対戦が終わってリザルト（カード・フォトモードも）にいるときは、タイトルに戻さず
+    // 「相手が退出しました」と出して、スタンプを送れないようにするだけ
+    if (wasPlaying && mode === "online" && ["result", "card", "photo"].includes(UI.current)) {
+      Stamps.peerLeft();
+      return;
+    }
     if (!wasPlaying && UI.current !== "online") return;
     UI.alert("接続が切れました").then(goTitle);
   }
@@ -412,6 +421,8 @@
       Game.drop();
     } else if (msg.t === "rematch" && UI.current === "result") {
       startOnlineHost(); // 相手が「もう一度」を押した
+    } else if (msg.t === "stamp") {
+      Stamps.receive(msg.id); // 相手のスタンプ
     }
   }
 
@@ -468,6 +479,8 @@
       if (msg.f) Dex.register(msg.f);
       Achievements.check(gameStatus());
       updateHud();
+    } else if (msg.t === "stamp") {
+      Stamps.receive(msg.id); // 相手のスタンプ
     } else if (msg.t === "se") {
       Sound.play(msg.name);
     } else if (msg.t === "rare") {
@@ -495,6 +508,7 @@
     maxHeight = 0;
     online.countedTurns = 0; // 手番の交代を数えなおす（重ねて届いた知らせを見分けるため）
     UI.clearConfetti();
+    Stamps.end(); // スタンプはリザルトのあいだだけ
     UI.show(null);
     Game.startRemote({
       dropOnRelease: () => Settings.get("release"),
@@ -651,6 +665,10 @@
     // 挑戦状のボタン（1人モードのときだけ。挑戦中なら「送り返す」）
     $("btn-challenge").classList.toggle("hidden", mode !== "solo");
     $("btn-challenge").firstChild.textContent = challenge ? "挑戦状を送り返す" : "挑戦状を送る";
+    // スタンプ：オンライン対戦のリザルトだけで使える（送るのはキャラの ID だけ）
+    if (mode === "online" && online) {
+      Stamps.begin((id) => Online.send({ t: "stamp", id }), online.names[online.me === 1 ? 2 : 1] || "相手");
+    } else Stamps.end();
     // 戦績を記録したあとで、実績を判定する（「10回プレイ」「対戦で10勝」など）
     Achievements.check(gameStatus());
     UI.show("result");
@@ -846,6 +864,7 @@ ${location.origin}${location.pathname}`), "image/png");
   Backup.init();
   PWA.init(); // アプリとしてインストールできるようにする
   Share.init();
+  Stamps.init();
   Card.init();
   // キャラの読み込みが終わったら進む Promise（挑戦状は、キャラがそろってから始める）
   let resolveShapesLoaded;

@@ -89,6 +89,10 @@ const Sound = (() => {
     } else if (name === "gameover") {
       // テッテッテー（下がっていく3音）
       [523, 392, 262].forEach((f, i) => tone("square", f, f, t + i * 0.2, i === 2 ? 0.5 : 0.18, 0.12, seGain));
+    } else if (name === "stamp") {
+      // ポンッ（低い音から高い音へ跳ねる）
+      tone("sine", 330, 880, t, 0.12, 0.4, seGain);
+      tone("sine", 880, 1320, t + 0.08, 0.1, 0.2, seGain);
     } else if (name === "click") {
       // ボタンを押したときのプッ
       tone("sine", 660, 520, t, 0.06, 0.25, seGain);
