@@ -71,6 +71,22 @@ const Records = (() => {
     Save.write();
   }
 
+  // イベントのステージ（おばけ屋敷など）の対戦が終わった（won: プレイヤーが勝ったか）。
+  // ふつうの CPU 対戦の戦績・実績には数えない。勝ったあとの勝利数を返す
+  function addEventResult(eventId, won) {
+    const all = (Save.data.eventStats = Save.data.eventStats || {});
+    const r = (all[eventId] = all[eventId] || { wins: 0, losses: 0 });
+    if (won) r.wins++;
+    else r.losses++;
+    Save.write();
+    return r.wins;
+  }
+
+  // イベントのステージの勝利数（遊んでいなければ 0）
+  function eventWins(eventId) {
+    return ((Save.data.eventStats || {})[eventId] || {}).wins || 0;
+  }
+
   // 2人対戦が終わった
   function addVersusResult(winner) {
     const s = stats();
@@ -107,12 +123,14 @@ const Records = (() => {
       `<h3 class="section-title">CPU対戦</h3>` +
       `<div class="stat-grid">` +
       Object.entries(window.GAME_CONFIG.cpu)
+        .filter(([, p]) => !p.event) // イベント用の強さ（おばけ屋敷など）は、下に別に出す
         .map(([level, p]) => {
           const r = s.cpu[level] || { plays: 0, wins: 0 };
           return item(`CPU（${UI.escape(p.name)}）`, `${r.wins}<small>勝</small> ${r.plays - r.wins}<small>敗</small>`);
         })
         .join("") +
       `</div>` +
+      eventSection(item) +
       `<h3 class="section-title">特殊ルール</h3>` +
       `<div class="stat-grid">` +
       item("プレイ回数", `${s.rulePlays}<small>回</small>`) +
@@ -129,5 +147,20 @@ const Records = (() => {
       `</div>`;
   }
 
-  return { init, addPiece, addSoloResult, addRuleResult, addCpuResult, addOnlineResult, addVersusResult };
+  // イベントのステージの戦績（遊んだことがあるか、期間中のイベントだけ）
+  function eventSection(item) {
+    const rows = Object.keys(window.GAME_CONFIG.events || {})
+      .map((id) => {
+        const r = (Save.data.eventStats || {})[id];
+        if (!r && !LimitedEvents.isActive(id)) return "";
+        const ev = (window.GAME_CONFIG.events || {})[id];
+        const rule = (window.GAME_CONFIG.rules || {})[ev.rule] || {};
+        const label = `${rule.icon || ""} ${UI.escape(LimitedEvents.nameOf(id).replace(/イベント$/, ""))}`;
+        return item(label, `${(r && r.wins) || 0}<small>勝</small> ${(r && r.losses) || 0}<small>敗</small>`);
+      })
+      .join("");
+    return rows ? `<h3 class="section-title">イベント</h3><div class="stat-grid">${rows}</div>` : "";
+  }
+
+  return { init, addPiece, addEventResult, eventWins, addSoloResult, addRuleResult, addCpuResult, addOnlineResult, addVersusResult };
 })();

@@ -197,8 +197,16 @@ const Game = (() => {
     get worldW() { return WORLD_W; },
     get worldH() { return worldH; },
     random: () => ruleRandom(), // 0 以上 1 未満の乱数（Math.random の代わりに使う）
+    get camY() { return camY; }, // カメラの位置（キャラの y から引くと、画面の座標になる）
     Body,
     bodies: () => bodies(),
+    // 明るくする場所（画面の座標）：持っているキャラと、落ちているキャラ（おばけ屋敷の暗闇で使う）
+    lights: () => {
+      const out = [];
+      if (held && (state === "aim" || state === "remote")) out.push({ x: held.x, y: holdY() });
+      for (const b of bodies()) if (!b.landed) out.push({ x: b.position.x, y: b.position.y - camY });
+      return out;
+    },
     setPlatformAngle: (angle) => Body.setAngle(platform, angle),
   };
 
@@ -628,8 +636,11 @@ const Game = (() => {
 
     // 本物と同じ細かさで計算する（落下速度の上限・小さな揺れを弱める処理も同じ）
     const all = [piece, ...tower];
+    // ルールの動き（おばけ屋敷のおばけなど）も、本物と同じように試算に入れる
+    const ruleSim = rule && rule.simulate ? rule.simulate(ruleAPI, rule.params, rule.state) : null;
     let landed = false, still = 0;
     for (let i = 0; i < 300 && still < 15; i++) {
+      if (ruleSim) ruleSim.step(landed ? [] : [piece]);
       for (let k = 0; k < SUBSTEPS; k++) {
         if (!landed && piece.velocity.y > MAX_FALL_SPEED) Body.setVelocity(piece, { x: piece.velocity.x, y: MAX_FALL_SPEED });
         Engine.update(sim, STEP_MS / SUBSTEPS);
@@ -1163,6 +1174,7 @@ const Game = (() => {
       }
       ctx.globalAlpha = 1;
     }
+    if (bgTheme.moon || bgTheme.bats) drawHalloweenSky(k);
     if (sky.clouds > 0) {
       ctx.globalAlpha = Math.min(1, sky.clouds);
       drawClouds(k, sky.cloud);
@@ -1363,7 +1375,104 @@ const Game = (() => {
     ctx.fillRect(-PLATFORM_W / 2, PLATFORM_H / 2 - 8, PLATFORM_W, 8);
     ctx.fillStyle = platTheme.top; // 上の面（木の台なら芝生）
     ctx.fillRect(-PLATFORM_W / 2, -PLATFORM_H / 2, PLATFORM_W, 8);
+    if (platTheme.pumpkin) drawPumpkinFace();
     ctx.restore();
+  }
+
+  // かぼちゃの台：たてのすじと、くり抜いた顔（中から光っている）。ctx は土台の真ん中に合わせてある
+  function drawPumpkinFace() {
+    ctx.strokeStyle = "rgba(120, 50, 0, 0.35)";
+    ctx.lineWidth = 2;
+    for (let i = -3; i <= 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * 40, -PLATFORM_H / 2 + 8);
+      ctx.quadraticCurveTo(i * 40 + (i < 0 ? -6 : 6), 0, i * 40, PLATFORM_H / 2 - 8);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#ffd23a";
+    const tri = (x1, y1, x2, y2, x3, y3) => {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.lineTo(x3, y3);
+      ctx.closePath();
+      ctx.fill();
+    };
+    tri(-62, 6, -46, -10, -30, 6); // 左の目
+    tri(30, 6, 46, -10, 62, 6); // 右の目
+    tri(-7, 8, 0, -1, 7, 8); // 鼻
+    // ギザギザの口
+    ctx.beginPath();
+    ctx.moveTo(-40, 10);
+    const teeth = [[-30, 15], [-20, 10], [-10, 15], [0, 10], [10, 15], [20, 10], [30, 15], [40, 10]];
+    for (const [tx, ty] of teeth) ctx.lineTo(tx, ty);
+    ctx.lineTo(30, 16);
+    ctx.quadraticCurveTo(0, 22, -30, 16);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ---------- ハロウィンの夜（背景 moon・bats） ----------
+  // 大きな満月（光のにじみも一緒に、最初に1回だけ画像にしておく）
+  let moonSprite = null;
+  function moonImage() {
+    if (moonSprite) return moonSprite;
+    const c = document.createElement("canvas");
+    c.width = c.height = 200;
+    const g = c.getContext("2d");
+    const glow = g.createRadialGradient(100, 100, 30, 100, 100, 100);
+    glow.addColorStop(0, "rgba(255, 240, 190, 0.6)");
+    glow.addColorStop(1, "rgba(255, 240, 190, 0)");
+    g.fillStyle = glow;
+    g.fillRect(0, 0, 200, 200);
+    g.fillStyle = "#fff4c8";
+    g.beginPath();
+    g.arc(100, 100, 46, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "rgba(220, 200, 140, 0.45)"; // もようのくぼみ
+    for (const [x, y, r] of [[84, 90, 9], [112, 112, 12], [108, 80, 6], [88, 118, 5]]) {
+      g.beginPath();
+      g.arc(x, y, r, 0, Math.PI * 2);
+      g.fill();
+    }
+    moonSprite = c;
+    return c;
+  }
+
+  // 満月とこうもり。上に登るほど薄くなる（高さで変わる背景に入れかわっていく）
+  function drawHalloweenSky(k) {
+    const fade = Math.max(0, 1 - skyHeight / 3);
+    if (fade <= 0) return;
+    ctx.globalAlpha = fade;
+    if (bgTheme.moon) {
+      const size = 130 * k; // タイトルのロゴ・ハイスコアにかからない、右上のあたり
+      ctx.drawImage(moonImage(), view.left + view.w * 0.85 - size / 2, view.top + view.h * 0.28 - size / 2 - camY * 0.05 * k, size, size);
+    }
+    if (bgTheme.bats) {
+      // 5羽のこうもりが、ゆっくり輪を描くように飛び回る（「視差効果を減らす」では止まった絵）
+      const t = reducedMotion.matches ? 0 : performance.now() / 1000;
+      ctx.fillStyle = "#140a1f";
+      for (let i = 0; i < 5; i++) {
+        const x = view.left + (((t * (18 + i * 5) + i * 97) % (WORLD_W + 120)) - 60) * k;
+        const y = view.top + (0.12 + i * 0.07 + Math.sin(t * 1.3 + i * 2) * 0.03) * view.h;
+        drawBat(x, y, (7 + (i % 3) * 2) * k, Math.sin(t * 10 + i * 3));
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // こうもり（体と、ぱたぱたする羽）。flap：-1〜1（羽の上がり具合）
+  function drawBat(x, y, s, flap) {
+    const up = flap * s * 0.7;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x - s * 0.8, y - s * 0.6 - up, x - s * 1.8, y - up);
+    ctx.quadraticCurveTo(x - s * 1.2, y + s * 0.1, x - s * 0.9, y + s * 0.4);
+    ctx.quadraticCurveTo(x - s * 0.5, y + s * 0.1, x, y + s * 0.5);
+    ctx.quadraticCurveTo(x + s * 0.5, y + s * 0.1, x + s * 0.9, y + s * 0.4);
+    ctx.quadraticCurveTo(x + s * 1.2, y + s * 0.1, x + s * 1.8, y - up);
+    ctx.quadraticCurveTo(x + s * 0.8, y - s * 0.6 - up, x, y);
+    ctx.fill();
   }
 
   // 地面（なだらかな丘）

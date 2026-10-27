@@ -36,7 +36,7 @@
   <!-- アプリとしてインストールするための設定（PWA） -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="css/style.css?v=1.7.0">
+  <link rel="stylesheet" href="css/style.css?v=1.8.0">
 </head>
 <body>
   <div id="app">
@@ -86,6 +86,8 @@
             <h1 class="logo">かじわら<br>タワーバトル</h1>
           </div>
           <p class="tagline">落としたら負け！</p>
+          <!-- ハロウィンイベントの期間中だけ出る、かぼちゃ（#screen-title.halloween のとき） -->
+          <span class="hw-pumpkin" aria-hidden="true">🎃</span>
         </div>
         <!-- 中央：ハイスコア -->
         <div class="title-middle">
@@ -127,6 +129,9 @@
         </div>
       </div>
 
+      <!-- ハロウィンイベントの期間中だけ、こうもりが横切る -->
+      <div class="hw-bats" aria-hidden="true"><span>🦇</span><span>🦇</span><span>🦇</span></div>
+
       <!-- 右下：バージョン番号（config.js の version） -->
       <p id="version" class="version"></p>
     </section>
@@ -139,6 +144,8 @@
           <button id="btn-solo" class="btn btn-big btn-p1">ひとりで<small>スコアアタック</small></button>
           <button class="btn btn-big btn-p2" data-open="versus">たいせん<small>ともだちと・CPUと</small></button>
           <button class="btn btn-big btn-special" data-open="rules">特殊ルール<small>風・傾く土台・つるつる など</small></button>
+          <!-- ハロウィンイベント（期間中だけ表示。halloween.js） -->
+          <button id="btn-halloween" class="btn btn-big btn-halloween hidden">🎃 ハロウィン<small id="halloween-progress"></small></button>
           <button id="btn-mode-back" class="btn btn-big btn-sub">もどる</button>
         </div>
       </div>
@@ -284,7 +291,7 @@
           </div>
           <!-- データのバックアップ（機種変更のときなど） -->
           <div class="setting-row setting-data">
-            <span>データのバックアップ<small>名前・写真・図鑑・スタンプ・実績・戦績・設定。v1.7.0 より前のファイルを読み込むと、実績と戦績はリセットされます</small></span>
+            <span>データのバックアップ<small>名前・写真・図鑑・スタンプ・実績・戦績・イベントの勝利数・設定。v1.7.0 より前のファイルを読み込むと、実績と戦績はリセットされます</small></span>
             <div class="setting-data-buttons">
               <button id="btn-export" class="btn btn-small btn-sub">書き出す</button>
               <label class="btn btn-small btn-sub">
@@ -324,6 +331,28 @@
           <button id="btn-card" class="btn btn-big btn-special">結果を画像でシェア<small>リザルトカードを作る</small></button>
           <button class="btn btn-big btn-sub" data-photo>📷 フォトモード</button>
           <button id="btn-result-title" class="btn btn-big btn-sub">タイトルへ</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== ハロウィンイベント：ステージの説明とごほうび（halloween.js） ===== -->
+    <section id="screen-halloween" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <button class="btn btn-icon" data-back="mode" aria-label="もどる">‹</button>
+          <h2>🎃 ハロウィンイベント</h2>
+        </header>
+        <div class="page-body halloween-body">
+          <div class="hw-stage">
+            <b id="hw-stage-name"></b>
+            <p id="hw-stage-desc"></p>
+            <small id="hw-period"></small>
+          </div>
+          <h3 class="section-title">ごほうび<small id="hw-wins"></small></h3>
+          <p class="page-note">勝つたびに、1つずつもらえます（負けても減りません）。もらったものは、イベントが終わってもずっと使えます。</p>
+          <div id="hw-rewards"></div>
+          <p id="hw-done" class="hw-done hidden">🎃 制覇！ ごほうびは全部もらいました。勝利数は、このあとも記録されます。</p>
+          <button id="btn-halloween-start" class="btn btn-big btn-halloween">挑戦する<small>CPU「つよい」と対戦</small></button>
         </div>
       </div>
     </section>
@@ -607,6 +636,20 @@
               <span>当たり判定を表示</span>
               <button class="toggle" data-setting="debug" role="switch" aria-label="当たり判定を表示"></button>
             </div>
+            <h3 class="section-title">イベント（確認用）</h3>
+            <div class="setting-row">
+              <span>イベント期間中として表示<small>パソコンの日付を変えずに、イベントの画面を確認する</small></span>
+              <button class="toggle" data-setting="eventPreview" role="switch" aria-label="イベント期間中として表示"></button>
+            </div>
+            <label class="field">
+              <span>ハロウィンの勝利数</span>
+              <select id="admin-hw-wins">
+                <option value="0">0勝</option>
+                <option value="1">1勝</option>
+                <option value="2">2勝</option>
+                <option value="3">3勝</option>
+              </select>
+            </label>
             <h3 class="section-title">次に出すキャラ</h3>
             <label class="field">
               <select id="admin-next"></select>
@@ -658,41 +701,42 @@
 
   <!-- ?v= のあとの番号：更新したら config.js の version と一緒に上げる（スマホに古いファイルが残らないように） -->
   <!-- ライブラリ（lib/ に同梱） -->
-  <script src="lib/decomp.min.js?v=1.7.0"></script>
-  <script src="lib/matter.min.js?v=1.7.0"></script>
-  <script src="lib/peerjs.min.js?v=1.7.0"></script>
-  <script src="lib/mqtt.min.js?v=1.7.0"></script>
+  <script src="lib/decomp.min.js?v=1.8.0"></script>
+  <script src="lib/matter.min.js?v=1.8.0"></script>
+  <script src="lib/peerjs.min.js?v=1.8.0"></script>
+  <script src="lib/mqtt.min.js?v=1.8.0"></script>
   <!-- 設定ファイル -->
-  <script src="config.js?v=1.7.0"></script>
-  <script src="characters.js?v=1.7.0"></script>
-  <script src="js/chars.js?v=1.7.0"></script>
+  <script src="config.js?v=1.8.0"></script>
+  <script src="characters.js?v=1.8.0"></script>
+  <script src="js/chars.js?v=1.8.0"></script>
   <!-- ゲーム本体 -->
-  <script src="js/settings.js?v=1.7.0"></script>
-  <script src="js/save.js?v=1.7.0"></script>
-  <script src="js/audio.js?v=1.7.0"></script>
-  <script src="js/shape.js?v=1.7.0"></script>
-  <script src="js/aura.js?v=1.7.0"></script>
-  <script src="js/game.js?v=1.7.0"></script>
-  <script src="js/rules.js?v=1.7.0"></script>
-  <script src="js/cpu.js?v=1.7.0"></script>
-  <script src="js/challenge.js?v=1.7.0"></script>
-  <script src="js/card.js?v=1.7.0"></script>
-  <script src="js/stamps.js?v=1.7.0"></script>
-  <script src="js/title-fx.js?v=1.7.0"></script>
-  <script src="js/online.js?v=1.7.0"></script>
-  <script src="js/ui.js?v=1.7.0"></script>
-  <script src="js/themes.js?v=1.7.0"></script>
-  <script src="js/profile.js?v=1.7.0"></script>
-  <script src="js/data-file.js?v=1.7.0"></script>
-  <script src="js/news.js?v=1.7.0"></script>
-  <script src="js/events.js?v=1.7.0"></script>
-  <script src="js/ranking.js?v=1.7.0"></script>
-  <script src="js/records.js?v=1.7.0"></script>
-  <script src="js/dex.js?v=1.7.0"></script>
-  <script src="js/achievements.js?v=1.7.0"></script>
-  <script src="js/backup.js?v=1.7.0"></script>
-  <script src="js/admin.js?v=1.7.0"></script>
-  <script src="js/pwa.js?v=1.7.0"></script>
-  <script src="js/main.js?v=1.7.0"></script>
+  <script src="js/settings.js?v=1.8.0"></script>
+  <script src="js/save.js?v=1.8.0"></script>
+  <script src="js/audio.js?v=1.8.0"></script>
+  <script src="js/shape.js?v=1.8.0"></script>
+  <script src="js/aura.js?v=1.8.0"></script>
+  <script src="js/game.js?v=1.8.0"></script>
+  <script src="js/rules.js?v=1.8.0"></script>
+  <script src="js/cpu.js?v=1.8.0"></script>
+  <script src="js/challenge.js?v=1.8.0"></script>
+  <script src="js/card.js?v=1.8.0"></script>
+  <script src="js/stamps.js?v=1.8.0"></script>
+  <script src="js/halloween.js?v=1.8.0"></script>
+  <script src="js/title-fx.js?v=1.8.0"></script>
+  <script src="js/online.js?v=1.8.0"></script>
+  <script src="js/ui.js?v=1.8.0"></script>
+  <script src="js/themes.js?v=1.8.0"></script>
+  <script src="js/profile.js?v=1.8.0"></script>
+  <script src="js/data-file.js?v=1.8.0"></script>
+  <script src="js/news.js?v=1.8.0"></script>
+  <script src="js/events.js?v=1.8.0"></script>
+  <script src="js/ranking.js?v=1.8.0"></script>
+  <script src="js/records.js?v=1.8.0"></script>
+  <script src="js/dex.js?v=1.8.0"></script>
+  <script src="js/achievements.js?v=1.8.0"></script>
+  <script src="js/backup.js?v=1.8.0"></script>
+  <script src="js/admin.js?v=1.8.0"></script>
+  <script src="js/pwa.js?v=1.8.0"></script>
+  <script src="js/main.js?v=1.8.0"></script>
 </body>
 </html>

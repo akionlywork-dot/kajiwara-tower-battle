@@ -120,6 +120,17 @@ const Admin = (() => {
     // 次に出すキャラ
     $("admin-next").addEventListener("change", (e) => Game.setForcedShape(e.target.value || null));
 
+    // ハロウィンの勝利数を変える（ごほうびの確認用。負けの数はそのまま）
+    $("admin-hw-wins").addEventListener("change", (e) => {
+      const all = (Save.data.eventStats = Save.data.eventStats || {});
+      const r = (all[Halloween.EVENT_ID] = all[Halloween.EVENT_ID] || { wins: 0, losses: 0 });
+      r.wins = Number(e.target.value);
+      Save.write();
+      Achievements.check(null); // 3勝なら実績「かぼちゃの王」
+      Themes.apply(); // 使えなくなった背景・土台は元に戻す
+      UI.toast(`ハロウィンの勝利数を ${r.wins} にしました`);
+    });
+
     // 図鑑・実績
     $("btn-admin-dex-all").addEventListener("click", () => {
       Dex.setAll(true);
@@ -169,6 +180,9 @@ const Admin = (() => {
       `<option value="">ランダム（ふつう）</option>` +
       window.CHARACTERS.map((c) => `<option value="${UI.escape(c.id)}">${UI.escape(c.name)}（${UI.escape(c.rarity || "N")}）</option>`).join("");
     select.value = current;
+    $("admin-hw-wins").value = String(Math.min(3, Records.eventWins(Halloween.EVENT_ID)));
+    // 管理者メニューのスイッチを、今の設定に合わせる
+    for (const t of document.querySelectorAll("#admin-panel .toggle[data-setting]")) t.setAttribute("aria-checked", String(Settings.get(t.dataset.setting)));
     renderNet();
   }
 

@@ -17,6 +17,7 @@ const Settings = (() => {
     cardSize: "landscape", // リザルトカードの形（"landscape"=横長 / "portrait"=縦長）
     cardIcon: false, // リザルトカードに写真アイコンを載せるか（初めは載せない）
     ranking: false, // ハイスコアをランキングに自動で送るか（最初に1回だけ聞く）
+    eventPreview: false, // 管理者モード：イベント期間中として表示する（確認用）
     rankingIcon: false, // ランキングに写真アイコンも載せるか（写真を設定している人に、1回だけ聞く）
   };
 

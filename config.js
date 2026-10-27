@@ -7,7 +7,7 @@ window.GAME_CONFIG = {
   achievementsEpoch: 2,
 
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v1.7.0",
+  version: "v1.8.0",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -106,6 +106,9 @@ window.GAME_CONFIG = {
       { id: "night", name: "星空", unlock: "height5", top: "#0b1633", bottom: "#33467e", cloud: "#4d5f8f", ground: "#2e5a3b", groundDark: "#1f422a", stars: true },
       // むずかしい実績で解放：宇宙到達（高さ9m）→ 銀河
       { id: "galaxy", name: "銀河", unlock: "height9", top: "#07041c", bottom: "#3b1f72", cloud: "#5c4a9c", ground: "#2b2350", groundDark: "#1a1538", stars: true },
+      // ハロウィンイベントのごほうび（1勝目）。moon: 大きな満月、bats: こうもりが飛び回る
+      // unlock に { event, wins } を書くと、そのイベントの勝利数で解放される（イベントが終わっても使える）
+      { id: "halloween_night", name: "ハロウィンの夜", unlock: { event: "halloween2026", wins: 1 }, top: "#1c0b33", bottom: "#5b2a86", cloud: "#4a2d6b", ground: "#2e1f3a", groundDark: "#1d1426", stars: true, moon: true, bats: true },
     ],
     platforms: [
       { id: "wood", name: "木の台", unlock: null, body: "#8a5a3b", top: "#6fbf4a", pillar: "#a39587" },
@@ -114,6 +117,8 @@ window.GAME_CONFIG = {
       { id: "gold", name: "金の台", unlock: "dex_complete", body: "#d4a019", top: "#ffe27a", pillar: "#b3861a" },
       // むずかしい実績で解放：無敗の王（CPU「つよい」に3連勝）→ ダイヤの台
       { id: "diamond", name: "ダイヤの台", unlock: "cpu_hard_streak3", body: "#7fd6f2", top: "#f2fdff", pillar: "#6ab3cf" },
+      // ハロウィンイベントのごほうび（2勝目）。pumpkin: 台の正面に、くり抜いた顔の模様を描く
+      { id: "pumpkin", name: "かぼちゃの台", unlock: { event: "halloween2026", wins: 2 }, body: "#f07b14", top: "#4f8a2b", pillar: "#7a5a3a", pumpkin: true },
     ],
   },
 
@@ -163,6 +168,9 @@ window.GAME_CONFIG = {
     easy: { name: "よわい", candidates: 6, choice: "random", noise: 45, thinkTime: 1.2, maxThink: 1.5 },
     normal: { name: "ふつう", candidates: 24, choice: "top", noise: 10, thinkTime: 1.4, maxThink: 2.5 },
     hard: { name: "つよい", candidates: 56, choice: "best", noise: 0, thinkTime: 1.6, maxThink: 3.5 },
+    // ハロウィンイベント「おばけ屋敷」の CPU（初めは「つよい」と同じ。勝ちやすさはここで調整する）。
+    // event を書いた強さは、ふつうの CPU 対戦のボタン・戦績には出ない
+    halloween: { name: "つよい", candidates: 56, choice: "best", noise: 0, thinkTime: 1.6, maxThink: 3.5, event: "halloween2026" },
   },
 
   // オンライン対戦
@@ -204,6 +212,40 @@ window.GAME_CONFIG = {
       icon: "🦖",
       description: "キャラが大きくなる",
       scale: 1.35, // 大きさの倍率
+    },
+    // ハロウィンイベントのステージ「おばけ屋敷」（stage: true なので、特殊ルールの一覧には出ない。動きは rules.js）
+    haunted: {
+      name: "おばけ屋敷",
+      icon: "🎃",
+      description: "まっくらなお屋敷で、CPU「つよい」と対戦。ときどき稲妻が光り、おばけが落ちているキャラを押してくる",
+      event: "halloween2026",
+      stage: true,
+      darkness: 0.86, // 暗さ（0〜1。1でまっくら）
+      lightRadius: 120, // 持っているキャラ・落ちているキャラのまわりの、明るい丸の大きさ（ゲーム内の単位）
+      lightningEvery: [4, 7], // 稲妻が光る間隔（秒。この間でランダム）
+      flashTime: 0.45, // 稲妻で明るくなっている時間（秒）
+      ghostEvery: [3, 6], // おばけが出てくる間隔（秒。この間でランダム）
+      ghostSpeed: 130, // おばけが横切る速さ（ゲーム内の単位/秒。画面の横幅が 450）
+      ghostRadius: 70, // おばけが押す範囲（おばけの真ん中からの距離）
+      ghostPush: 0.05, // 押す強さ（大きいほど、落ちているキャラが横に流される。0.05 で、おばけの中を通ると30くらい横にずれる）
+    },
+  },
+
+  // イベントのステージとごほうび（イベントの期間は data/events.json）
+  //   rule    : ステージの動き（上の rules の名前）
+  //   cpu     : 対戦する CPU の強さ（上の cpu の名前）
+  //   rewards : 勝つたびに1つずつもらえるごほうび。wins 勝目にもらえる
+  //             type: "background"（背景）/ "platform"（土台）/ "achievement"（実績）、id: themes・実績の id
+  //             背景・土台は、themes の unlock に { event, wins } を書いておくと、その勝利数で使えるようになる
+  events: {
+    halloween2026: {
+      rule: "haunted",
+      cpu: "halloween",
+      rewards: [
+        { wins: 1, type: "background", id: "halloween_night", name: "背景「ハロウィンの夜」" },
+        { wins: 2, type: "platform", id: "pumpkin", name: "土台「かぼちゃの台」" },
+        { wins: 3, type: "achievement", id: "pumpkin_king", name: "実績「かぼちゃの王」（称号「パンプキンキング」）" },
+      ],
     },
   },
 

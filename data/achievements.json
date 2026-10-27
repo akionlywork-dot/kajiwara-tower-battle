@@ -329,6 +329,19 @@
         "type": "edgeLanding",
         "ratio": 0.05
       }
+    },
+    {
+      "id": "pumpkin_king",
+      "name": "かぼちゃの王",
+      "title": "パンプキンキング",
+      "description": "ハロウィンイベントのおばけ屋敷で、CPU「つよい」に3勝した",
+      "category": "イベント",
+      "event": "halloween2026",
+      "condition": {
+        "type": "eventWins",
+        "event": "halloween2026",
+        "value": 3
+      }
     }
   ]
 }

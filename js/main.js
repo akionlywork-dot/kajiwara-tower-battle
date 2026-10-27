@@ -58,6 +58,8 @@
     Sound.setSeEnabled(Settings.get("se"));
     // 当たり判定の表示は開発用。公開版（devMode: false）では、設定に関係なく常にOFF
     Game.setDebug((CONFIG.devMode || Admin.unlocked) && Settings.get("debug"));
+    // 管理者モード：イベント期間中として表示（確認用）
+    LimitedEvents.setPreview((CONFIG.devMode || Admin.unlocked) && Settings.get("eventPreview"));
     if (Game.playing && !isCpuTurn()) Game.setTurnTimeLimit(turnTimeLimit());
   }
 
@@ -578,7 +580,7 @@
         : "";
       $("hud-info").innerHTML = `<span class="big">${calcScore()}</span> 点 ${ruleTag()}<br>${sub}${target}`;
     } else {
-      $("hud-info").innerHTML = `<span class="player-tag p${player}">${UI.escape(nameOf(player))} の番</span><br>${sub}`;
+      $("hud-info").innerHTML = `<span class="player-tag p${player}">${UI.escape(nameOf(player))} の番</span> ${ruleTag()}<br>${sub}`;
     }
   }
 
@@ -661,12 +663,17 @@
     } else {
       const loser = lastDropper;
       const winner = loser === 1 ? 2 : 1;
+      let stageNote = ""; // イベントのステージのごほうびの知らせ
       // 戦績に記録（CPU対戦・オンライン対戦は、人どうしの対戦とは別に数える）
       if (mode === "online") {
         clearInterval(sendTimer);
         // ホストは、ゲストにも結果を知らせる
         if (online && online.role === "host") sendImportant({ t: "over", g: online.gameNo, loser, n: stacked, h: maxHeight });
         if (online) Records.addOnlineResult(winner === online.me);
+      } else if (cpuLevel && Halloween.isStageCpu(cpuLevel)) {
+        // イベントのステージ（おばけ屋敷）：ふつうの CPU 対戦とは別に記録し、勝つたびにごほうび
+        const n = Records.addEventResult(Halloween.EVENT_ID, winner === 1);
+        stageNote = Halloween.resultHTML(winner === 1, n);
       } else if (cpuLevel) Records.addCpuResult(cpuLevel, winner === 1);
       else Records.addVersusResult(winner);
       lastResult = { mode, cpu: cpuLevel, winner, loser, count: stacked, height: maxHeight };
@@ -680,7 +687,8 @@
         `<div class="result-stats">` +
         `<div>積んだ数<b>${stacked}体</b></div>` +
         `<div>高さ<b>${maxHeight.toFixed(2)}m</b></div>` +
-        `</div>`;
+        `</div>` +
+        stageNote;
       Sound.play("record");
       const color = winner === 1 ? "#ff5d73" : "#3d8bff";
       UI.confetti([color, "#ffffff", "#ffd84d"]);
@@ -802,6 +810,7 @@
     const r = Rules.get(ruleId);
     if (mode === "solo") return challenge ? `挑戦状（${challenge.name}さん ${challenge.score}点）` : r ? `特殊ルール「${r.params.name}」` : "スコアアタック";
     if (mode === "online") return "オンライン対戦";
+    if (cpuLevel && r) return `${r.params.icon || ""} ${r.params.name}`; // イベントのステージ（おばけ屋敷など）
     return cpuLevel ? `CPU対戦（${CONFIG.cpu[cpuLevel].name}）` : "ふたりで対戦";
   }
 
@@ -997,6 +1006,8 @@ ${location.origin}${location.pathname}`), "image/png");
   PWA.init(); // アプリとしてインストールできるようにする
   Share.init();
   Stamps.init();
+  // ハロウィンイベント：「挑戦する」で、おばけ屋敷（CPU対戦）を始める
+  Halloween.init((rule, cpu) => startGame("versus", rule, cpu));
   TitleFx.init(); // タイトル画面の演出（goTitle より前に）
   Card.init();
   // キャラの読み込みが終わったら進む Promise（挑戦状は、キャラがそろってから始める）

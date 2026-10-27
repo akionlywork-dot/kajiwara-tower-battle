@@ -2972,3 +2972,203 @@ select {
 .ach-secret {
   background: rgba(20, 10, 40, 0.35);
 }
+
+/* =============================================
+   ハロウィンイベント
+   ============================================= */
+/* モード選択画面・ステージ画面のボタン（かぼちゃ色） */
+.btn-halloween {
+  color: #fff;
+  background: linear-gradient(135deg, #ff8a1f, #b8410e);
+  --color-sub-shadow: #6b2a0c;
+}
+
+.btn-halloween small {
+  opacity: 0.95;
+}
+
+/* ステージの説明 */
+.halloween-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+}
+
+.hw-stage {
+  padding: var(--space-m);
+  border-radius: var(--radius-m);
+  background: linear-gradient(160deg, rgba(40, 14, 64, 0.85), rgba(16, 6, 28, 0.85));
+}
+
+.hw-stage b {
+  font-size: var(--font-size-l);
+}
+
+.hw-stage p {
+  margin: var(--space-xs) 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.hw-stage small {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.halloween-body .section-title small {
+  margin-left: var(--space-s);
+  font-size: 13px;
+  color: var(--color-gold);
+}
+
+/* ごほうび（もらったものにはチェック、まだのものは「？」） */
+.hw-reward {
+  display: flex;
+  align-items: center;
+  gap: var(--space-m);
+  margin-bottom: var(--space-s);
+  padding: var(--space-s) var(--space-m);
+  border-radius: var(--radius-m);
+  background: var(--color-panel);
+}
+
+.hw-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-weight: bold;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.hw-reward.got {
+  background: rgba(255, 138, 31, 0.35);
+}
+
+.hw-reward.got .hw-mark {
+  color: #fff;
+  background: #ff8a1f;
+}
+
+.hw-reward-main b {
+  display: block;
+  font-size: 15px;
+}
+
+.hw-reward-main small {
+  font-size: 13px;
+}
+
+.hw-done {
+  font-weight: bold;
+  color: var(--color-gold);
+  text-align: center;
+}
+
+/* リザルトの「ごほうびゲット！」 */
+.reward-get {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-m);
+  padding: var(--space-m);
+  border-radius: var(--radius-l);
+  color: #fff;
+  background: linear-gradient(135deg, #ff8a1f, #7a2bb0);
+  box-shadow: 0 0 24px rgba(255, 138, 31, 0.7);
+  animation: pop 0.6s ease-out 0.4s both;
+}
+
+.reward-get span {
+  font-size: 30px;
+  font-weight: bold;
+}
+
+.reward-get b {
+  font-size: var(--font-size-m);
+}
+
+.reward-get small {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.reward-note {
+  margin-top: var(--space-s);
+  font-size: var(--font-size-s);
+  font-weight: bold;
+}
+
+/* タイトル画面：ロゴの横のかぼちゃと、横切るこうもり（期間中だけ。#screen-title.halloween） */
+.title-top {
+  position: relative;
+}
+
+.hw-pumpkin,
+.hw-bats {
+  display: none;
+}
+
+#screen-title.halloween .hw-pumpkin {
+  display: block;
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  font-size: 44px;
+  animation: hw-pumpkin 2.4s ease-in-out infinite;
+}
+
+@keyframes hw-pumpkin {
+  0%, 100% { transform: rotate(-8deg) translateY(0); }
+  50% { transform: rotate(8deg) translateY(-6px); }
+}
+
+#screen-title.halloween .hw-bats {
+  display: block;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.hw-bats span {
+  position: absolute;
+  left: -40px;
+  font-size: 26px;
+  animation: hw-bat 9s linear infinite;
+}
+
+.hw-bats span:nth-child(1) { top: 22%; animation-delay: 0s; }
+.hw-bats span:nth-child(2) { top: 34%; font-size: 20px; animation-delay: 3.2s; animation-duration: 11s; }
+.hw-bats span:nth-child(3) { top: 14%; font-size: 18px; animation-delay: 6.1s; animation-duration: 8s; }
+
+@keyframes hw-bat {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(calc(25vw + 30px), -18px); }
+  50% { transform: translate(calc(50vw + 40px), 10px); }
+  75% { transform: translate(calc(75vw + 50px), -14px); }
+  100% { transform: translate(calc(100vw + 80px), 0); }
+}
+
+/* 実績：期間限定 */
+.ach-limited {
+  color: var(--color-gold);
+}
+
+.ach-closed {
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #screen-title.halloween .hw-pumpkin,
+  .hw-bats span {
+    animation: none;
+  }
+
+  .hw-bats span {
+    left: auto;
+    right: 12%;
+  }
+}

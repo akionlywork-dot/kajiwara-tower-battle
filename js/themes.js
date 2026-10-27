@@ -2,7 +2,9 @@
 // themes.js
 // 背景と土台の解放・選択（種類と解放条件は config.js の themes）
 //
-// 解放条件は「実績の id」。その実績を達成すると、その背景・土台が使えるようになる
+// 解放条件は「実績の id」。その実績を達成すると、その背景・土台が使えるようになる。
+// { event: "イベントの id", wins: 数 } と書くと、そのイベントのステージで wins 回勝ったら使えるようになる
+// （イベントが終わっても、ずっと使える）
 // =============================================
 
 const Themes = (() => {
@@ -14,9 +16,12 @@ const Themes = (() => {
   const list = (kind) => (window.GAME_CONFIG.themes || {})[kind] || [];
   const chosen = () => Save.data.cosmetics;
 
-  // 解放ずみか（条件なし、または条件の実績を達成ずみ）
+  // 解放ずみか（条件なし、条件の実績を達成ずみ、またはイベントの勝利数が届いた）
   function isUnlocked(def) {
-    return !def.unlock || !!Save.data.achievements[def.unlock];
+    const u = def.unlock;
+    if (!u) return true;
+    if (typeof u === "object") return Records.eventWins(u.event) >= (u.wins || 1);
+    return !!Save.data.achievements[u];
   }
 
   // 今選んでいるもの（選んでいたものが使えなくなっていたら、最初のものに戻す）
@@ -41,6 +46,7 @@ const Themes = (() => {
 
   // 解放条件の説明（例：「実績『10体積み』を達成」）
   function conditionText(def) {
+    if (def.unlock && typeof def.unlock === "object") return `${LimitedEvents.nameOf(def.unlock.event)}で${def.unlock.wins || 1}勝`;
     const a = typeof Achievements !== "undefined" ? Achievements.find(def.unlock) : null;
     return a ? `実績「${a.name}」を達成` : "ある実績を達成";
   }
@@ -80,7 +86,9 @@ const Themes = (() => {
 
   // 見本の見た目（背景は空のグラデーション、土台は空の上に台）
   function previewStyle(kind, def) {
-    if (kind === "backgrounds") return `background:linear-gradient(${def.top}, ${def.bottom} 70%, ${def.ground} 70%)`;
+    // 満月のある背景（ハロウィンの夜）は、見本にも月を描く
+    const moon = def.moon ? "radial-gradient(circle at 74% 26%, #fff4c8 0 13%, rgba(255,240,190,0.35) 14% 20%, transparent 21%), " : "";
+    if (kind === "backgrounds") return `background:${moon}linear-gradient(${def.top}, ${def.bottom} 70%, ${def.ground} 70%)`;
     const bg = current("backgrounds");
     return `background:linear-gradient(${bg.top}, ${bg.bottom})`;
   }

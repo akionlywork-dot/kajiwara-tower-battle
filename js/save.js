@@ -62,6 +62,9 @@ const Save = (() => {
         sentScore: 0, // 最後に送ったスコア（これより高くなったら、また送る）
         sentProfile: "", // 最後に送った名前・称号・アイコンの目印（変えたら、また送る）
       },
+      // イベントのステージの戦績：イベントの id → { wins, losses }（負けても勝利数は減らない）。
+      // ごほうび（背景・土台・実績）は、この勝利数で決まる。実績のリセット（achievementsEpoch）でも消さない
+      eventStats: {},
       // スタンプ（オンライン対戦のリザルトで使う4つ）：キャラの ID（例 "chara03"）。null の枠は初期スタンプ
       stamps: [null, null, null, null],
       // 選んでいる背景と土台（config.js の themes の id）

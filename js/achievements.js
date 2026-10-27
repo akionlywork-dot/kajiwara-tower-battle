@@ -20,10 +20,13 @@
 //   noRotate     … ひとりモードの1回のゲームで、回転を使わずに value 体積んだ
 //   quickStreak  … ひとりモードの1回のゲームで、1手 seconds 秒以内で value 体続けて積んだ
 //   edgeLanding  … 土台の端から ratio（土台の幅に対する割合）以内の所に着地させて、積めた
+//   eventWins    … イベント event のステージで value 回勝った   例 { "type": "eventWins", "event": "halloween2026", "value": 3 }
 //
 // そのほかの項目：
 //   category … 実績画面の分類（見出し）。同じ分類の実績をまとめて表示する
 //   hidden   … true にすると、達成するまで名前・説明・称号を「？？？」で表示する（隠し実績）
+//   event    … イベントの id を書くと期間限定の実績になる。期間中・達成ずみならふつうに表示し、
+//              期間外で未達成なら「期間限定（終了）」と表示して、全体の達成数（〇 / 〇）に数えない
 // =============================================
 
 const Achievements = (() => {
@@ -115,6 +118,8 @@ const Achievements = (() => {
         return { now: cpu.wins || 0, goal: v };
       case "cpuStreak":
         return { now: cpu.bestStreak || 0, goal: v };
+      case "eventWins":
+        return { now: Records.eventWins(cond.event), goal: v };
       case "rarityPlaced":
         return { now: (s.placed || {})[cond.rarity] || 0, goal: v || 1 };
       case "auraPlaced": {
@@ -166,8 +171,10 @@ const Achievements = (() => {
       load().then(() => defs && UI.current === "achievements" && render());
       return;
     }
-    const got = defs.filter((a) => unlocked()[a.id]).length;
-    $("achievements-count").textContent = `${got} / ${defs.length}`;
+    // 期間が終わって、もう取れない期間限定の実績は、全体の数に入れない
+    const counted = defs.filter((a) => !closed(a));
+    const got = counted.filter((a) => unlocked()[a.id]).length;
+    $("achievements-count").textContent = `${got} / ${counted.length}`;
     // 分類ごとにまとめる（json に書いた順番のまま）
     const groups = new Map();
     for (const a of defs) {
@@ -177,15 +184,33 @@ const Achievements = (() => {
     }
     box.innerHTML = [...groups.entries()]
       .map(([cat, list]) => {
-        const done = list.filter((a) => unlocked()[a.id]).length;
-        return `<h3 class="ach-section">${UI.escape(cat)}<small>${done} / ${list.length}</small></h3>` + list.map(rowHTML).join("");
+        const open = list.filter((a) => !closed(a));
+        const done = open.filter((a) => unlocked()[a.id]).length;
+        return `<h3 class="ach-section">${UI.escape(cat)}<small>${done} / ${open.length}</small></h3>` + list.map(rowHTML).join("");
       })
       .join("");
+  }
+
+  // 期間限定の実績で、期間外（開催前・終了）で、まだ達成していない（もう取れない）か
+  function closed(a) {
+    return !!a.event && !unlocked()[a.id] && !LimitedEvents.isActive(a.event);
   }
 
   // 1つ分の行
   function rowHTML(a) {
     const at = unlocked()[a.id];
+    if (closed(a)) {
+      const label = LimitedEvents.status(a.event) === "before" ? "期間限定（開催前）" : "期間限定（終了）";
+      return `
+      <div class="ach-row ach-locked ach-closed">
+        <span class="ach-icon">⌛</span>
+        <span class="ach-main">
+          <b>${UI.escape(a.name)}</b>
+          <small>${UI.escape(a.description || "")}</small>
+          <span class="ach-title ach-limited">${label}</span>
+        </span>
+      </div>`;
+    }
     const date = at ? new Date(at) : null;
     const secret = a.hidden && !at; // 隠し実績で、まだ達成していない
     // 累計の実績は、進み具合のバー（達成していない・隠していないものだけ）
@@ -197,7 +222,7 @@ const Achievements = (() => {
       <div class="ach-row ${at ? "ach-done" : "ach-locked"} ${secret ? "ach-secret" : ""}">
         <span class="ach-icon">${at ? "🏆" : secret ? "❓" : "🔒"}</span>
         <span class="ach-main">
-          <b>${secret ? "？？？" : UI.escape(a.name)}</b>
+          <b>${secret ? "？？？" : UI.escape(a.name)}${a.event ? ` <span class="limited-tag">期間限定</span>` : ""}</b>
           <small>${secret ? "？？？（隠し実績）" : UI.escape(a.description || "")}</small>
           <span class="ach-title">称号「${UI.escape(at ? a.title : "？？？")}」</span>
           ${bar}
