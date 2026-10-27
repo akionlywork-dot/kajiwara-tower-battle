@@ -1229,7 +1229,7 @@ select {
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 
-/* スーパーレアは虹色に光る */
+/* めっちゃレア（★3）は虹色に光る */
 .rare-banner.super span {
   background: linear-gradient(90deg, #ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0);
   box-shadow: 0 0 30px #ffc21a;
@@ -2761,7 +2761,7 @@ select {
 }
 
 /* =============================================
-   ★4（アルティメット）とオーラ
+   ★4（激レア）とオーラ
    ============================================= */
 /* 出たときのバナー：光る帯が流れる、大きめの札 */
 .rare-banner.ultimate {
@@ -2893,4 +2893,30 @@ select {
   .aura-card::after {
     animation: none;
   }
+}
+
+/* 図鑑：レア度ごとの見出し（3列のグリッドの横いっぱいに） */
+.dex-section {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-s);
+  margin-top: var(--space-s);
+  padding: 2px var(--space-xs);
+  border-bottom: 2px solid var(--rare-color);
+  font-size: var(--font-size-m);
+}
+
+.dex-section:first-child {
+  margin-top: 0;
+}
+
+.dex-section .rarity-stars {
+  font-size: 13px;
+}
+
+.dex-section small {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.9;
 }

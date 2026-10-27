@@ -29,6 +29,16 @@ const Chars = (() => {
     seen.add(c.id);
   }
 
+  // 出やすさ（characters.js の weight。書いていなければ config.js のレア度の weight）。0 なら出ない
+  function chance(c) {
+    if (typeof c.weight === "number") return c.weight;
+    const r = (window.GAME_CONFIG.rarity || {})[c.rarity] || (window.GAME_CONFIG.rarity || {}).N || {};
+    return typeof r.weight === "number" ? r.weight : 1;
+  }
+
+  // ゲームに出てくるキャラか（出やすさが 0 のキャラ＝まぼろしなど、まだ登場しないキャラは false）
+  const appears = (c) => chance(c) > 0;
+
   // ID のキャラ（無ければ null）
   function byId(id) {
     return list.find((c) => c.id === id) || null;
@@ -41,5 +51,5 @@ const Chars = (() => {
     return c ? c.id : idOf(file);
   }
 
-  return { list, byId, idOf, idFromFile };
+  return { list, byId, idOf, idFromFile, chance, appears };
 })();

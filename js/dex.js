@@ -8,8 +8,9 @@ const Dex = (() => {
   const $ = (id) => document.getElementById(id);
   // 図鑑に並べるキャラ。期間限定のキャラ（characters.js の event）は、登録ずみか、イベントの期間中だけ出す
   const chars = () => window.CHARACTERS.filter((c) => !c.event || registered()[c.id] || LimitedEvents.isActive(c.event));
-  // 「図鑑コンプリート」に数えるキャラ（期間限定のキャラは数えない。期間が終わると集められなくなるため）
-  const regular = () => window.CHARACTERS.filter((c) => !c.event);
+  // 「図鑑コンプリート」に数えるキャラ（期間限定のキャラは数えない。期間が終わると集められなくなるため。
+  // まぼろしのように出る確率が 0 のキャラも、まだ集められないので数えない）
+  const regular = () => window.CHARACTERS.filter((c) => !c.event && Chars.appears(c));
   const registered = () => Save.data.dex; // キャラの ID → 登録した日時
 
   function init() {
@@ -43,22 +44,51 @@ const Dex = (() => {
   }
 
   // ---------- 図鑑画面 ----------
+  // レア度の低い順（★1 → ★5）に、レア度ごとに区切って並べる。
+  // 同じレア度の中は characters.js の順番。No. は並べた順につける
+  // 見出しに、全体とレア度ごとの解放率（登録した数 ÷ 集められるキャラの数）を出す
   function render() {
-    $("dex-count").textContent = `${count()} / ${total()}体`;
-    $("dex-grid").innerHTML = chars()
-      .map((c, i) => {
-        const got = !!registered()[c.id];
-        const no = String(i + 1).padStart(2, "0");
-        const r = rarityOf(c);
-        // レア度は、未登録のキャラでも★だけ見せる（「レアがまだいる！」と分かるように）
-        return `
-          <button class="dex-card ${got ? "" : "dex-locked"} ${r.id !== "N" ? "dex-rare" : ""}" style="--rare-color:${r.color}" data-id="${UI.escape(c.id)}" ${got ? "" : "disabled"}>
-            <span class="dex-img ${auraClass(c)}"><img src="${UI.escape(c.file)}" alt=""></span>
-            <span class="dex-no">No.${no} <span class="rarity-stars">${"★".repeat(r.stars)}</span></span>
-            <b class="dex-name">${got ? UI.escape(c.name) : "？？？"}</b>
-          </button>`;
+    $("dex-count").textContent = `${count()} / ${total()}体（${percent(count(), total())}%）`;
+    const list = chars();
+    const groups = new Map(); // レア度の id → そのレア度のキャラ
+    for (const c of list) {
+      const id = rarityOf(c).id;
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id).push(c);
+    }
+    const order = [...groups.keys()].sort((a, b) => rarityOf({ rarity: a }).stars - rarityOf({ rarity: b }).stars);
+    let no = 0;
+    $("dex-grid").innerHTML = order
+      .map((rid) => {
+        const r = rarityOf({ rarity: rid });
+        // 解放率は、集められるキャラ（期間限定・まだ登場しないキャラを除く）で数える
+        const members = regular().filter((c) => rarityOf(c).id === rid);
+        const got = members.filter((c) => registered()[c.id]).length;
+        const rate = members.length ? `${got} / ${members.length}（${percent(got, members.length)}%）` : "まだだれも見つけていない";
+        const head = `
+          <h3 class="dex-section" style="--rare-color:${r.color}">
+            <span class="rarity-stars">${"★".repeat(r.stars)}</span> ${UI.escape(r.name)}
+            <small>${rate}</small>
+          </h3>`;
+        return head + groups.get(rid).map((c) => cardHTML(c, r, ++no)).join("");
       })
       .join("");
+  }
+
+  // 割合（%。小数は切り捨て。0人中なら 0）
+  function percent(n, all) {
+    return all ? Math.floor((n / all) * 100) : 0;
+  }
+
+  // 1体分のカード（レア度は、未登録のキャラでも★だけ見せる。「レアがまだいる！」と分かるように）
+  function cardHTML(c, r, no) {
+    const got = !!registered()[c.id];
+    return `
+      <button class="dex-card ${got ? "" : "dex-locked"} ${r.id !== "N" ? "dex-rare" : ""}" style="--rare-color:${r.color}" data-id="${UI.escape(c.id)}" ${got ? "" : "disabled"}>
+        <span class="dex-img ${auraClass(c)}"><img src="${UI.escape(c.file)}" alt=""></span>
+        <span class="dex-no">No.${String(no).padStart(2, "0")} <span class="rarity-stars">${"★".repeat(r.stars)}</span></span>
+        <b class="dex-name">${got ? UI.escape(c.name) : "？？？"}</b>
+      </button>`;
   }
 
   // キャラのレア度の情報 { id, name, color, stars }（config.js の rarity）

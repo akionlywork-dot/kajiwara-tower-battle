@@ -574,12 +574,13 @@
     }
   }
 
-  // レアキャラが出たときの「レア！」「スーパーレア！！」
-  // ★4（アルティメット）は、専用のバナーと、画面が一瞬光る演出と、専用の効果音
+  // レアキャラが出たときの「レア！」「めっちゃレア！！」「激レア！！！」
+  // ★4（激レア）は、専用のバナーと、画面が一瞬光る演出と、専用の効果音
   function showRareBanner(shape, info) {
     const el = $("rare-banner");
     const ultimate = info.stars >= 4;
-    const label = ultimate ? "アルティメット！！！" : info.stars >= 3 ? "スーパーレア！！" : "レア！";
+    // 文字は config.js のレア度の名前 ＋「！」（★2は1つ、★3は2つ、★4は3つ）。例「めっちゃレア！！」
+    const label = info.name + "！".repeat(Math.max(1, Math.min(3, info.stars - 1)));
     el.innerHTML = `<span>${label}</span><small>${UI.escape(shape.name)}</small>`;
     el.style.setProperty("--rare-color", info.color);
     el.className = ultimate ? `rare-banner ultimate aura-${shape.aura || "light"}` : info.stars >= 3 ? "rare-banner super" : "rare-banner";
@@ -1032,7 +1033,7 @@ ${location.origin}${location.pathname}`), "image/png");
         shape.event = c.event || null; // 期間限定のキャラなら、イベントの id
         // レア度と出やすさ（characters.js の rarity・weight。無ければノーマル・config.js の値）
         shape.rarity = CONFIG.rarity[c.rarity] ? c.rarity : "N";
-        shape.weight = typeof c.weight === "number" ? c.weight : CONFIG.rarity[shape.rarity].weight;
+        shape.weight = Chars.chance(c); // 出やすさ（0 なら出ない。まぼろしなど）
         return shape;
       } catch (e) {
         console.error(e); // 画像が無い・壊れているときは、そのキャラだけ飛ばす

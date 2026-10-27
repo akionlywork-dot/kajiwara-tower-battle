@@ -7,7 +7,7 @@
 //   （番号が変わると、新しいファイルを保存しなおし、古いものは消す）
 // =============================================
 
-const VERSION = "1.6.0";
+const VERSION = "1.6.1";
 const CACHE = `kajiwara-tb-${VERSION}`;
 
 // バージョン番号（?v=）を付けて読み込んでいるファイル（index.html と同じもの）
@@ -26,6 +26,7 @@ const OTHERS = [
   "./", "index.html", "manifest.webmanifest", "favicon.svg", "apple-touch-icon.png",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png",
   ...Array.from({ length: 12 }, (_, i) => `images/chara${String(i + 1).padStart(2, "0")}.webp`),
+  "images/maboroshi01.webp",
 ];
 
 // インストールされたとき：ファイルをまとめて保存する

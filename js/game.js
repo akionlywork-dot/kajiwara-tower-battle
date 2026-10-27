@@ -424,16 +424,21 @@ const Game = (() => {
     };
   }
 
+  // キャラの出やすさ（weight）。0 なら出ない
+  const chance = (s) => (typeof s.weight === "number" ? Math.max(0, s.weight) : 1);
+
   // キャラを選ぶ。出やすさ（weight）に合わせて、くじ引きのように選ぶ（同じキャラが2回続かないように）
   function randomShape() {
     // 期間限定のキャラは、イベントの期間中だけ出る（events.js）
     const open = shapes.filter((s) => LimitedEvents.available(s));
     const pool = open.length > 1 ? open.filter((s) => s !== lastShape) : open.length ? open : shapes;
-    const total = pool.reduce((sum, s) => sum + (s.weight || 1), 0);
+    // 出やすさが 0 のキャラ（まぼろしなど、まだ登場しないキャラ）は選ばれない
+    const total = pool.reduce((sum, s) => sum + chance(s), 0);
     let r = pieceRandom() * total; // 0〜合計 のどこかに当たりを置き、
-    let shape = pool[pool.length - 1];
+    let shape = pool.filter((s) => chance(s) > 0).pop() || pool[pool.length - 1]; // 計算の端数で外れたときは、最後の出るキャラ
     for (const s of pool) {
-      r -= s.weight || 1; // 出やすいキャラほど「幅」が広いので当たりやすい
+      if (chance(s) <= 0) continue;
+      r -= chance(s); // 出やすいキャラほど「幅」が広いので当たりやすい
       if (r < 0) {
         shape = s;
         break;
