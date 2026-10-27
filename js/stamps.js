@@ -127,6 +127,7 @@ const Stamps = (() => {
   function end() {
     session = null;
     $("stamp-layer").innerHTML = "";
+    $("stamp-status").textContent = "";
     updateBar();
   }
 

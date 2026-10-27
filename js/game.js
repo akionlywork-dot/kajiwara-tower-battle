@@ -75,16 +75,24 @@ const Game = (() => {
   // 今の特殊ルール（rules.js の Rules.get で作ったもの）。ふつうのルールなら null
   let rule = null;
 
-  // 空に浮かぶ雲 { x, y, scale, speed }。x, y は画面の割合（0〜1）
+  // 空に浮かぶ雲 { x, y, scale, speed, alpha, depth }。x, y は画面の割合（0〜1）
+  // 奥（far）と手前（near）の2層。奥の雲は小さく、薄く、ゆっくり流れる（config.js の titleFx.clouds）
+  const FX = window.GAME_CONFIG.titleFx || {};
   const clouds = [];
-  for (let i = 0; i < 5; i++) {
-    clouds.push({
-      x: Math.random(),
-      y: 0.06 + i * 0.12 + Math.random() * 0.05,
-      scale: 0.7 + Math.random() * 0.6,
-      speed: 0.004 + Math.random() * 0.008, // 1秒に画面の何割進むか
-    });
+  for (const [layer, def] of [["far", { count: 4, speed: 0.004, scale: 0.6, alpha: 0.6 }], ["near", { count: 3, speed: 0.012, scale: 1.1, alpha: 1 }]]) {
+    const c = Object.assign(def, (FX.clouds || {})[layer]);
+    for (let i = 0; i < c.count; i++) {
+      clouds.push({
+        x: Math.random(),
+        y: 0.05 + Math.random() * 0.6,
+        scale: c.scale * (0.8 + Math.random() * 0.4),
+        speed: c.speed * (0.8 + Math.random() * 0.4), // 1秒に画面の何割進むか
+        alpha: c.alpha,
+        depth: layer === "far" ? 0.08 : 0.2, // カメラが動いたときに、どれだけ一緒に動くか（奥ほど小さい）
+      });
+    }
   }
+  clouds.sort((a, b) => a.depth - b.depth); // 奥の雲から先に描く
 
   // ---------- 初期化 ----------
   function init(canvasEl, loadedShapes) {
@@ -343,6 +351,13 @@ const Game = (() => {
       }
     } else {
       const t = (simTime - demo.phaseAt) / 1000;
+      // 地面まで落ちたキャラ：砂ぼこりと、画面の揺れ（1体につき1回）
+      for (const b of pieces()) {
+        if (!b.hitGround && b.bounds.max.y > groundY()) {
+          b.hitGround = true;
+          landImpact(b.position.x);
+        }
+      }
       // 最初の0.5秒は左右に揺らし、そのあと一方に傾ける
       const angle = t < 0.5 ? Math.sin(t * 40) * 0.03 : Math.min(0.5, (t - 0.5) * 0.5);
       Body.setAngle(platform, angle);
@@ -693,6 +708,7 @@ const Game = (() => {
   function loop(time) {
     requestAnimationFrame(loop);
     moveClouds(Math.min(time - lastTime, 100) / 1000);
+    stepTitleFx(Math.min(time - lastTime, 100) / 1000);
     if (engine && !paused) {
       // 画面のリフレッシュレート（60Hz/120Hz）に関係なく、一定の速さで物理演算を進める
       acc += Math.min(time - lastTime, 100);
@@ -836,6 +852,12 @@ const Game = (() => {
     const dpr = window.devicePixelRatio || 1;
     if (photo) photo.view.h = photo.view.w * (canvas.height / canvas.width); // 画面の形が変わっても合わせる
     const v = photo ? photo.view : { left: 0, top: camY, w: WORLD_W, h: worldH };
+    // タイトルのデモで塔が崩れたときの、画面の揺れ
+    const s = photo ? null : shakeOffset();
+    if (s) {
+      v.left += s.x;
+      v.top += s.y;
+    }
     renderScene(ctx, v, (canvas.width / v.w), !photo);
     // 特殊ルールの表示（風の筋など。画面の座標で描く）
     if (!photo && rule && rule.draw) {
@@ -870,6 +892,7 @@ const Game = (() => {
     }
     // 地面はキャラより手前に描く（落ちたキャラが地面の向こうに消えていくように）
     drawGround();
+    if (withUI) drawDust();
     if (!engine || !withUI) {
       ctx.restore();
       ctx = prevCtx;
@@ -1102,6 +1125,7 @@ const Game = (() => {
       drawClouds(k, sky.cloud);
       ctx.globalAlpha = 1;
     }
+    if (!photo) drawBirds();
   }
 
   // ---------- 雲 ----------
@@ -1119,17 +1143,143 @@ const Game = (() => {
 
   function drawClouds(k, color) {
     ctx.fillStyle = color;
+    const base = ctx.globalAlpha;
     for (const c of clouds) {
-      // カメラが上に行くと、雲は少しだけ下に流れる（遠くにある感じを出す）
+      // カメラが上に行くと、雲は少しだけ下に流れる（遠くにある感じを出す。奥の雲ほどゆっくり）
       const x = view.left + c.x * view.w;
-      const y = view.top + c.y * view.h - camY * 0.15 * k;
+      const y = view.top + c.y * view.h - camY * c.depth * k;
       const s = c.scale * k;
+      ctx.globalAlpha = base * c.alpha;
       for (const [dx, dy, rx, ry] of CLOUD_PUFFS) {
         ctx.beginPath(); // 1つずつ塗る（まとめて塗ると、重なった部分が抜けてしまう）
         ctx.ellipse(x + dx * s, y + dy * s, rx * s, ry * s, 0, 0, Math.PI * 2);
         ctx.fill();
       }
     }
+    ctx.globalAlpha = base;
+  }
+
+  // ---------- タイトル画面の演出（鳥・画面の揺れ・砂ぼこり） ----------
+  // タイトル画面が出ているあいだだけ動かす（title-fx.js が setTitleFx でオン・オフする）。
+  // 「視差効果を減らす」が ON の端末では出さない。数値は config.js の titleFx
+  let titleFxOn = false;
+  const birds = []; // { x, y（画面の割合）, vx, size, phase }
+  const dusts = []; // 砂ぼこりの粒 { x, y, vx, vy, r, life }
+  let nextBirdAt = 0; // 次に鳥が来る時刻（秒）
+  let shake = { until: 0, time: 1, strength: 0 }; // 画面の揺れ
+  const fxNow = () => performance.now() / 1000;
+  // [最小, 最大] のあいだのランダムな数（書いていなければ def）
+  const between = (range, def) => {
+    const [a, b] = Array.isArray(range) ? range : def;
+    return a + Math.random() * (b - a);
+  };
+
+  function setTitleFx(on) {
+    titleFxOn = on && !reducedMotion.matches;
+    if (!titleFxOn) {
+      birds.length = 0;
+      dusts.length = 0;
+      shake.until = 0;
+    }
+    nextBirdAt = fxNow() + between((FX.birds || {}).firstAfter, [2, 4]);
+  }
+
+  // 毎フレーム：鳥を飛ばす・砂ぼこりを動かす（dt：秒）
+  function stepTitleFx(dt) {
+    if (!titleFxOn) return;
+    const conf = FX.birds || {};
+    if (fxNow() >= nextBirdAt) {
+      // 左右どちらかから、数羽の群れが横切る
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      const n = Math.round(between(conf.count, [1, 4]));
+      const y = 0.1 + Math.random() * 0.25;
+      const speed = conf.speed || 70;
+      for (let i = 0; i < n; i++) {
+        birds.push({
+          x: dir > 0 ? -20 - i * 22 : WORLD_W + 20 + i * 22,
+          y: y + (i % 2) * 0.025 + Math.random() * 0.01,
+          vx: dir * speed * (0.9 + Math.random() * 0.2),
+          size: 5 + Math.random() * 3,
+          phase: Math.random() * Math.PI * 2,
+        });
+      }
+      nextBirdAt = fxNow() + between(conf.every, [6, 12]);
+    }
+    for (let i = birds.length - 1; i >= 0; i--) {
+      const b = birds[i];
+      b.x += b.vx * dt;
+      b.phase += dt * 12; // 羽ばたき
+      if (b.x < -120 || b.x > WORLD_W + 120) birds.splice(i, 1);
+    }
+    for (let i = dusts.length - 1; i >= 0; i--) {
+      const d = dusts[i];
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      d.vx *= 0.95;
+      d.vy *= 0.95;
+      d.r += dt * 26; // ふくらみながら
+      d.life -= dt / ((FX.dust || {}).time || 1); // 消えていく
+      if (d.life <= 0) dusts.splice(i, 1);
+    }
+  }
+
+  // デモの塔が崩れて、キャラが地面に落ちた：砂ぼこりを出して、画面を揺らす
+  function landImpact(x) {
+    if (!titleFxOn) return;
+    const conf = FX.dust || {};
+    const n = conf.count || 12;
+    for (let i = 0; i < n; i++) {
+      // 地面から、もくもくと上に舞い上がる（地面のあたりはスタートボタンに隠れるので、高めに上げる）
+      dusts.push({
+        x: x + (Math.random() - 0.5) * 40,
+        y: groundY() - 4,
+        vx: (Math.random() - 0.5) * 140,
+        vy: -50 - Math.random() * 110,
+        r: 6 + Math.random() * 8,
+        life: 1,
+      });
+    }
+    const s = FX.shake || {};
+    shake = { until: fxNow() + (s.time || 0.45), time: s.time || 0.45, strength: s.strength || 6 };
+  }
+
+  // 画面の揺れの、今のずれ（ゲーム内の単位）。だんだん弱くなる
+  function shakeOffset() {
+    const left = shake.until - fxNow();
+    if (left <= 0) return null;
+    const amp = shake.strength * (left / shake.time);
+    return { x: (Math.random() - 0.5) * 2 * amp, y: (Math.random() - 0.5) * 2 * amp };
+  }
+
+  // 鳥（羽を上下に動かす「く」の字を2つつなげた形）。色は、選んだ背景の空の色を暗くしたもの
+  function drawBirds() {
+    if (!birds.length) return;
+    ctx.strokeStyle = bgTheme.stars ? "#dfe6f7" : mix(bgTheme.top || "#7ec8f0", "#1d2433", 0.75);
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    for (const b of birds) {
+      const x = view.left + b.x;
+      const y = view.top + b.y * view.h;
+      const flap = Math.sin(b.phase) * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(x - b.size, y - b.size * flap);
+      ctx.quadraticCurveTo(x - b.size * 0.4, y - b.size * 0.2, x, y);
+      ctx.quadraticCurveTo(x + b.size * 0.4, y - b.size * 0.2, x + b.size, y - b.size * flap);
+      ctx.stroke();
+    }
+  }
+
+  // 砂ぼこり（選んだ背景の地面の色を明るくした、ふわっと広がる丸）
+  function drawDust() {
+    if (!dusts.length) return;
+    ctx.fillStyle = mix(bgTheme.groundDark || "#5fa845", "#efe3c8", 0.75);
+    for (const d of dusts) {
+      ctx.globalAlpha = Math.max(0, d.life) * 0.7;
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
   }
 
   // ---------- 地面・柱・土台 ----------
@@ -1436,7 +1586,7 @@ const Game = (() => {
   }
 
   return {
-    init, start, stop, startDemo, towerImage, enterPhoto, exitPhoto, photoImage, setForcedShape, setDemoCeiling, setTheme, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
+    init, start, stop, startDemo, setTitleFx, towerImage, enterPhoto, exitPhoto, photoImage, setForcedShape, setDemoCeiling, setTheme, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
     get state() { return state; },
     get paused() { return paused; },
     get heldX() { return held ? held.x : WORLD_W / 2; }, // 持っているキャラの位置

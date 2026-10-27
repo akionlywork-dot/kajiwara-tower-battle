@@ -395,6 +395,7 @@
     // 「相手が退出しました」と出して、スタンプを送れないようにするだけ
     if (wasPlaying && mode === "online" && ["result", "card", "photo"].includes(UI.current)) {
       Stamps.peerLeft();
+      updateRetryButton(); // 「もう一度」も押せなくする（待っていた状態も消える）
       return;
     }
     if (!wasPlaying && UI.current !== "online") return;
@@ -419,8 +420,8 @@
     } else if (msg.t === "drop" && isRemoteTurn()) {
       Game.setHeldPose(msg.x, msg.a);
       Game.drop();
-    } else if (msg.t === "rematch" && UI.current === "result") {
-      startOnlineHost(); // 相手が「もう一度」を押した
+    } else if (msg.t === "rematch") {
+      onRematchMessage(msg); // 相手が「もう一度」を押した・取り消した
     } else if (msg.t === "stamp") {
       Stamps.receive(msg.id); // 相手のスタンプ
     }
@@ -481,6 +482,10 @@
       updateHud();
     } else if (msg.t === "stamp") {
       Stamps.receive(msg.id); // 相手のスタンプ
+    } else if (msg.t === "rematch") {
+      onRematchMessage(msg); // 相手が「もう一度」を押した・取り消した
+    } else if (msg.t === "rematch-go") {
+      onRematchGo(msg); // ホストが「両方そろった」と知らせてきた
     } else if (msg.t === "se") {
       Sound.play(msg.name);
     } else if (msg.t === "rare") {
@@ -667,11 +672,110 @@
     $("btn-challenge").firstChild.textContent = challenge ? "挑戦状を送り返す" : "挑戦状を送る";
     // スタンプ：オンライン対戦のリザルトだけで使える（送るのはキャラの ID だけ）
     if (mode === "online" && online) {
-      Stamps.begin((id) => Online.send({ t: "stamp", id }), online.names[online.me === 1 ? 2 : 1] || "相手");
+      Stamps.begin((id) => Online.send({ t: "stamp", id }), opponentName());
     } else Stamps.end();
+    resetRematch(); // 「もう一度」の希望は、試合ごとに最初から
     // 戦績を記録したあとで、実績を判定する（「10回プレイ」「対戦で10勝」など）
     Achievements.check(gameStatus());
     UI.show("result");
+  }
+
+  // ---------- オンライン対戦の「もう一度」 ----------
+  // お互いが「もう一度」を押したときだけ、次の試合を始める（始めるのはホスト）。
+  // 押した・取り消した知らせ：{ t: "rematch", on: 押したか, g: 試合の番号, n: 押した回数 }
+  //   g … 前の試合の希望が、次の試合に残らないように
+  //   n … 3回ずつ送る知らせが、押した・取り消しの前後で入れかわって届いても、新しい方だけ使うように
+  // 両方そろったら、ホストが { t: "rematch-go", g } を送り、両方に「再戦！」を出してから始める
+  const REMATCH_DELAY = 1100; // 「再戦！」を出してから始めるまで（ミリ秒）
+
+  // 対戦相手の名前
+  function opponentName() {
+    return (online && online.names[online.me === 1 ? 2 : 1]) || "相手";
+  }
+
+  // リザルトに来たとき：お互いの希望を「まだ」にする
+  function resetRematch() {
+    if (mode === "online" && online) online.rematch = { me: false, them: false, seq: 0, theirSeq: 0, go: false };
+    updateRetryButton();
+  }
+
+  // 自分が「もう一度」を押した（もう一度押すと取り消し）
+  function toggleRematch() {
+    const r = online && online.rematch;
+    if (!r || r.go) return;
+    r.me = !r.me;
+    r.seq++;
+    sendImportant({ t: "rematch", on: r.me, g: online.gameNo, n: r.seq });
+    updateRetryButton();
+    checkRematch();
+  }
+
+  // 相手が押した・取り消した（前の試合のもの・古い知らせは使わない）
+  function onRematchMessage(msg) {
+    const r = online && online.rematch;
+    if (!r || r.go || msg.g !== online.gameNo || !(msg.n > r.theirSeq)) return;
+    r.theirSeq = msg.n;
+    r.them = !!msg.on;
+    updateRetryButton();
+    checkRematch();
+  }
+
+  // ホスト：両方そろったら、「再戦！」を出してから始める
+  function checkRematch() {
+    const r = online.rematch;
+    if (online.role !== "host" || !r.me || !r.them || r.go) return;
+    r.go = true;
+    sendImportant({ t: "rematch-go", g: online.gameNo });
+    showRematchBanner();
+    updateRetryButton();
+    setTimeout(() => {
+      if (online && mode === "online" && online.rematch === r) startOnlineHost();
+    }, REMATCH_DELAY);
+  }
+
+  // ゲスト：ホストから「両方そろった」が届いた（このあと、ホストから「始める」が届く）
+  function onRematchGo(msg) {
+    const r = online && online.rematch;
+    if (!r || r.go || msg.g !== online.gameNo) return;
+    r.go = true;
+    showRematchBanner();
+    updateRetryButton();
+  }
+
+  // 「再戦！」を大きく出す
+  function showRematchBanner() {
+    const el = $("rematch-banner");
+    el.className = "";
+    void el.offsetWidth; // アニメーションを最初から
+    el.className = "show";
+    Sound.play("record");
+  }
+
+  // 「もう一度」ボタンと、「〇〇さんが再戦を希望しています」の表示を、今の状態に合わせる
+  function updateRetryButton() {
+    const btn = $("btn-retry");
+    const note = $("rematch-note");
+    btn.classList.remove("waiting", "attention");
+    btn.disabled = false;
+    btn.textContent = "もう一度";
+    note.classList.add("hidden");
+    if (mode !== "online") return; // 1人・ともだちと・CPU対戦は、今までどおり
+    const r = online && online.rematch;
+    if (!r) {
+      btn.disabled = true; // 相手が退出した
+      return;
+    }
+    if (r.go) {
+      btn.disabled = true;
+      btn.textContent = "まもなく再戦！";
+    } else if (r.me) {
+      btn.innerHTML = "相手を待っています…<small>もう一度押すと取り消す</small>";
+      btn.classList.add("waiting");
+    } else if (r.them) {
+      note.textContent = `${opponentName()}さんが再戦を希望しています`;
+      note.classList.remove("hidden");
+      btn.classList.add("attention");
+    }
   }
 
   // ---------- リザルトカード ----------
@@ -778,13 +882,8 @@
   // リザルト
   on("btn-retry", () => {
     if (mode !== "online") return startGame(mode, ruleId, cpuLevel);
-    // オンライン対戦：ホストはすぐ始める。ゲストはホストに頼んで、始めてもらう
-    if (!online) return goTitle();
-    if (online.role === "host") startOnlineHost();
-    else {
-      Online.send({ t: "rematch" });
-      UI.toast("相手に「もう一度」を送りました");
-    }
+    // オンライン対戦：お互いが押したら始まる（もう一度押すと取り消し）
+    toggleRematch();
   });
 
   // 特殊ルールを選ぶ画面：rules.js にあるルールを並べる
@@ -865,6 +964,7 @@ ${location.origin}${location.pathname}`), "image/png");
   PWA.init(); // アプリとしてインストールできるようにする
   Share.init();
   Stamps.init();
+  TitleFx.init(); // タイトル画面の演出（goTitle より前に）
   Card.init();
   // キャラの読み込みが終わったら進む Promise（挑戦状は、キャラがそろってから始める）
   let resolveShapesLoaded;
