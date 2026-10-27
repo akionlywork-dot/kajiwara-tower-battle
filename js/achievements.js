@@ -3,14 +3,27 @@
 // 実績・称号（条件と称号は data/achievements.json）
 //
 // condition の type（条件の種類）：
-//   count       … 1回のゲームで value 体積んだ（1人・2人どちらでも）
-//   height      … 1回のゲームでタワーの高さが value m に届いた
-//   score       … ひとりモード（ふつうのルール）で value 点以上
-//   plays       … ゲームを合計 value 回遊んだ（1人・2人の合計）
-//   totalPieces … これまでに合計 value 体積んだ
-//   versusWins  … 2人対戦でプレイヤー1が value 回勝った
-//   dexCount    … 図鑑に value 体登録した
-//   dexComplete … 図鑑を全部登録した（value は不要）
+//   count        … 1回のゲームで value 体積んだ（1人・2人どちらでも）
+//   height       … 1回のゲームでタワーの高さが value m に届いた
+//   score        … ひとりモード（ふつうのルール）で value 点以上
+//   plays        … ゲームを合計 value 回遊んだ（全部のモードの合計）
+//   totalPieces  … これまでに合計 value 体積んだ
+//   versusWins   … 2人対戦でプレイヤー1が value 回勝った
+//   dexCount     … 図鑑に value 体登録した
+//   dexComplete  … 図鑑を全部登録した（value は不要）
+//   onlineWins   … オンライン対戦で value 回勝った
+//   cpuWins      … CPU（level の強さ）に value 回勝った        例 { "type": "cpuWins", "level": "hard", "value": 1 }
+//   cpuStreak    … CPU（level の強さ）に value 連勝した
+//   ruleScore    … 特殊ルール rule で value 点以上（rule が "all" なら、全部のルールで value 点以上）
+//   rarityPlaced … レア度 rarity のキャラを、合計 value 体積んだ（value を省略すると 1）
+//   auraPlaced   … auras に書いたオーラ（★4）のキャラを、全部の種類1体以上積んだ   例 { "auras": ["light", "dark"] }
+//   noRotate     … ひとりモードの1回のゲームで、回転を使わずに value 体積んだ
+//   quickStreak  … ひとりモードの1回のゲームで、1手 seconds 秒以内で value 体続けて積んだ
+//   edgeLanding  … 土台の端から ratio（土台の幅に対する割合）以内の所に着地させて、積めた
+//
+// そのほかの項目：
+//   category … 実績画面の分類（見出し）。同じ分類の実績をまとめて表示する
+//   hidden   … true にすると、達成するまで名前・説明・称号を「？？？」で表示する（隠し実績）
 // =============================================
 
 const Achievements = (() => {
@@ -28,29 +41,88 @@ const Achievements = (() => {
   }
 
   // ---------- 条件の判定 ----------
-  // game: 今のゲームの状況 { mode, count, height, score }。ゲーム中でなければ null
+  // game: 今のゲームの状況 { mode, rule, count, height, score, rotations, aimTimes, edge }。ゲーム中でなければ null
   function isMet(cond, game) {
     const s = Save.data.stats;
     const v = cond.value || 0;
+    const solo = !!game && game.mode === "solo";
     switch (cond.type) {
       case "count":
         return !!game && game.count >= v;
       case "height":
         return !!game && game.height >= v;
       case "score":
-        return !!game && game.mode === "solo" && !game.rule && game.score >= v; // 特殊ルールは数えない
-      case "plays":
-        return s.soloPlays + s.versusPlays >= v;
+        return solo && !game.rule && game.score >= v; // 特殊ルールは数えない
+      case "noRotate":
+        return solo && game.rotations === 0 && game.count >= v;
+      case "quickStreak":
+        return solo && longestQuickRun(game.aimTimes || [], (cond.seconds || 3) * 1000) >= v;
+      case "edgeLanding":
+        return !!game && typeof game.edge === "number" && game.edge <= (cond.ratio || 0.05);
+      case "ruleScore":
+        return ruleScoreMet(cond.rule, v, game);
+      default: {
+        // 累計の条件（今の数と、目標の数）
+        const p = progress(cond);
+        return !!p && p.now >= p.goal;
+      }
+    }
+  }
+
+  // 1手ごとの時間の並びの中で、limit ミリ秒以内が一番長く続いた数
+  function longestQuickRun(times, limit) {
+    let run = 0, best = 0;
+    for (const t of times) {
+      run = typeof t === "number" && t <= limit ? run + 1 : 0;
+      best = Math.max(best, run);
+    }
+    return best;
+  }
+
+  // 特殊ルールのスコア（"all" なら全部のルール）。記録したハイスコアか、今のゲームのスコアで判定する
+  function ruleScoreMet(rule, v, game) {
+    const s = Save.data.stats;
+    const scoreOf = (id) => Math.max((s.ruleBest[id] || {}).score || 0, game && game.mode === "solo" && game.rule === id ? game.score : 0);
+    if (rule === "all") {
+      const all = Rules.list().filter((r) => !r.params.event); // 期間限定のルールは数えない
+      return all.length > 0 && all.every((r) => scoreOf(r.id) >= v);
+    }
+    return scoreOf(rule) >= v;
+  }
+
+  // 累計の条件の進み具合 { now, goal }（累計でない条件なら null）。実績画面のバーにも使う
+  function progress(cond) {
+    const s = Save.data.stats;
+    const v = cond.value || 0;
+    const cpu = (s.cpu || {})[cond.level] || {};
+    switch (cond.type) {
+      case "plays": {
+        // 全部のモードの合計（ひとり・特殊ルール・ともだちと・CPU・オンライン）
+        const cpuPlays = Object.values(s.cpu || {}).reduce((sum, r) => sum + (r.plays || 0), 0);
+        return { now: s.soloPlays + (s.rulePlays || 0) + s.versusPlays + cpuPlays + ((s.online || {}).plays || 0), goal: v };
+      }
       case "totalPieces":
-        return s.totalPieces >= v;
+        return { now: s.totalPieces, goal: v };
       case "versusWins":
-        return (s.versusWins[1] || 0) >= v;
+        return { now: s.versusWins[1] || 0, goal: v };
       case "dexCount":
-        return Dex.count() >= v;
+        return { now: Dex.count(), goal: v };
       case "dexComplete":
-        return Dex.count() >= Dex.total();
+        return { now: Dex.count(), goal: Dex.total() };
+      case "onlineWins":
+        return { now: (s.online || {}).wins || 0, goal: v };
+      case "cpuWins":
+        return { now: cpu.wins || 0, goal: v };
+      case "cpuStreak":
+        return { now: cpu.bestStreak || 0, goal: v };
+      case "rarityPlaced":
+        return { now: (s.placed || {})[cond.rarity] || 0, goal: v || 1 };
+      case "auraPlaced": {
+        const auras = cond.auras || [];
+        return { now: auras.filter((a) => ((s.placedAura || {})[a] || 0) > 0).length, goal: auras.length };
+      }
       default:
-        return false; // 知らない種類の条件は、達成しない
+        return null;
     }
   }
 
@@ -85,6 +157,7 @@ const Achievements = (() => {
   }
 
   // ---------- 実績画面 ----------
+  // 分類（category）ごとに見出しをつけて並べる。隠し実績は、達成するまで「？？？」
   function render() {
     const box = $("achievements-list");
     if (!defs) {
@@ -95,22 +168,42 @@ const Achievements = (() => {
     }
     const got = defs.filter((a) => unlocked()[a.id]).length;
     $("achievements-count").textContent = `${got} / ${defs.length}`;
-    box.innerHTML = defs
-      .map((a) => {
-        const at = unlocked()[a.id];
-        const date = at ? new Date(at) : null;
-        return `
-          <div class="ach-row ${at ? "ach-done" : "ach-locked"}">
-            <span class="ach-icon">${at ? "🏆" : "🔒"}</span>
-            <span class="ach-main">
-              <b>${UI.escape(a.name)}</b>
-              <small>${UI.escape(a.description || "")}</small>
-              <span class="ach-title">称号「${UI.escape(at ? a.title : "？？？")}」</span>
-            </span>
-            ${date ? `<span class="ach-date">${date.getMonth() + 1}/${date.getDate()}</span>` : ""}
-          </div>`;
+    // 分類ごとにまとめる（json に書いた順番のまま）
+    const groups = new Map();
+    for (const a of defs) {
+      const cat = a.category || "そのほか";
+      if (!groups.has(cat)) groups.set(cat, []);
+      groups.get(cat).push(a);
+    }
+    box.innerHTML = [...groups.entries()]
+      .map(([cat, list]) => {
+        const done = list.filter((a) => unlocked()[a.id]).length;
+        return `<h3 class="ach-section">${UI.escape(cat)}<small>${done} / ${list.length}</small></h3>` + list.map(rowHTML).join("");
       })
       .join("");
+  }
+
+  // 1つ分の行
+  function rowHTML(a) {
+    const at = unlocked()[a.id];
+    const date = at ? new Date(at) : null;
+    const secret = a.hidden && !at; // 隠し実績で、まだ達成していない
+    // 累計の実績は、進み具合のバー（達成していない・隠していないものだけ）
+    const p = !at && !secret && a.condition ? progress(a.condition) : null;
+    const bar = p && p.goal > 0
+      ? `<span class="ach-progress"><i style="width:${Math.min(100, (p.now / p.goal) * 100)}%"></i></span><span class="ach-progress-text">${Math.min(p.now, p.goal)} / ${p.goal}</span>`
+      : "";
+    return `
+      <div class="ach-row ${at ? "ach-done" : "ach-locked"} ${secret ? "ach-secret" : ""}">
+        <span class="ach-icon">${at ? "🏆" : secret ? "❓" : "🔒"}</span>
+        <span class="ach-main">
+          <b>${secret ? "？？？" : UI.escape(a.name)}</b>
+          <small>${secret ? "？？？（隠し実績）" : UI.escape(a.description || "")}</small>
+          <span class="ach-title">称号「${UI.escape(at ? a.title : "？？？")}」</span>
+          ${bar}
+        </span>
+        ${date ? `<span class="ach-date">${date.getMonth() + 1}/${date.getDate()}</span>` : ""}
+      </div>`;
   }
 
   // 管理者モード：全部達成する（on=true）／全部消す（on=false）

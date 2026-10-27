@@ -2,8 +2,12 @@
 // ゲームの設定ファイル（数値を変えるとゲームのルールが変わります）
 // =============================================
 window.GAME_CONFIG = {
+  // 実績の世代番号。実績を大きく作り直したときに1つ上げると、開いた人から順に、
+  // 1回だけ「実績と戦績」がリセットされる（図鑑・名前・写真・設定・スタンプは残る）。README の「実績のリセット」を参照
+  achievementsEpoch: 2,
+
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v1.6.1",
+  version: "v1.7.0",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -100,12 +104,16 @@ window.GAME_CONFIG = {
       { id: "sakura", name: "さくら", unlock: "dex_half", top: "#ffb8d2", bottom: "#fff0f6", cloud: "#ffffff", ground: "#9fd36b", groundDark: "#82b854" },
       // stars: true にすると、空に星を描く
       { id: "night", name: "星空", unlock: "height5", top: "#0b1633", bottom: "#33467e", cloud: "#4d5f8f", ground: "#2e5a3b", groundDark: "#1f422a", stars: true },
+      // むずかしい実績で解放：宇宙到達（高さ9m）→ 銀河
+      { id: "galaxy", name: "銀河", unlock: "height9", top: "#07041c", bottom: "#3b1f72", cloud: "#5c4a9c", ground: "#2b2350", groundDark: "#1a1538", stars: true },
     ],
     platforms: [
       { id: "wood", name: "木の台", unlock: null, body: "#8a5a3b", top: "#6fbf4a", pillar: "#a39587" },
       { id: "stone", name: "石の台", unlock: "first_stack", body: "#7d808c", top: "#b3b7c2", pillar: "#6b6e78" },
       { id: "ice", name: "氷の台", unlock: "plays10", body: "#7ec4e8", top: "#e3f6ff", pillar: "#6aa9c9" },
       { id: "gold", name: "金の台", unlock: "dex_complete", body: "#d4a019", top: "#ffe27a", pillar: "#b3861a" },
+      // むずかしい実績で解放：無敗の王（CPU「つよい」に3連勝）→ ダイヤの台
+      { id: "diamond", name: "ダイヤの台", unlock: "cpu_hard_streak3", body: "#7fd6f2", top: "#f2fdff", pillar: "#6ab3cf" },
     ],
   },
 

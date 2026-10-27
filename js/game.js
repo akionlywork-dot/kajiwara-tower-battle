@@ -186,6 +186,7 @@ const Game = (() => {
     }
 
     lastShape = null;
+    rotations = 0;
     nextPiece();
   }
 
@@ -462,9 +463,13 @@ const Game = (() => {
   }
 
   // ---------- 操作 ----------
+  // このゲームで回転を使った回数（実績「回さず勝負」の判定に使う）
+  let rotations = 0;
+
   function rotate() {
     if (paused || state !== "aim" || !held) return;
     held.angle += Math.PI / 4; // 45度
+    rotations++;
     clampHeld();
   }
 
@@ -708,6 +713,7 @@ const Game = (() => {
     const body = Shape.spawnBody(held.shape, held.x, camY + holdY(), held.angle, pieceOptions());
     Composite.add(engine.world, body);
     dropped = body;
+    lastAimMs = simTime - aimStartAt; // キャラが出てから落とすまでの時間（実績「早業」に使う）
     droppedAt = simTime;
     held = null;
     state = "falling";
@@ -820,9 +826,32 @@ const Game = (() => {
       state = "settled";
       updateCamera();
       reachHeight(getStats().height);
-      if (callbacks.onSettled) callbacks.onSettled(getStats());
+      // aimMs：その1手にかかった時間（ミリ秒）、edge：土台の端からどれだけの所に着地したか（土台の幅に対する割合）
+      if (callbacks.onSettled) callbacks.onSettled(Object.assign(getStats(), { aimMs: lastAimMs, edge: edgeRatio(dropped) }));
       else nextPiece();
     }
+  }
+
+  let lastAimMs = 0; // 最後の1手にかかった時間（ミリ秒）
+
+  // キャラ b が土台の上に直接乗っているとき、土台の端から一番近い接地点までの距離（土台の幅に対する割合）。
+  // 土台に乗っていない（ほかのキャラの上・落ちた）ときは null（実績「崖っぷち」に使う）
+  function edgeRatio(b) {
+    if (!b || !engine || !Composite.get(engine.world, b.id, "body")) return null;
+    const bottom = b.bounds.max.y;
+    if (bottom < platformTop - 4 || bottom > platformTop + 8) return null; // 土台の上面にふれていない
+    const left = platform.position.x - PLATFORM_W / 2;
+    const right = platform.position.x + PLATFORM_W / 2;
+    let best = null;
+    const parts = b.parts.length > 1 ? b.parts.slice(1) : b.parts;
+    for (const part of parts) {
+      for (const v of part.vertices) {
+        if (v.y < bottom - 4 || v.x < left || v.x > right) continue; // 一番下のあたりで、土台の上にある点だけ
+        const d = Math.min(v.x - left, right - v.x);
+        if (best === null || d < best) best = d;
+      }
+    }
+    return best === null ? null : best / PLATFORM_W;
   }
 
   // 塔のてっぺんが、持っているキャラに近づいたらカメラを上げる
@@ -1561,6 +1590,7 @@ const Game = (() => {
   return {
     init, start, stop, startDemo, setTitleFx, towerImage, enterPhoto, exitPhoto, photoImage, setForcedShape, setDemoCeiling, setTheme, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
     get state() { return state; },
+    get rotations() { return rotations; }, // このゲームで回転を使った回数
     get paused() { return paused; },
     get heldX() { return held ? held.x : WORLD_W / 2; }, // 持っているキャラの位置
     // ゲーム中（ポーズできる状態）か

@@ -37,12 +37,21 @@ const Save = (() => {
         versusPlays: 0, // 2人対戦の回数
         versusWins: { 1: 0, 2: 0 }, // プレイヤー1・2の勝利数
         totalPieces: 0, // これまでに積んだキャラの合計（両モード）
-        // CPU対戦の強さごとの対戦数と勝利数（人どうしの対戦とは別に数える）
-        cpu: { easy: { plays: 0, wins: 0 }, normal: { plays: 0, wins: 0 }, hard: { plays: 0, wins: 0 } },
+        // CPU対戦の強さごとの対戦数・勝利数・今の連勝数・一番の連勝数（人どうしの対戦とは別に数える）
+        cpu: {
+          easy: { plays: 0, wins: 0, streak: 0, bestStreak: 0 },
+          normal: { plays: 0, wins: 0, streak: 0, bestStreak: 0 },
+          hard: { plays: 0, wins: 0, streak: 0, bestStreak: 0 },
+        },
         online: { plays: 0, wins: 0 }, // オンライン対戦の対戦数と勝利数
         rulePlays: 0, // 特殊ルールのプレイ回数
         ruleBest: {}, // 特殊ルールごとのハイスコア（ルール名 → { score, count, height }）
+        placed: {}, // レア度ごとの、積んだキャラの数（レア度 → 数。例 { SR: 3 }）
+        placedAura: {}, // ★4のオーラの種類ごとの、積んだ数（例 { light: 1, dark: 2 }）
       },
+      // 実績の世代番号（config.js の achievementsEpoch）。config の番号の方が大きければ、1回だけ実績と戦績をリセットする
+      //   epochResetNotice：リセットしたことを、次にタイトル画面が出たときに知らせるか
+      meta: { achievementsEpoch: currentEpoch(), epochResetNotice: false },
       // お知らせ：最後に読んだお知らせの id
       news: { lastReadId: 0 },
       // ランキング（オンライン）
@@ -77,18 +86,43 @@ const Save = (() => {
     return saved;
   }
 
+  // config.js の実績の世代番号（書いていなければ 1）
+  function currentEpoch() {
+    const n = (window.GAME_CONFIG || {}).achievementsEpoch;
+    return typeof n === "number" ? n : 1;
+  }
+
   // 保存データ（またはバックアップの中身）を、初期値と合わせて今の形にする。
   // 項目ごとに初期値と合わせるので、後から項目を増やしても古いデータのまま動く
   function normalize(saved) {
     const result = defaults();
     if (!saved) return result;
+    // 実績の世代番号（古いデータには無いので 1 とみなす）。マージする前に読んでおく
+    const savedEpoch = saved.meta && typeof saved.meta.achievementsEpoch === "number" ? saved.meta.achievementsEpoch : 1;
     migrate(saved);
     for (const section of Object.keys(result)) {
       if (saved[section] && typeof saved[section] === "object" && typeof result[section] === "object") {
         result[section] = Object.assign(result[section], saved[section]);
       }
     }
+    if (savedEpoch < currentEpoch()) resetForNewEpoch(result);
     return result;
+  }
+
+  // 実績が新しくなった（config.js の achievementsEpoch を上げた）ときに、1回だけ行うリセット。
+  // 実績・戦績・称号・背景と土台の選択を初期に戻す（図鑑・名前・写真・設定・スタンプは残す）。
+  // 戦績も戻すのは、「合計100回」などの累計の実績が、リセットした直後にまた解除されないようにするため
+  function resetForNewEpoch(d) {
+    const fresh = defaults();
+    d.achievements = {};
+    d.stats = fresh.stats;
+    d.profile.titleId = null;
+    d.cosmetics = fresh.cosmetics;
+    d.meta.achievementsEpoch = currentEpoch();
+    d.meta.epochResetNotice = true; // 次にタイトル画面が出たときに知らせる
+    try {
+      localStorage.removeItem("stack.best"); // 古いハイスコアが引き継がれないように
+    } catch (e) {}
   }
 
   function load() {
@@ -106,6 +140,8 @@ const Save = (() => {
   }
 
   const data = load();
+  // 実績の世代が変わってリセットしたときは、すぐに保存する（次に開いたとき、もう一度リセットしないように）
+  if (data.meta.epochResetNotice) write();
 
   // ---------- バックアップ（書き出し・読み込み） ----------
   // 書き出すデータ：プレイデータと設定を1つにまとめる
@@ -159,15 +195,6 @@ const Save = (() => {
     }
   }
 
-  // 戦績だけを初期状態に戻す（プロフィール・図鑑・実績はそのまま）
-  function resetStats() {
-    data.stats = defaults().stats;
-    try {
-      localStorage.removeItem("stack.best"); // 古いハイスコアも消す（引き継がれないように）
-    } catch (e) {}
-    write();
-  }
-
   // ---------- よく使う値 ----------
   // プレイヤーの名前（2人対戦のプレイヤー2は、いつも「プレイヤー2」）
   function playerName(n) {
@@ -175,5 +202,5 @@ const Save = (() => {
     return data.profile.name || "プレイヤー";
   }
 
-  return { data, write, resetStats, playerName, exportData, checkImport, importData };
+  return { data, write, playerName, exportData, checkImport, importData };
 })();

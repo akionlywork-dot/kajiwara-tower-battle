@@ -9,22 +9,22 @@ const Records = (() => {
 
   function init() {
     UI.onShow("records", render);
-    $("btn-records-reset").addEventListener("click", async () => {
-      const ok = await UI.confirm(
-        "戦績をリセットしますか？\nプレイ回数・ハイスコア・勝利数などが消えます。\n（プロフィール・図鑑・実績は消えません）",
-        "リセット"
-      );
-      if (!ok) return;
-      Save.resetStats();
-      render();
-      UI.toast("戦績をリセットしました");
-    });
   }
 
   // ---------- 記録する（main.js から呼ばれる） ----------
-  // キャラを1体積めた
-  function addPiece() {
-    stats().totalPieces++;
+  // キャラを1体積めた（shape：積んだキャラ。レア度・オーラごとの数も数える。実績の判定に使う）
+  function addPiece(shape) {
+    const s = stats();
+    s.totalPieces++;
+    if (shape) {
+      const rarity = shape.rarity || "N";
+      s.placed = s.placed || {};
+      s.placed[rarity] = (s.placed[rarity] || 0) + 1;
+      if (shape.aura) {
+        s.placedAura = s.placedAura || {};
+        s.placedAura[shape.aura] = (s.placedAura[shape.aura] || 0) + 1;
+      }
+    }
     Save.write();
   }
 
@@ -52,12 +52,14 @@ const Records = (() => {
     return isNew;
   }
 
-  // CPU対戦が終わった（won: プレイヤーが勝ったか）
+  // CPU対戦が終わった（won: プレイヤーが勝ったか）。連勝数も数える（負けたら0に戻る）
   function addCpuResult(level, won) {
     const s = stats();
     const r = (s.cpu[level] = s.cpu[level] || { plays: 0, wins: 0 });
     r.plays++;
     if (won) r.wins++;
+    r.streak = won ? (r.streak || 0) + 1 : 0;
+    r.bestStreak = Math.max(r.bestStreak || 0, r.streak);
     Save.write();
   }
 

@@ -2920,3 +2920,55 @@ select {
   font-size: 12px;
   opacity: 0.9;
 }
+
+/* =============================================
+   実績：分類の見出し・進み具合のバー・隠し実績
+   ============================================= */
+.ach-section {
+  display: flex;
+  align-items: baseline;
+  margin: var(--space-m) 0 var(--space-s);
+  padding-bottom: 2px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.35);
+  font-size: var(--font-size-m);
+}
+
+.ach-section:first-child {
+  margin-top: 0;
+}
+
+.ach-section small {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+/* 累計の実績の進み具合（例 347 / 1000） */
+.ach-progress {
+  display: block;
+  height: 6px;
+  margin-top: 4px;
+  border-radius: var(--radius-round);
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.ach-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-gold);
+}
+
+.ach-progress-text {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: bold;
+  opacity: 0.85;
+}
+
+/* 隠し実績（まだ達成していない） */
+.ach-secret {
+  background: rgba(20, 10, 40, 0.35);
+}

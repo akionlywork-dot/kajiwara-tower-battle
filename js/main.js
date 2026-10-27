@@ -27,6 +27,9 @@
   let stacked = 0; // 積むのに成功した数
   let maxHeight = 0; // いちばん高く積めた高さ（m）
   let droppedShape = null; // 最後に落としたキャラ
+  // 1回のゲームの中の記録（実績「早業」「崖っぷち」の判定に使う）
+  let aimTimes = []; // 1手ごとの、キャラが出てから落とすまでの時間（ミリ秒）
+  let lastEdge = null; // 最後に積んだキャラが、土台の端からどれだけの所に着地したか（土台の幅に対する割合。null なら土台に乗っていない）
   let settingsReturnTo = "title"; // 設定画面を閉じたときに戻る画面
   let shapesReady = false; // キャラの読み込みが終わったか
 
@@ -158,6 +161,8 @@
     stacked = 0;
     maxHeight = 0;
     droppedShape = null;
+    aimTimes = [];
+    lastEdge = null;
     // 挑戦中は挑戦状と同じ順番、そうでなければ新しい順番
     seed = challenge && mode === "solo" && ruleId === challenge.rule ? challenge.seed : Challenge.newSeed();
     UI.clearConfetti();
@@ -211,7 +216,9 @@
   function onSettled(stats) {
     stacked++;
     maxHeight = Math.max(maxHeight, stats.height);
-    Records.addPiece();
+    aimTimes.push(stats.aimMs);
+    lastEdge = stats.edge;
+    Records.addPiece(droppedShape);
     if (droppedShape) Dex.register(droppedShape.id);
     Achievements.check(gameStatus()); // 「10体積んだ」などの実績を、ゲーム中に判定する
     if (isVs()) {
@@ -476,7 +483,7 @@
       }
       stacked = Math.max(stacked, msg.n);
       maxHeight = Math.max(maxHeight, msg.h);
-      Records.addPiece();
+      Records.addPiece(shapesById[msg.id] || null); // 知らない ID なら、レア度は数えない
       if (msg.id) Dex.register(msg.id); // 知らない ID なら何もしない
       Achievements.check(gameStatus());
       updateHud();
@@ -551,8 +558,9 @@
   }
 
   // 今のゲームの状況（実績の判定に使う）
+  //   rotations：回転を使った回数、aimTimes：1手ごとにかかった時間、edge：最後に積んだキャラの、土台の端からの距離
   function gameStatus() {
-    return { mode, rule: ruleId, count: stacked, height: maxHeight, score: calcScore() };
+    return { mode, rule: ruleId, count: stacked, height: maxHeight, score: calcScore(), rotations: Game.rotations, aimTimes, edge: lastEdge };
   }
 
   // 特殊ルールの名前の札（ふつうのルールなら ""）
@@ -813,6 +821,21 @@
     });
   }
 
+  // ---------- 実績のリセットのお知らせ ----------
+  // config.js の achievementsEpoch が上がって、実績と戦績をリセットした（save.js）ときに、1回だけ出す
+  async function showEpochNotice() {
+    if (!Save.data.meta.epochResetNotice) return;
+    // タイトル画面で、ほかのポップアップ（お知らせ・挑戦状など）が出ていないときまで待つ
+    while (UI.current !== "title" || document.querySelector(".dialog.active") || !$("splash").classList.contains("hidden")) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+    Save.data.meta.epochResetNotice = false;
+    Save.write();
+    await UI.alert("アップデートで実績が新しくなったため、実績と戦績をリセットしました。\n（図鑑・名前・写真・スタンプ・設定はそのままです）");
+    updateBestCard();
+    Profile.refresh();
+  }
+
   // ---------- 挑戦状 ----------
   // リザルトの「〇〇さんに勝ち！」（挑戦中でなければ ""）
   function challengeResultHTML(score) {
@@ -1003,6 +1026,8 @@ ${location.origin}${location.pathname}`), "image/png");
       await shapesLoaded;
       showChallengePopup(received);
     } else News.popupIfUnread();
+    // 実績が新しくなってリセットしたことを、1回だけ知らせる（ほかのポップアップが閉じてから）
+    shapesLoaded.then(showEpochNotice);
     // ランキング：前からハイスコアがある人は、ここで載せる（送っていいか、初めてなら聞く）
     shapesLoaded.then(() => Ranking.atStartup());
   });
