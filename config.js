@@ -3,7 +3,7 @@
 // =============================================
 window.GAME_CONFIG = {
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v1.3.2",
+  version: "v1.4.0",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -167,7 +167,7 @@ window.GAME_CONFIG = {
   //   url : Google Apps Script のウェブアプリの URL（README の「ランキング（オンライン）」の手順で作る）。
   //         "" のあいだは、data/ranking.json を手で書いたランキングを表示する（スコアはどこにも送らない）
   ranking: {
-    url: "",
+    url: "https://script.google.com/macros/s/AKfycbyQQ9_9KCd2MXGjTB6p7DLZlHnFQ7nS0Jda7kuPaJjnV_zFF4PBL8XB6hyn9N2o-fPb/exec",
   },
 
   // 効果音・BGM のファイル
