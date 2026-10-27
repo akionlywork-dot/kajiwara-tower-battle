@@ -19,8 +19,8 @@ const Game = (() => {
   // キャラの物理的な性質
   const BODY_OPTIONS = {
     density: 0.004, // 重さ（密度）
-    friction: 0.9, // 滑りにくさ
-    frictionStatic: 1.2, // 止まっているときの滑りにくさ
+    friction: 1.2, // 滑りにくさ
+    frictionStatic: 1.8, // 止まっているときの滑りにくさ
     frictionAir: 0.02, // 空気抵抗（揺れや跳ねを少しずつ弱める）
     restitution: 0, // 跳ね返り（0 = 跳ねない）
   };
@@ -123,7 +123,7 @@ const Game = (() => {
     platformTop = worldH - fromBottom;
     platform = Bodies.rectangle(WORLD_W / 2, platformTop + PLATFORM_H / 2, PLATFORM_W, PLATFORM_H, {
       isStatic: true,
-      friction: 1,
+      friction: BODY_OPTIONS.friction, // キャラと同じにする（ぶつかった2つのうち小さい方が使われるため）
       label: "platform",
     });
     Composite.add(engine.world, platform);

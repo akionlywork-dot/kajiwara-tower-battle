@@ -27,6 +27,10 @@ const Shape = (() => {
     // true にすると、輪郭をすっぽり包む凸多角形（凸包）1つにする。一番シンプルで安定するが、
     // 足の間などのすき間も埋まる
     hull: false,
+    // 足元を平らにする高さ（キャラの高さに対する割合）。0 にすると何もしない
+    // 一番下からこの高さまでにある足の裏を、下までのばして平らにする。
+    // つま先やかかとの丸い点で立つと、接触点が定まらずガタガタ揺れるため
+    base: 0.05,
   };
 
   // ---------- 1. 画像を読み込む ----------
@@ -65,6 +69,7 @@ const Shape = (() => {
     for (let i = 0; i < cfg.smooth; i++) mask = erode(mask, w, h);
     for (let i = 0; i < cfg.smooth; i++) mask = dilate(mask, w, h);
     mask = keepLargestBlob(mask, w, h);
+    if (cfg.base > 0) flattenBase(mask, w, h, cfg.base);
     return { mask, w, h, pad, scale };
   }
 
@@ -90,6 +95,31 @@ const Shape = (() => {
       }
     }
     return out;
+  }
+
+  // 足元を平らにする（mask を直接書きかえる）
+  // 一番下から ratio の高さまでに不透明なピクセルがある列は、一番下の行まで不透明にする。
+  // 左右の足の間は埋めない（埋めると股下が囲まれた穴になり、輪郭抽出で股下全体が埋まってしまう）
+  function flattenBase(m, w, h, ratio) {
+    let top = -1, bottom = -1;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (m[y * w + x]) {
+          if (top < 0) top = y;
+          bottom = y;
+          break;
+        }
+      }
+    }
+    if (top < 0) return;
+    const band = Math.max(1, Math.round((bottom - top + 1) * ratio));
+    for (let x = 0; x < w; x++) {
+      for (let y = bottom - band + 1; y <= bottom; y++) {
+        if (!m[y * w + x]) continue;
+        for (let yy = y; yy <= bottom; yy++) m[yy * w + x] = 1;
+        break;
+      }
+    }
   }
 
   // つながっている不透明ピクセルのかたまりのうち、一番大きいものだけ残す
@@ -300,6 +330,9 @@ const Shape = (() => {
     return { img, w, h, com, parts, rough, info };
   }
 
+  // Matter.js が1つの形のボディの回りにくさにかけている倍率（Body._inertiaScale）
+  const INERTIA_SCALE = 4;
+
   // かけら（凸多角形）の配列から Matter.js のボディを作る
   // Bodies.fromVertices と同じことを手作業で行い、かけら同士の位置関係を正確に保つ
   function buildBody(pieces, options) {
@@ -316,7 +349,19 @@ const Shape = (() => {
       Matter.Body.set(bodyParts[0], rest);
       return bodyParts[0];
     }
-    return Matter.Body.create(Object.assign({ parts: bodyParts }, rest));
+    const body = Matter.Body.create(Object.assign({ parts: bodyParts }, rest));
+    // 回りにくさ（慣性モーメント）を計算しなおす。
+    // Matter.js は、かけらの回りにくさを単純に足すだけで、かけらが重心から離れている分を足さない。
+    // そのままだと細長いキャラほど回りやすすぎて、着地した瞬間にクルクル回ってしまう
+    // （Matter.js は1つの形のボディの回りにくさを4倍にしているので、それに合わせる）
+    let inertia = 0;
+    for (const p of bodyParts) {
+      const dx = p.position.x - body.position.x;
+      const dy = p.position.y - body.position.y;
+      inertia += p.inertia + INERTIA_SCALE * p.mass * (dx * dx + dy * dy);
+    }
+    Matter.Body.setInertia(body, inertia);
+    return body;
   }
 
   // 形のデータから、指定した位置・角度にボディを作る
@@ -328,11 +373,11 @@ const Shape = (() => {
     return body;
   }
 
-  // characters.js の1行から、当たり判定の設定（tolerance / smooth / hull）だけを取り出す
+  // characters.js の1行から、当たり判定の設定（tolerance / smooth / hull / base）だけを取り出す
   // 書いていない項目は DEFAULTS の値が使われる
   function optionsFrom(c) {
     const options = {};
-    for (const key of ["tolerance", "smooth", "hull"]) {
+    for (const key of ["tolerance", "smooth", "hull", "base"]) {
       if (c[key] !== undefined) options[key] = c[key];
     }
     return options;
