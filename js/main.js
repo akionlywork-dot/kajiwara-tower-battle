@@ -72,6 +72,20 @@
   const toggles = document.querySelectorAll(".toggle[data-setting]");
   function updateToggles() {
     for (const t of toggles) t.setAttribute("aria-checked", String(Settings.get(t.dataset.setting)));
+    // data-needs="ranking" の行（プロフィールを公開・写真アイコン）は、ランキングに参加しているときだけ選べる
+    for (const row of document.querySelectorAll(".setting-row[data-needs]")) {
+      const off = !Settings.get(row.dataset.needs);
+      row.classList.toggle("disabled", off);
+      row.querySelector(".toggle").disabled = off;
+    }
+  }
+  // スイッチの行は、行のどこを押しても切りかわる（小さなスイッチをねらって押さなくてよいように）
+  for (const t of toggles) {
+    const row = t.closest(".setting-row");
+    row.classList.add("setting-tap");
+    row.addEventListener("click", (e) => {
+      if (e.target !== t && !t.disabled) t.click();
+    });
   }
   for (const t of toggles) {
     t.addEventListener("click", () => {
@@ -79,8 +93,8 @@
       Settings.set(name, !Settings.get(name));
       updateToggles();
       applySettings();
-      // ランキングに参加した・写真アイコンを載せる／外したら、今のハイスコアとプロフィールを送る
-      if (name === "ranking" || name === "rankingIcon") Ranking.submitBest();
+      // ランキングに参加した・写真アイコンを載せる／外した・プロフィールを公開する／やめたら、今のハイスコアとプロフィールを送る
+      if (name === "ranking" || name === "rankingIcon" || name === "rankingProfile") Ranking.submitBest();
       Sound.play("click");
     });
   }

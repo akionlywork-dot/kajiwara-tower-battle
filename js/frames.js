@@ -13,6 +13,8 @@
 
 const Frames = (() => {
   const RANKS = ["bronze", "silver", "gold", "legend", "event"];
+  // 枠のてっぺんに並べる星の数（格が上がるほど増える。期間限定はゴールドと同じ）
+  const STARS = { bronze: 1, silver: 2, gold: 3, legend: 4, event: 3 };
   const EVENT_PATTERN = /^[a-z0-9_-]{1,40}$/; // イベントの id として使ってよい形（CSS のクラス名に使うため）
 
   // 枠 { rank, event } を正しい形にする（オンライン対戦で相手から届いたものにも使う）。おかしければ null
@@ -37,22 +39,32 @@ const Frames = (() => {
     return a ? clean(a.rank, a.event) : null;
   }
 
-  // アイコンに付けるクラス名（枠なしなら ""）
+  // アイコンに付けるクラス名（枠なしなら ""）。stars-〇 は、枠のてっぺんの星の数
   function avatarClass(f) {
-    return f ? `frame frame-${f.rank}${f.event ? ` frame-ev-${f.event}` : ""}` : "";
+    return f ? `frame frame-${f.rank} stars-${STARS[f.rank] || 1}${f.event ? ` frame-ev-${f.event}` : ""}` : "";
+  }
+
+  // 星の数のクラス（称号を選ぶ画面の、まだ取っていない称号の灰色の枠にも使う）
+  function starsClass(rank) {
+    return `stars-${STARS[rank] || 1}`;
   }
 
   // アイコンの要素に枠を付けなおす
   function applyAvatar(el, f) {
-    el.className = el.className.replace(/\bframe(-[\w-]+)?\b/g, "").replace(/\s+/g, " ").trim();
+    el.className = el.className.replace(/\b(frame(-[\w-]+)?|stars-\d)\b/g, "").replace(/\s+/g, " ").trim();
     if (f) el.className += " " + avatarClass(f);
   }
 
-  // 称号の札（HTML）。称号が無ければ ""。枠があれば、枠と同じ色の札（ranked）にする
+  // 枠の星の数（リザルトカードの画像に使う）
+  function starCount(rank) {
+    return STARS[rank] || 1;
+  }
+
+  // 称号の札（HTML）。称号が無ければ ""。枠があれば、枠と同じ色の札（ranked）にする（星は枠の方に付く）
   function titleHTML(text, f) {
     if (!text) return "";
     return `<span class="title-badge${f ? ` ranked rank-${f.rank}${f.event ? ` rank-ev-${f.event}` : ""}` : ""}">${UI.escape(text)}</span>`;
   }
 
-  return { clean, ofTitleId, ofTitleText, avatarClass, applyAvatar, titleHTML };
+  return { clean, ofTitleId, ofTitleText, avatarClass, starsClass, starCount, applyAvatar, titleHTML };
 })();

@@ -70,8 +70,9 @@ const Save = (() => {
       opponents: {},
       // スタンプ（オンライン対戦のリザルトで使う4つ）：キャラの ID（例 "chara03"）。null の枠は初期スタンプ
       stamps: [null, null, null, null],
-      // 選んでいる背景と土台（config.js の themes の id）
-      cosmetics: { background: "sky", platform: "wood" },
+      // 選んでいる背景と土台（config.js の themes の id）。
+      //   cardBg：オンライン対戦の対戦カードの色にする背景の id（null なら、いつもの色）
+      cosmetics: { background: "sky", platform: "wood", cardBg: null },
     };
   }
 

@@ -120,7 +120,8 @@ const VsIntro = (() => {
       </div>`;
   }
 
-  // 1人分のカード（side："me"＝自分・青 / "them"＝相手・赤）
+  // 1人分のカード（side："me"＝自分・青 / "them"＝相手・赤）。
+  // p.card（背景の id）があれば、その背景の絵をカードの下地にする（自分か相手かは、枠と札の色で分かる）
   function cardHTML(p, side) {
     const name = p.name || "プレイヤー";
     const cls = Frames.avatarClass(p.frame);
@@ -133,8 +134,10 @@ const VsIntro = (() => {
     else if (p.best != null) rows.push(["ハイスコア", `${p.best}点`, ""]);
     if (p.ach) rows.push(["実績", `🏆 ${p.ach[0]} / ${p.ach[1]}`, ""]);
     if (p.online) rows.push(["オンライン対戦", `${p.online[0]}勝${p.online[1]}敗`, ""]);
+    const bg = p.card ? Themes.previewOf("backgrounds", p.card) : null;
+    const bgStyle = bg ? ` style="background-image:linear-gradient(rgba(10,16,34,0.3),rgba(10,16,34,0.55)),url(${bg.src})"` : "";
     return `
-      <div class="vs-card vs-${side}">
+      <div class="vs-card vs-${side}${bg ? " has-bg" : ""}"${bgStyle}>
         <span class="vs-side">${side === "me" ? "あなた" : "相手"}</span>
         <div class="vs-head">
           ${avatar}
@@ -151,7 +154,8 @@ const VsIntro = (() => {
   }
 
   // ---------- 相手に送るプロフィール ----------
-  // { title, rank, ev, best, rankNo, ach: [達成数, 全体], online: [勝, 敗], id, icon }
+  // { title, rank, ev, best, rankNo, ach: [達成数, 全体], online: [勝, 敗], id, icon, card }
+  //   card：対戦カードの色にする背景の id（プロフィールで選んだもの。いつもの色なら null）
   //   rankNo：ランキングの順位（参加している人だけ。最後にランキングを開いた・送ったときの値。試合前に取りにはいかない）
   //   id：相手を見分けるための番号（ランキングの番号から作った別の値。ランキングの番号そのものは送らない）
   //   icon：設定「対戦相手に写真アイコンを見せる」が ON の人だけ（64px）
@@ -172,13 +176,44 @@ const VsIntro = (() => {
       online: [online.wins, online.plays - online.wins],
       id: await Ranking.opponentKey(),
       icon: Settings.get("onlineIcon") && p.icon ? await Profile.smallIcon(p.icon) : "",
+      card: cardBgId(),
     };
+  }
+
+  // 対戦カードの色にする背景の id（いつもの色なら null）
+  function cardBgId() {
+    const def = Themes.cardBackground();
+    return def ? def.id : null;
+  }
+
+  // プロフィール画面に出す、自分の対戦カードの見本（相手の画面に出るのと同じ中身。写真は「見せる」設定のときだけ）
+  function myCardHTML() {
+    const p = Save.data.profile;
+    const s = Save.data.stats;
+    const frame = Frames.ofTitleId(p.titleId);
+    const counts = Achievements.counts();
+    const online = s.online || { plays: 0, wins: 0 };
+    const lastRank = Save.data.ranking.lastRank;
+    return cardHTML(
+      {
+        name: Save.playerName(1),
+        title: Profile.titleText(p.titleId),
+        frame,
+        best: s.best ? s.best.score : null,
+        rankNo: Ranking.joined() && lastRank ? lastRank : null,
+        ach: counts ? [counts.got, counts.total] : null,
+        online: [online.wins, online.plays - online.wins],
+        icon: Settings.get("onlineIcon") && p.icon ? p.icon : null,
+        card: cardBgId(),
+      },
+      "me"
+    );
   }
 
   // 相手から届いたプロフィールを確かめる（おかしな値は使わない）。
   // 古いバージョンの相手からは届かないので、そのときは名前だけ（{ name }）
   function cleanProfile(name, p) {
-    const out = { name, title: "", frame: null, best: null, rankNo: null, ach: null, online: null, id: null, icon: null };
+    const out = { name, title: "", frame: null, best: null, rankNo: null, ach: null, online: null, id: null, icon: null, card: null };
     if (!p || typeof p !== "object") return out;
     const int = (v, max) => (Number.isInteger(v) && v >= 0 && v <= max ? v : null);
     out.title = typeof p.title === "string" ? p.title.slice(0, 20) : "";
@@ -189,6 +224,8 @@ const VsIntro = (() => {
     if (Array.isArray(p.online) && int(p.online[0], 9999999) !== null && int(p.online[1], 9999999) !== null) out.online = [p.online[0], p.online[1]];
     if (typeof p.id === "string" && ID_PATTERN.test(p.id)) out.id = p.id;
     if (typeof p.icon === "string" && p.icon.length <= ICON_MAX && ICON_PATTERN.test(p.icon)) out.icon = p.icon;
+    // 対戦カードの色：config.js にある背景の id だけ使う
+    if (typeof p.card === "string" && Themes.previewOf("backgrounds", p.card)) out.card = p.card;
     return out;
   }
 
@@ -197,6 +234,7 @@ const VsIntro = (() => {
     cancel,
     duration,
     myProfile,
+    myCardHTML,
     cleanProfile,
     get active() { return !!el; },
   };

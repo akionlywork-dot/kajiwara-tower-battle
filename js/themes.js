@@ -85,8 +85,9 @@ const Themes = (() => {
   const PREVIEW_W = 160, PREVIEW_H = 90; // 見本の絵の大きさ（ピクセル。画面では小さく表示する）
   const previews = new Map();
 
-  function previewImage(kind, def) {
-    const bg = kind === "backgrounds" ? def : current("backgrounds");
+  // bgDef：土台の見本の後ろの背景（省略すると、自分が選んでいる背景）
+  function previewImage(kind, def, bgDef) {
+    const bg = kind === "backgrounds" ? def : bgDef || current("backgrounds");
     const key = `${kind}|${def.id}|${bg.id}`;
     if (!previews.has(key)) {
       const c = document.createElement("canvas");
@@ -153,5 +154,49 @@ const Themes = (() => {
     ctx.fill();
   }
 
-  return { apply, select, renderPicker, notifyUnlocked };
+  // ---------- 対戦カードの色（プロフィールで選ぶ。持っている背景だけ） ----------
+  // 対戦カードにする背景（自分の）。選んでいない・使えなくなっていたら null（いつもの色）
+  function cardBackground() {
+    const def = list("backgrounds").find((d) => d.id === chosen().cardBg);
+    return def && isUnlocked(def) ? def : null;
+  }
+
+  // 対戦カードの色を選ぶ。id が null なら、いつもの色。持っていない背景は選べない
+  function selectCardBg(id) {
+    const def = id ? list("backgrounds").find((d) => d.id === id) : null;
+    if (id && (!def || !isUnlocked(def))) return;
+    chosen().cardBg = id || null;
+    Save.write();
+  }
+
+  // 対戦カードの色の見本を並べる（いちばん左が「いつもの色」、そのあとに持っている背景）
+  function renderCardPicker(container) {
+    const now = cardBackground();
+    container.innerHTML =
+      `<button class="theme-tile ${now ? "" : "selected"}" data-card-bg="">
+        <span class="theme-preview card-default-swatch"></span>
+        <b>いつもの色</b>
+      </button>` +
+      list("backgrounds")
+        .filter(isUnlocked)
+        .map(
+          (def) => `
+          <button class="theme-tile ${now && now.id === def.id ? "selected" : ""}" data-card-bg="${UI.escape(def.id)}" aria-label="${UI.escape(def.name)}">
+            <span class="theme-preview"><img src="${previewImage("backgrounds", def)}" alt=""></span>
+            <b>${UI.escape(def.name)}</b>
+          </button>`
+        )
+        .join("");
+  }
+
+  // ほかの人の背景・土台の見本（ランキングのプロフィールで使う）。{ name, src }。id が無ければ null
+  //   bgId：土台の見本の後ろに描く背景の id（その人が選んでいる背景）
+  function previewOf(kind, id, bgId) {
+    const def = list(kind).find((d) => d.id === id);
+    if (!def) return null;
+    const bg = list("backgrounds").find((d) => d.id === bgId) || list("backgrounds")[0];
+    return { name: def.name, src: previewImage(kind, def, bg) };
+  }
+
+  return { apply, select, renderPicker, notifyUnlocked, previewOf, cardBackground, selectCardBg, renderCardPicker };
 })();

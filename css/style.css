@@ -1950,11 +1950,31 @@ select {
 }
 
 /* ===== 設定画面 ===== */
+/* 設定画面：上に「‹ 設定」、その下が見出しごとに分かれたリスト（リストだけスクロール） */
 .settings-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-s);
-  margin-top: var(--space-l);
+  gap: 6px;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-group.hidden {
+  display: none;
+}
+
+.settings-heading {
+  margin: var(--space-m) 0 2px 4px;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.settings-heading:first-child {
+  margin-top: 0;
 }
 
 .setting-row {
@@ -1962,9 +1982,10 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-m);
-  padding: var(--space-m);
+  min-height: 56px;
+  padding: 10px var(--space-m);
   border-radius: var(--radius-m);
-  font-size: var(--font-size-m);
+  font-size: 16px;
   font-weight: bold;
   text-align: left;
   background: var(--color-panel);
@@ -1972,11 +1993,31 @@ select {
 
 .setting-row small {
   display: block;
-  margin-top: var(--space-xs);
-  font-size: var(--font-size-s);
-  line-height: 1.3;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.35;
   font-weight: normal;
   opacity: 0.8;
+}
+
+/* スイッチの行は、行のどこを押しても切りかわる */
+.setting-row.setting-tap {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: filter var(--dur-press);
+}
+
+.setting-row.setting-tap:active {
+  filter: brightness(1.15);
+}
+
+/* ランキングに参加したときだけ選べる行：少し右にずらして、親の項目の下だと分かるように */
+.setting-row.setting-sub {
+  margin-left: var(--space-m);
+}
+
+.setting-row.setting-tap.disabled {
+  cursor: default;
 }
 
 /* 設定画面のバックアップの行（ボタンが2つ並ぶ） */
@@ -3246,7 +3287,7 @@ select {
   --frame-color: #b65cf0;
   --frame-dark: #4a2470;
   --frame-text: #ffffff;
-  --frame-star: conic-gradient(#ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0, #ff5d73);
+  --frame-star: linear-gradient(90deg, #ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0);
   --frame-badge: linear-gradient(90deg, #ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0, #ff5d73) 0 0 / 300% 100%;
 }
 .frame-event, .rank-event { --frame-color: #ff8a1f; --frame-dark: #3b1458; --frame-light: #ffc27a; --frame-text: #ffb15c; --frame-badge: linear-gradient(#5a2380, #3b1458); }
@@ -3261,17 +3302,25 @@ select {
   box-shadow: 0 0 0 max(1px, calc(var(--av) * 0.025)) var(--frame-dark);
 }
 
-/* てっぺんの小さな星 */
+/* てっぺんに並ぶ星（格の数だけ。.stars-〇 で数を決める。星の形を横にくり返したもの） */
+.stars-1 { --frame-stars: 1; }
+.stars-2 { --frame-stars: 2; }
+.stars-3 { --frame-stars: 3; }
+.stars-4 { --frame-stars: 4; }
+
 .avatar.frame::after {
+  --star: max(11px, calc(var(--av) * 0.3));
   content: "";
   position: absolute;
   left: 50%;
-  top: calc(var(--av) * -0.24);
-  width: max(13px, calc(var(--av) * 0.36));
-  height: max(13px, calc(var(--av) * 0.36));
+  top: calc(var(--star) * -0.75);
+  width: calc(var(--star) * var(--frame-stars, 1));
+  height: var(--star);
   transform: translateX(-50%);
   background: var(--frame-star, linear-gradient(var(--frame-light, var(--frame-color)), var(--frame-color)));
-  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2 61 37 98 37 68 58 79 93 50 72 21 93 32 58 2 37 39 37Z'/%3E%3C/svg%3E") 0 0 / var(--star) var(--star) repeat-x;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2 61 37 98 37 68 58 79 93 50 72 21 93 32 58 2 37 39 37Z'/%3E%3C/svg%3E") 0 0 / var(--star) var(--star) repeat-x;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
   pointer-events: none;
 }
 
@@ -3343,19 +3392,14 @@ select {
   box-shadow: inset 0 0 0 1px var(--frame-dark);
 }
 
-.title-badge.ranked::before {
-  content: "★ "; /* 枠の星と同じ印 */
-  font-size: 0.85em;
-}
+
 
 .title-badge.rank-legend {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   animation: badge-rainbow 6s linear infinite;
 }
 
-.title-badge.rank-event::before {
-  color: var(--frame-color);
-}
+
 
 /* 金の札：ときどき光が走る */
 .title-badge.rank-gold::after {
@@ -3484,6 +3528,37 @@ select {
 
 .vs-card.vs-me {
   align-self: flex-start;
+  background: linear-gradient(135deg, #4f9bff, #2459a8);
+}
+
+/* 色を背景にしたカード（プロフィールで選んだ背景の絵を下地に。自分・相手は枠の色で分かる） */
+.vs-card.has-bg {
+  background-size: cover;
+  background-position: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.vs-card.vs-me.has-bg {
+  border-color: #4f9bff;
+}
+
+.vs-card.vs-them.has-bg {
+  border-color: #ff6f82;
+}
+
+/* プロフィール画面の、自分の対戦カードの見本（演出の外なので、最初から見えるように） */
+.card-preview .vs-card {
+  width: 100%;
+  max-width: 340px;
+  margin: 16px auto 10px;
+  opacity: 1;
+}
+
+/* 対戦カードの色の「いつもの色」の見本 */
+.card-default-swatch {
+  display: block;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
   background: linear-gradient(135deg, #4f9bff, #2459a8);
 }
 
@@ -3911,4 +3986,144 @@ button.title-row:active {
   padding: var(--space-s) var(--space-m);
   border-radius: var(--radius-l);
   font-size: var(--font-size-m);
+}
+
+/* =============================================
+   ランキングの人のプロフィール（#rank-profile。ranking.js）
+   枠・称号の札は、自分のプロフィールと同じ部品（frames.js・「称号の枠」）
+   ============================================= */
+/* ランキングの行は、タップできるボタン */
+button.rank-row {
+  width: 100%;
+  border: none;
+  font-family: inherit;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--dur-press), filter var(--dur-press);
+}
+
+button.rank-row:active {
+  transform: scale(0.98);
+  filter: brightness(1.12);
+}
+
+/* ポップアップ：枠の色が見やすいよう、暗い下地にする */
+.dialog-box.rank-profile-box {
+  max-width: 340px;
+  color: var(--color-text);
+  background: linear-gradient(160deg, #3a4d70, #24324b);
+  text-align: left;
+}
+
+/* 中身が長いときは、ポップアップの中でスクロール */
+#rank-profile-content {
+  max-height: calc(100dvh - 200px);
+  overflow-y: auto;
+}
+
+.rp-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-m);
+  padding-top: 10px; /* 枠のてっぺんの星の分 */
+}
+
+.rp-avatar {
+  --av: 84px;
+  width: 84px;
+  height: 84px;
+  font-size: 34px;
+}
+
+.rp-who {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rp-who b {
+  font-size: var(--font-size-l);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.rp-who .title-badge {
+  font-size: 13px;
+  white-space: normal;
+}
+
+.rp-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-s);
+  margin-top: var(--space-m);
+}
+
+.rp-stat {
+  padding: 8px 12px;
+  border-radius: var(--radius-m);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.rp-stat span {
+  display: block;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.rp-stat b {
+  font-size: 20px;
+  color: var(--color-gold);
+}
+
+.rp-stat small {
+  margin-left: 2px;
+  font-size: 12px;
+}
+
+/* 公開しているプロフィール */
+.rp-section {
+  margin: var(--space-m) 0 0;
+  font-size: 13px;
+  font-weight: bold;
+  opacity: 0.85;
+}
+
+.rp-themes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-s);
+  margin-top: var(--space-s);
+}
+
+.rp-theme img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-s);
+}
+
+.rp-theme small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+
+/* ランキングに参加していないときの「プロフィールを公開」（選べない） */
+.setting-row.disabled {
+  opacity: 0.5;
+}
+
+/* 記録した日：横いっぱいに（日付が折り返さないように） */
+.rp-stat.wide {
+  grid-column: 1 / -1;
+}
+
+.rp-stat.wide b {
+  font-size: 17px;
 }

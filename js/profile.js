@@ -74,6 +74,13 @@ const Profile = (() => {
         renderThemes();
       });
     }
+    // 対戦カードの色（持っている背景）をタップしたら、それにする
+    $("card-bgs").addEventListener("click", (e) => {
+      const tile = e.target.closest("[data-card-bg]");
+      if (!tile) return;
+      Themes.selectCardBg(tile.dataset.cardBg || null);
+      renderCard();
+    });
     UI.onShow("profile", render);
     refresh();
   }
@@ -83,8 +90,15 @@ const Profile = (() => {
     const p = Save.data.profile;
     $("input-name").value = p.name;
     renderThemes();
+    renderCard();
     Stamps.renderSlots();
     refresh();
+  }
+
+  // 対戦カードの見本と、色の選択肢（vs-intro.js・themes.js）
+  function renderCard() {
+    $("card-preview").innerHTML = VsIntro.myCardHTML();
+    Themes.renderCardPicker($("card-bgs"));
   }
 
   function renderThemes() {
@@ -168,7 +182,7 @@ const Profile = (() => {
       // 隠し実績は、取り方も「？？？」。期間が終わったものは、もう取れないことを書く
       const how = a.hidden ? "？？？" : UI.escape(a.description);
       const note = a.closed ? `<span class="limited-tag">期間限定（終了）</span>` : a.event ? `<span class="limited-tag">期間限定</span>` : "";
-      return `<div class="title-row locked">${myAvatarHTML("frame frame-locked")}<span class="title-row-main"><span class="title-badge ranked rank-locked">？？？</span><small>${how} ${note}</small></span></div>`;
+      return `<div class="title-row locked">${myAvatarHTML(`frame frame-locked ${Frames.starsClass(a.rank)}`)}<span class="title-row-main"><span class="title-badge ranked rank-locked">？？？</span><small>${how} ${note}</small></span></div>`;
     }
     const frame = Frames.clean(a.rank, a.event);
     return `<button class="title-row ${selected ? "selected" : ""}" data-title="${UI.escape(a.id)}">${myAvatarHTML(Frames.avatarClass(frame))}<span class="title-row-main">${Frames.titleHTML(a.title, frame)}</span>${mark}</button>`;

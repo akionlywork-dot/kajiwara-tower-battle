@@ -282,17 +282,27 @@ const Card = (() => {
     ring(ctx, cx, cy, r + w / 2 + edge / 2, f.dark, w + edge * 2);
     ctx.restore();
     ring(ctx, cx, cy, r + w / 2, f.rainbow ? rainbow(ctx, cx, cy, r) : f.color, w);
-    // てっぺんの小さな星（輪の外側のふちに、真ん中を合わせる）
-    const sr = d * 0.2;
-    const sy = cy - r - w;
-    star(ctx, cx, sy, sr + edge * 1.5, f.dark);
-    const fill = f.rainbow ? rainbow(ctx, cx, sy, sr) : (() => {
+    // てっぺんに並ぶ星（格の数だけ。画面の CSS と同じ大きさ・並び）
+    const n = Frames.starCount(frame.rank);
+    const size = d * 0.3; // 星1つの幅
+    const sr = size / 2;
+    const sy = cy - r - w * 0.4;
+    const fill = f.rainbow ? (() => {
+      // 虹：星の列の左から右へ（画面の CSS と同じ）
+      const g = ctx.createLinearGradient(cx - sr * n, 0, cx + sr * n, 0);
+      RAINBOW.slice(0, -1).forEach((c, i, a) => g.addColorStop(i / (a.length - 1), c));
+      return g;
+    })() : (() => {
       const g = ctx.createLinearGradient(0, sy - sr, 0, sy + sr);
       g.addColorStop(0, f.light);
       g.addColorStop(1, f.color);
       return g;
     })();
-    star(ctx, cx, sy, sr, fill);
+    for (let i = 0; i < n; i++) {
+      const sx = cx + (i - (n - 1) / 2) * size;
+      star(ctx, sx, sy, sr + edge, f.dark);
+      star(ctx, sx, sy, sr, fill);
+    }
   }
 
   function ring(ctx, cx, cy, r, style, width) {
@@ -316,11 +326,11 @@ const Card = (() => {
     ctx.fill();
   }
 
-  // 称号の札（枠と同じ色。頭に枠と同じ★）
+  // 称号の札（枠と同じ色。星は枠の方に付く）
   function titlePill(ctx, text, x, y, fontSize, frame) {
     const f = frame && FRAME_COLORS[frame.rank];
     if (!f) return pill(ctx, text, x, y, fontSize, COLOR.gold, "#2b3a55"); // 枠なしなら、前と同じ金色
-    const label = `★ ${text}`;
+    const label = text;
     ctx.font = `bold ${fontSize}px ${FONT}`;
     const h = fontSize + 16;
     const pw = ctx.measureText(label).width + 32;

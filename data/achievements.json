@@ -27,7 +27,7 @@
     {
       "id": "stack10",
       "name": "10体積み",
-      "title": "積み上げ名人",
+      "title": "積み上げ見習い",
       "rank": "bronze",
       "description": "1回のゲームで10体積んだ",
       "condition": {
@@ -39,7 +39,7 @@
     {
       "id": "stack20",
       "name": "20体積み",
-      "title": "塔の職人",
+      "title": "積み上げ職人",
       "rank": "silver",
       "description": "1回のゲームで20体積んだ",
       "category": "積む",
@@ -51,7 +51,7 @@
     {
       "id": "stack30",
       "name": "30体積み",
-      "title": "塔の神",
+      "title": "積み上げ界の神",
       "rank": "legend",
       "description": "1回のゲームで30体積んだ",
       "category": "積む",
@@ -75,7 +75,7 @@
     {
       "id": "height5",
       "name": "高さ5m達成",
-      "title": "天空の塔",
+      "title": "天空の住人",
       "rank": "silver",
       "description": "タワーの高さが5mに届いた",
       "condition": {
@@ -87,7 +87,7 @@
     {
       "id": "height9",
       "name": "宇宙到達",
-      "title": "宇宙飛行士",
+      "title": "宇宙の住人",
       "rank": "gold",
       "description": "タワーの高さが9m（宇宙）に届いた",
       "category": "高さ",
@@ -199,7 +199,7 @@
     {
       "id": "online_win1",
       "name": "オンライン初勝利",
-      "title": "ネットの勝負師",
+      "title": "世界進出",
       "rank": "bronze",
       "description": "オンライン対戦で勝った",
       "category": "オンライン",
@@ -211,7 +211,7 @@
     {
       "id": "online_win10",
       "name": "オンライン10勝",
-      "title": "全国区",
+      "title": "トップランカー",
       "rank": "gold",
       "description": "オンライン対戦で10勝した",
       "category": "オンライン",
@@ -251,7 +251,7 @@
     {
       "id": "dex_half",
       "name": "図鑑 半分",
-      "title": "コレクター",
+      "title": "図鑑コレクター",
       "rank": "bronze",
       "description": "図鑑に6体登録した",
       "condition": {
@@ -362,7 +362,7 @@
     {
       "id": "pumpkin_king",
       "name": "かぼちゃの王",
-      "title": "パンプキンキング",
+      "title": "パンプキング",
       "rank": "event",
       "description": "ハロウィンイベントのおばけ屋敷で、CPU「つよい」に3勝した",
       "category": "イベント",

@@ -12,6 +12,12 @@
 //   hidden … ここに何か書くと（例：x）、その人はランキングに出なくなる（変な名前・不正なスコア用）
 //   title  … 称号
 //   icon   … 写真アイコン（小さな JPEG を文字にしたもの）。本人が「載せる」を選んだときだけ入る
+//   ここから下は、本人が「ランキングでプロフィールを公開」を ON にしたときだけ入る（OFF にすると、次に送られたときに消す）：
+//   ach / achTotal       … 実績の達成数 / 全部の数
+//   dex / dexTotal       … 図鑑の登録数 / 全部の数
+//   bg / platform        … 選んでいる背景・土台の id（config.js の themes にあるものだけ）
+//   plays / pieces       … プレイ回数・これまでに積んだ数の合計
+//   onlineWins / onlineLosses … オンライン対戦の勝ち・負け
 // =============================================
 
 const SHEET_NAME = "ranking";
@@ -19,7 +25,13 @@ const TOP = 100; // ランキングに出す人数
 const NAME_MAX = 10; // 名前の最大文字数（ゲームのプロフィールと同じ）
 const TITLE_MAX = 20; // 称号の最大文字数
 const ICON_MAX = 12000; // 写真アイコンの最大の長さ（文字数。1つのセルに入る量より十分小さく）
-const HEADERS = ["id", "name", "score", "count", "height", "date", "hidden", "title", "icon"];
+const HEADERS = ["id", "name", "score", "count", "height", "date", "hidden", "title", "icon",
+  "ach", "achTotal", "dex", "dexTotal", "bg", "platform", "plays", "pieces", "onlineWins", "onlineLosses"];
+const PROFILE_COL = 10; // プロフィールの列が始まる場所（ach の列。1から数える）
+const PROFILE_KEYS = HEADERS.slice(PROFILE_COL - 1); // ["ach", …, "onlineLosses"]
+// 背景・土台の id（config.js の themes の backgrounds・platforms と同じにする。ここに無い id は保存しない）
+const BACKGROUNDS = ["sky", "sunset", "sakura", "night", "galaxy", "halloween_night"];
+const PLATFORMS = ["wood", "stone", "ice", "gold", "diamond", "pumpkin"];
 // スコアの計算（config.js の score と同じにする）：積んだ数 × PER_PIECE ＋ 高さ(m) × PER_METER
 const PER_PIECE = 100;
 const PER_METER = 100;
@@ -38,6 +50,7 @@ function doGet(e) {
     ranking: list.slice(0, TOP).map((r) => {
       const row = { rank: r.rank, name: r.name, title: r.title, score: r.score, count: r.count, height: r.height, date: r.date };
       if (r.icon) row.icon = r.icon;
+      if (r.profile) row.profile = r.profile; // プロフィールを公開している人だけ
       if (mine && r.id === me) row.me = true;
       return row;
     }),
@@ -46,7 +59,9 @@ function doGet(e) {
 }
 
 // ---------- スコアを受け取る（ゲームが自動で送ってくる） ----------
-// 本文（JSON）：{ id, name, title, icon, score, count, height }
+// 本文（JSON）：{ id, name, title, icon, score, count, height, profile }
+//   profile … 「ランキングでプロフィールを公開」が ON の人だけ。OFF の人・古いバージョンからは届かない（そのときは消す）
+//     { ach: [達成数, 全部], dex: [登録数, 全部], bg, platform, plays, pieces, online: [勝ち, 負け] }
 function doPost(e) {
   let d;
   try {
@@ -59,6 +74,7 @@ function doPost(e) {
   const name = cleanName_(d.name);
   const title = cleanText_(d.title, TITLE_MAX);
   const icon = cleanIcon_(d.icon);
+  const profile = profileCells_(d.profile); // シートに書く値（公開していなければ、全部 ""）
   const count = Number(d.count);
   const height = Math.round(Number(d.height) * 100) / 100;
   const score = Number(d.score);
@@ -83,11 +99,12 @@ function doPost(e) {
     const today = Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd");
     const found = rows.find((r) => r.id === id);
     if (!found) {
-      sh.appendRow([text_(id), text_(name), score, count, height, text_(today), "", title ? text_(title) : "", icon]);
+      sh.appendRow([text_(id), text_(name), score, count, height, text_(today), "", title ? text_(title) : "", icon].concat(profile));
     } else {
       // 名前・称号・アイコンはいつも新しいものに。スコアは前より高いときだけ書きかえる（hidden はそのまま）
       sh.getRange(found.row, 2).setValue(text_(name));
       sh.getRange(found.row, 8, 1, 2).setValues([[title ? text_(title) : "", icon]]);
+      sh.getRange(found.row, PROFILE_COL, 1, PROFILE_KEYS.length).setValues([profile]); // 公開をやめた人は、ここで消える
       if (score > found.score) sh.getRange(found.row, 3, 1, 4).setValues([[score, count, height, text_(today)]]);
     }
     SpreadsheetApp.flush();
@@ -108,7 +125,7 @@ function sheet_() {
     sh.appendRow(HEADERS);
     sh.setFrozenRows(1);
   } else if (String(sh.getRange(1, HEADERS.length).getValue()) !== HEADERS[HEADERS.length - 1]) {
-    // 前のバージョンで作ったシート：あとから増えた列（title・icon）の見出しを足す
+    // 前のバージョンで作ったシート：あとから増えた列（title・icon・プロフィール）の見出しを足す
     sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
   }
   return sh;
@@ -129,7 +146,49 @@ function readRows_() {
     hidden: String(v[6]).trim() !== "",
     title: String(v[7] || ""),
     icon: String(v[8] || ""),
+    profile: readProfile_(v.slice(PROFILE_COL - 1)),
   }));
+}
+
+// ---------- プロフィール（公開している人だけ） ----------
+// 届いた profile を、シートに書く値の並び（PROFILE_KEYS の順）にする。
+// おかしい値は保存しない（その欄は ""）。profile が無ければ全部 ""（＝公開をやめた人のデータを消す）
+function profileCells_(p) {
+  const empty = PROFILE_KEYS.map(() => "");
+  if (!p || typeof p !== "object") return empty;
+  const int = (v, max) => (Number.isInteger(v) && v >= 0 && v <= max ? v : "");
+  const pair = (a, max) => {
+    if (!Array.isArray(a)) return ["", ""];
+    const x = int(a[0], max), y = int(a[1], max);
+    return x === "" || y === "" || x > y ? ["", ""] : [x, y]; // 達成数が全部の数より多いのはおかしい
+  };
+  const online = Array.isArray(p.online) ? [int(p.online[0], 1000000), int(p.online[1], 1000000)] : ["", ""];
+  const cells = []
+    .concat(pair(p.ach, 1000))
+    .concat(pair(p.dex, 1000))
+    .concat([
+      BACKGROUNDS.indexOf(p.bg) >= 0 ? text_(p.bg) : "",
+      PLATFORMS.indexOf(p.platform) >= 0 ? text_(p.platform) : "",
+      int(p.plays, 10000000),
+      int(p.pieces, 100000000),
+    ])
+    .concat(online[0] === "" || online[1] === "" ? ["", ""] : online);
+  return cells;
+}
+
+// シートの値から、ゲームに返す profile を作る（1つも無ければ null）
+function readProfile_(v) {
+  const get = (i) => (v[i] === "" || v[i] === undefined || v[i] === null ? null : v[i]);
+  const num = (i) => (get(i) === null || !isFinite(Number(v[i])) ? null : Number(v[i]));
+  const p = {};
+  if (num(0) !== null && num(1) !== null) p.ach = [num(0), num(1)];
+  if (num(2) !== null && num(3) !== null) p.dex = [num(2), num(3)];
+  if (get(4) !== null) p.bg = String(v[4]);
+  if (get(5) !== null) p.platform = String(v[5]);
+  if (num(6) !== null) p.plays = num(6);
+  if (num(7) !== null) p.pieces = num(7);
+  if (num(8) !== null && num(9) !== null) p.online = [num(8), num(9)];
+  return Object.keys(p).length ? p : null;
 }
 
 // 隠していない人を、スコアの高い順に並べて順位をつける（同じ点数は同じ順位）

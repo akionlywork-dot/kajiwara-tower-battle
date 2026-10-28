@@ -7,7 +7,7 @@ window.GAME_CONFIG = {
   achievementsEpoch: 2,
 
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v1.13.0",
+  version: "v1.14.0",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -251,7 +251,7 @@ window.GAME_CONFIG = {
       rewards: [
         { wins: 1, type: "background", id: "halloween_night", name: "背景「ハロウィンの夜」" },
         { wins: 2, type: "platform", id: "pumpkin", name: "土台「かぼちゃの台」" },
-        { wins: 3, type: "achievement", id: "pumpkin_king", name: "実績「かぼちゃの王」（称号「パンプキンキング」）" },
+        { wins: 3, type: "achievement", id: "pumpkin_king", name: "実績「かぼちゃの王」（称号「パンプキング」）" },
       ],
       // 期間中のホーム（タイトル）画面の後ろの絵（js/halloween-home.js）。
       // プロフィールで何を選んでいても、まだ解放していなくても、ホームではこの背景・土台で描く（ゲーム中は選んだもの）

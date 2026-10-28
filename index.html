@@ -36,7 +36,7 @@
   <!-- アプリとしてインストールするための設定（PWA） -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="css/style.css?v=1.13.0">
+  <link rel="stylesheet" href="css/style.css?v=1.14.0">
 </head>
 <body>
   <div id="app">
@@ -83,9 +83,9 @@
         <!-- 上：タイトルロゴ -->
         <div class="title-top">
           <div class="logo-pop">
-            <h1 class="logo">かじわら<br>タワーバトル</h1>
+            <h1 class="logo">かじわら<br>タワーバトル２</h1>
           </div>
-          <p class="tagline">落としたら負け！</p>
+          <p class="tagline">あの梶原タワーバトルが<br>進化して新登場！</p>
           <!-- ハロウィンイベントの期間中だけ出る、かぼちゃ（#screen-title.halloween のとき） -->
           <span class="hw-pumpkin" aria-hidden="true">🎃</span>
         </div>
@@ -215,7 +215,7 @@
           <div class="online-notes">
             <p>・まず2台を直接つなぎます。直接つながらないときは、自動で公開の中継サーバー経由に切りかえます（少し反応がゆっくりになります）。</p>
             <p>・ルームコードは、対戦する相手にだけ伝えてください（SNS などに貼らないでください）。</p>
-            <p>・試合の前に、対戦カードでおたがいの名前・称号・ハイスコア（ランキングに参加している人は順位も）・実績の数・オンライン対戦の勝敗が相手に伝わります。写真アイコンは、設定で「対戦相手に写真アイコンを見せる」をオンにした人だけ伝わります。</p>
+            <p>・試合の前に、対戦カードでおたがいの名前・称号・ハイスコア（ランキングに参加している人は順位も）・実績の数・オンライン対戦の勝敗が相手に伝わります。写真アイコンは、設定の「オンライン対戦」→「相手に写真アイコンを見せる」をオンにした人だけ伝わります。</p>
             <p>・直接つながったときは、お互いのネット上の住所（IPアドレス）が相手の端末に伝わります。中継サーバー経由のときは、ゲームのデータ（キャラの位置・名前・対戦カードの情報）が中継サーバーを通ります。知っている人と遊んでください。</p>
             <p>・画面を消したり、ほかのアプリに切りかえたりすると、接続が切れます。</p>
           </div>
@@ -284,11 +284,16 @@
     </section>
 
     <!-- ===== 設定画面 ===== -->
-    <section id="screen-settings" class="screen screen-dim">
-      <div class="screen-inner">
-        <h2 class="screen-title">設定</h2>
-        <div class="settings-list">
-          <!-- data-setting の名前は settings.js の DEFAULTS と同じにする -->
+    <section id="screen-settings" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <!-- もどる（設定を開いた画面へ。タイトル・ポーズのどちらからでも） -->
+          <button id="btn-settings-back" class="btn btn-icon" aria-label="もどる">‹</button>
+          <h2>設定</h2>
+        </header>
+        <!-- data-setting の名前は settings.js の DEFAULTS と同じにする。スイッチの行は、行のどこを押しても切りかわる（main.js） -->
+        <div class="page-body settings-list">
+          <h3 class="settings-heading">音</h3>
           <div class="setting-row">
             <span>BGM</span>
             <button class="toggle" data-setting="bgm" role="switch" aria-label="BGM"></button>
@@ -297,6 +302,8 @@
             <span>効果音</span>
             <button class="toggle" data-setting="se" role="switch" aria-label="効果音"></button>
           </div>
+
+          <h3 class="settings-heading">あそびかた</h3>
           <div class="setting-row">
             <span>制限時間<small id="timer-desc"></small></span>
             <button class="toggle" data-setting="timer" role="switch" aria-label="制限時間"></button>
@@ -305,19 +312,32 @@
             <span>指を離したら落とす<small>ドラッグして指を離すと落下</small></span>
             <button class="toggle" data-setting="release" role="switch" aria-label="指を離したら落とす"></button>
           </div>
-          <!-- ランキングに参加（config.js の ranking.url を設定したときだけ表示） -->
-          <div id="setting-ranking-row" class="setting-row hidden">
-            <span>ランキングに参加<small>ハイスコア・名前・称号を自動で送る</small></span>
-            <button class="toggle" data-setting="ranking" role="switch" aria-label="ランキングに参加"></button>
+
+          <!-- ランキング（config.js の ranking.url を設定したときだけ表示。ranking.js） -->
+          <div id="setting-ranking-group" class="settings-group hidden">
+            <h3 class="settings-heading">ランキング</h3>
+            <div class="setting-row">
+              <span>ランキングに参加<small>ハイスコア・名前・称号を自動で送る</small></span>
+              <button class="toggle" data-setting="ranking" role="switch" aria-label="ランキングに参加"></button>
+            </div>
+            <!-- 下の2つは、ランキングに参加しているときだけ選べる -->
+            <div class="setting-row setting-sub" data-needs="ranking">
+              <span>プロフィールを公開<small>実績・図鑑の数、背景と土台、プレイ回数、積んだ数の合計、オンライン対戦の勝敗が、ランキングで見られる</small></span>
+              <button class="toggle" data-setting="rankingProfile" role="switch" aria-label="ランキングでプロフィールを公開"></button>
+            </div>
+            <div class="setting-row setting-sub" data-needs="ranking">
+              <span>写真アイコンを載せる<small>オフのときは、名前の1文字目</small></span>
+              <button class="toggle" data-setting="rankingIcon" role="switch" aria-label="ランキングに写真アイコンを載せる"></button>
+            </div>
           </div>
-          <div id="setting-ranking-icon-row" class="setting-row hidden">
-            <span>ランキングに写真アイコンを載せる<small>オフのときは、名前の1文字目が出る</small></span>
-            <button class="toggle" data-setting="rankingIcon" role="switch" aria-label="ランキングに写真アイコンを載せる"></button>
-          </div>
+
+          <h3 class="settings-heading">オンライン対戦</h3>
           <div class="setting-row">
-            <span>対戦相手に写真アイコンを見せる<small>オンライン対戦で、相手の画面に小さく出る。オフのときは名前の1文字目</small></span>
+            <span>相手に写真アイコンを見せる<small>オフのときは、名前の1文字目</small></span>
             <button class="toggle" data-setting="onlineIcon" role="switch" aria-label="対戦相手に写真アイコンを見せる"></button>
           </div>
+
+          <h3 class="settings-heading">アプリ・データ</h3>
           <!-- アプリとしてインストール（インストールできるときだけ表示。pwa.js） -->
           <div id="setting-install-row" class="setting-row hidden">
             <span>アプリとしてインストール<small id="install-desc"></small></span>
@@ -334,6 +354,7 @@
               </label>
             </div>
           </div>
+
           <!-- 管理者モードの端末だけ表示される -->
           <div id="setting-admin-row" class="setting-row hidden">
             <span>管理者メニュー<small>この端末は管理者モードです</small></span>
@@ -344,9 +365,6 @@
             <span>当たり判定を表示<small>開発用</small></span>
             <button class="toggle" data-setting="debug" role="switch" aria-label="当たり判定を表示"></button>
           </div>
-        </div>
-        <div class="menu">
-          <button id="btn-settings-back" class="btn btn-big btn-sub">もどる</button>
         </div>
       </div>
     </section>
@@ -462,10 +480,14 @@
           <div id="theme-backgrounds" class="theme-grid"></div>
           <h3 class="section-title">土台</h3>
           <div id="theme-platforms" class="theme-grid"></div>
+          <!-- 対戦カード：オンライン対戦の前に相手の画面に出るカードの見本と、色（持っている背景）を選ぶ -->
+          <h3 class="section-title">対戦カード<small>オンライン対戦の前に、相手の画面に出る。色を、持っている背景から選べる</small></h3>
+          <div id="card-preview" class="card-preview"></div>
+          <div id="card-bgs" class="theme-grid"></div>
           <!-- スタンプ（中身は stamps.js が作る） -->
           <h3 class="section-title">スタンプ<small>オンライン対戦のリザルトで送れる。枠をタップして変える</small></h3>
           <div id="stamp-slots" class="stamp-slots"></div>
-          <p class="page-note">写真と名前はこの端末の中に保存されます。名前はオンライン対戦の相手に、ランキングに参加したときは名前・称号（と、選んだ人は写真）がランキングに送られます。</p>
+          <p class="page-note">写真と名前はこの端末の中に保存されます。名前はオンライン対戦の相手に、ランキングに参加したときは名前・称号（と、選んだ人は写真）がランキングに送られます。設定の「ランキング」→「プロフィールを公開」をオンにすると、実績の数・図鑑の数・背景と土台・プレイ回数・積んだ数の合計・オンライン対戦の勝敗もランキングを見た人に見えます。</p>
         </div>
       </div>
     </section>
@@ -572,6 +594,17 @@
     </section>
 
     <!-- ===== 図鑑のキャラの詳細 ===== -->
+    <!-- ===== ランキングの人のプロフィール（ranking.js。行をタップしたとき） ===== -->
+    <div id="rank-profile" class="dialog">
+      <div class="dialog-box rank-profile-box">
+        <div id="rank-profile-content"></div>
+        <div class="dialog-buttons">
+          <button id="rank-profile-mine" class="btn btn-sub hidden">プロフィールへ</button>
+          <button id="rank-profile-close" class="btn btn-primary">閉じる</button>
+        </div>
+      </div>
+    </div>
+
     <div id="dex-popup" class="dialog">
       <div class="dialog-box dex-popup-box">
         <div id="dex-popup-content"></div>
@@ -740,46 +773,46 @@
 
   <!-- ?v= のあとの番号：更新したら config.js の version と一緒に上げる（スマホに古いファイルが残らないように） -->
   <!-- ライブラリ（lib/ に同梱） -->
-  <script src="lib/decomp.min.js?v=1.13.0"></script>
-  <script src="lib/matter.min.js?v=1.13.0"></script>
-  <script src="lib/peerjs.min.js?v=1.13.0"></script>
-  <script src="lib/mqtt.min.js?v=1.13.0"></script>
+  <script src="lib/decomp.min.js?v=1.14.0"></script>
+  <script src="lib/matter.min.js?v=1.14.0"></script>
+  <script src="lib/peerjs.min.js?v=1.14.0"></script>
+  <script src="lib/mqtt.min.js?v=1.14.0"></script>
   <!-- 設定ファイル -->
-  <script src="config.js?v=1.13.0"></script>
-  <script src="characters.js?v=1.13.0"></script>
-  <script src="js/chars.js?v=1.13.0"></script>
+  <script src="config.js?v=1.14.0"></script>
+  <script src="characters.js?v=1.14.0"></script>
+  <script src="js/chars.js?v=1.14.0"></script>
   <!-- ゲーム本体 -->
-  <script src="js/settings.js?v=1.13.0"></script>
-  <script src="js/save.js?v=1.13.0"></script>
-  <script src="js/audio.js?v=1.13.0"></script>
-  <script src="js/shape.js?v=1.13.0"></script>
-  <script src="js/aura.js?v=1.13.0"></script>
-  <script src="js/platform-art.js?v=1.13.0"></script>
-  <script src="js/game.js?v=1.13.0"></script>
-  <script src="js/rules.js?v=1.13.0"></script>
-  <script src="js/cpu.js?v=1.13.0"></script>
-  <script src="js/challenge.js?v=1.13.0"></script>
-  <script src="js/card.js?v=1.13.0"></script>
-  <script src="js/stamps.js?v=1.13.0"></script>
-  <script src="js/halloween-home.js?v=1.13.0"></script>
-  <script src="js/halloween.js?v=1.13.0"></script>
-  <script src="js/title-fx.js?v=1.13.0"></script>
-  <script src="js/online.js?v=1.13.0"></script>
-  <script src="js/ui.js?v=1.13.0"></script>
-  <script src="js/themes.js?v=1.13.0"></script>
-  <script src="js/frames.js?v=1.13.0"></script>
-  <script src="js/profile.js?v=1.13.0"></script>
-  <script src="js/data-file.js?v=1.13.0"></script>
-  <script src="js/news.js?v=1.13.0"></script>
-  <script src="js/events.js?v=1.13.0"></script>
-  <script src="js/ranking.js?v=1.13.0"></script>
-  <script src="js/records.js?v=1.13.0"></script>
-  <script src="js/dex.js?v=1.13.0"></script>
-  <script src="js/achievements.js?v=1.13.0"></script>
-  <script src="js/vs-intro.js?v=1.13.0"></script>
-  <script src="js/backup.js?v=1.13.0"></script>
-  <script src="js/admin.js?v=1.13.0"></script>
-  <script src="js/pwa.js?v=1.13.0"></script>
-  <script src="js/main.js?v=1.13.0"></script>
+  <script src="js/settings.js?v=1.14.0"></script>
+  <script src="js/save.js?v=1.14.0"></script>
+  <script src="js/audio.js?v=1.14.0"></script>
+  <script src="js/shape.js?v=1.14.0"></script>
+  <script src="js/aura.js?v=1.14.0"></script>
+  <script src="js/platform-art.js?v=1.14.0"></script>
+  <script src="js/game.js?v=1.14.0"></script>
+  <script src="js/rules.js?v=1.14.0"></script>
+  <script src="js/cpu.js?v=1.14.0"></script>
+  <script src="js/challenge.js?v=1.14.0"></script>
+  <script src="js/card.js?v=1.14.0"></script>
+  <script src="js/stamps.js?v=1.14.0"></script>
+  <script src="js/halloween-home.js?v=1.14.0"></script>
+  <script src="js/halloween.js?v=1.14.0"></script>
+  <script src="js/title-fx.js?v=1.14.0"></script>
+  <script src="js/online.js?v=1.14.0"></script>
+  <script src="js/ui.js?v=1.14.0"></script>
+  <script src="js/themes.js?v=1.14.0"></script>
+  <script src="js/frames.js?v=1.14.0"></script>
+  <script src="js/profile.js?v=1.14.0"></script>
+  <script src="js/data-file.js?v=1.14.0"></script>
+  <script src="js/news.js?v=1.14.0"></script>
+  <script src="js/events.js?v=1.14.0"></script>
+  <script src="js/ranking.js?v=1.14.0"></script>
+  <script src="js/records.js?v=1.14.0"></script>
+  <script src="js/dex.js?v=1.14.0"></script>
+  <script src="js/achievements.js?v=1.14.0"></script>
+  <script src="js/vs-intro.js?v=1.14.0"></script>
+  <script src="js/backup.js?v=1.14.0"></script>
+  <script src="js/admin.js?v=1.14.0"></script>
+  <script src="js/pwa.js?v=1.14.0"></script>
+  <script src="js/main.js?v=1.14.0"></script>
 </body>
 </html>
