@@ -415,6 +415,7 @@
     },
     {
       "id": "mr_dex",
+      "hidden": true,
       "name": "まぼろし図鑑",
       "title": "幻想の収集家",
       "rank": "mythic",

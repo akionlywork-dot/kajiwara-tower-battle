@@ -104,7 +104,7 @@ window.GAME_CONFIG = {
       // unlock に { event, wins } を書くと、そのイベントの勝利数で解放される（イベントが終わっても使える）
       { id: "halloween_night", name: "ハロウィンの夜", unlock: { event: "halloween2026", wins: 1 }, top: "#1c0b33", bottom: "#5b2a86", cloud: "#4a2d6b", ground: "#2e1f3a", groundDark: "#1d1426", stars: true, moon: true, bats: true },
       // 実績のごほうび（unlock: "achievement"）：どの実績で解放されるかは、data/achievements.json の reward に書く
-      //   ふしぎの国 … 実績「伸び縮み自在」（サイズ違いを全部図鑑に） ／ オーロラ … 実績「まぼろし図鑑」（★5 を全部図鑑に）
+      //   ふしぎの国 … 実績「伸び縮み自在」（サイズ違いを全部図鑑に） ／ オーロラ … 隠し実績
       //   aurora: true … 空に、ゆらめくオーロラの光の帯
       { id: "wonderland", name: "ふしぎの国", unlock: "achievement", top: "#b98aff", bottom: "#ffd3ec", cloud: "#fff2fb", ground: "#8fd4a8", groundDark: "#6fb88c" },
       { id: "aurora", name: "オーロラ", unlock: "achievement", top: "#020b1f", bottom: "#123d52", cloud: "#26485c", ground: "#1e3b3a", groundDark: "#132826", stars: true, aurora: true },
