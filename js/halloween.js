@@ -2,7 +2,8 @@
 // halloween.js
 // ハロウィンイベント（id "halloween2026"）：ステージ「おばけ屋敷」とごほうび
 //
-// ・期間（data/events.json）の中だけ、モード選択画面に「🎃 ハロウィン」ボタンを出し、タイトルにかぼちゃ・こうもりを出す
+// ・期間（data/events.json）の中だけ、モード選択画面に「🎃 ハロウィン」ボタンを出し、タイトルにかぼちゃ・こうもりを出す。
+//   ホーム画面の後ろの絵も、ハロウィンの夜・かぼちゃの台・飾り（halloween-home.js）にする
 // ・ステージは CPU 対戦（config.js の events.halloween2026 の rule・cpu）。ギミックの動きは rules.js の haunted
 // ・勝つたびに、ごほうび（config.js の events.halloween2026.rewards）を1つずつもらえる。
 //   勝利数は Save.data.eventStats に保存し、背景・土台・実績は、この勝利数で使えるようになる（イベントが終わっても残る）
@@ -32,11 +33,11 @@ const Halloween = (() => {
     // モード選択画面・タイトルが出るたびと、イベントを読み込み終わったときに、期間に合わせて出し入れする
     UI.onChange((name) => {
       if (name === "mode") updateButton();
-      if (name === "title") updateTitle();
+      updateTitle(name === "title");
     });
     LimitedEvents.whenLoaded(() => {
       updateButton();
-      updateTitle();
+      updateTitle(UI.current === "title");
     });
   }
 
@@ -50,9 +51,13 @@ const Halloween = (() => {
     $("halloween-progress").textContent = n >= all ? `制覇！（${n}勝）` : `CPU つよい に勝ってごほうびをゲット 🎃 ${n}/${all}`;
   }
 
-  // タイトル画面のかぼちゃ・こうもり（期間外は出さない）
-  function updateTitle() {
-    $("screen-title").classList.toggle("halloween", isOpen());
+  // タイトル画面のかぼちゃ・こうもり（CSS）と、後ろの絵（背景「ハロウィンの夜」・かぼちゃの台・飾り。halloween-home.js）。
+  // 期間外は出さない。後ろの絵はタイトル画面が出ているあいだだけ入れ、ほかの画面・ゲーム中は選んだ背景・土台に戻す。
+  // プロフィールで選んだもの・解放の状態は変えない（まだ解放していない人にも、ホームでは見せる）
+  function updateTitle(onTitle) {
+    const open = isOpen();
+    $("screen-title").classList.toggle("halloween", open);
+    Game.setHomeScene(open && onTitle ? HalloweenHome.scene() : null);
   }
 
   // ステージの説明と、ごほうび3つ（もらったものにはチェック、まだのものは「？」）

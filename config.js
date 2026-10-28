@@ -7,7 +7,7 @@ window.GAME_CONFIG = {
   achievementsEpoch: 2,
 
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v1.10.0",
+  version: "v1.11.0",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -257,6 +257,18 @@ window.GAME_CONFIG = {
         { wins: 2, type: "platform", id: "pumpkin", name: "土台「かぼちゃの台」" },
         { wins: 3, type: "achievement", id: "pumpkin_king", name: "実績「かぼちゃの王」（称号「パンプキンキング」）" },
       ],
+      // 期間中のホーム（タイトル）画面の後ろの絵（js/halloween-home.js）。
+      // プロフィールで何を選んでいても、まだ解放していなくても、ホームではこの背景・土台で描く（ゲーム中は選んだもの）
+      home: {
+        background: "halloween_night", // 背景（themes.backgrounds の id）
+        platform: "pumpkin", // 土台（themes.platforms の id）
+        pumpkins: 4, // 丘の上のジャック・オ・ランタンの数（0〜6）
+        flicker: 1, // かぼちゃの光の揺れの速さ（1 がふつう）
+        windowBlink: 1, // おばけ屋敷の窓がまたたく速さ（0 なら消えない）
+        fog: { speed: 8, alpha: 0.8 }, // 霧の流れる速さ（1秒に動く量）と濃さ（0〜1）
+        ghosts: { every: [3, 7], firstAfter: [1.5, 3], time: 3, max: 2 }, // おばけが出る間隔（秒）・最初に出るまで・出ている時間・同時に出る数（0 なら出さない）
+        bats: 3, // キャンバスのこうもりの数（ホームでは CSS のこうもり3匹もいるので、ふだんの5匹から減らす）
+      },
     },
   },
 

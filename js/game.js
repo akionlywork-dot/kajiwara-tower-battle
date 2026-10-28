@@ -929,7 +929,9 @@ const Game = (() => {
     view = v;
     // ゲーム内の座標のまま描けるように、拡大と位置をセットする
     ctx.setTransform(scale, 0, 0, scale, -v.left * scale, -v.top * scale);
+    syncTheme();
     drawBackground();
+    if (homeActive() && homeScene.drawBack) homeScene.drawBack(ctx, groundY()); // ホーム画面の飾り（丘・屋敷・かぼちゃ・霧・おばけ）
 
     ctx.save();
     if (withUI && engine && state !== "demo") drawHeightMarks();
@@ -1096,9 +1098,33 @@ const Game = (() => {
   let bgTheme = { top: "#7ec8f0", bottom: "#d8f0ff", cloud: "#f4faff", ground: "#7cc35a", groundDark: "#5fa845" };
   let platTheme = { body: "#8a5a3b", top: "#6fbf4a", pillar: "#a39587" };
 
+  // bgTheme・platTheme は「今描くもの」。プロフィールで選んだものは chosenBg・chosenPlat に残しておく
+  let chosenBg = bgTheme;
+  let chosenPlat = platTheme;
+  // ホーム画面だけの見た目（ハロウィンの期間中など。halloween-home.js の scene()）。null ならいつもの見た目
+  //   { background, platform, bats（キャンバスのこうもりの数）, birds（false なら鳥を出さない）, drawBack(ctx, groundY) }
+  let homeScene = null;
+
   function setTheme(background, platformDef) {
-    if (background) bgTheme = background;
-    if (platformDef) platTheme = platformDef;
+    if (background) chosenBg = background;
+    if (platformDef) chosenPlat = platformDef;
+    syncTheme();
+  }
+
+  // ホーム画面の見た目を入れる・外す（halloween.js から。タイトル画面が出ているあいだだけ入れる）
+  function setHomeScene(scene) {
+    homeScene = scene || null;
+    syncTheme();
+  }
+
+  // ホーム画面の見た目を使うか（タイトルのデモのあいだだけ。ゲームが始まったら、選んだ背景・土台に戻る）
+  function homeActive() {
+    return !!homeScene && state === "demo";
+  }
+
+  function syncTheme() {
+    bgTheme = homeActive() ? homeScene.background : chosenBg;
+    platTheme = homeActive() ? homeScene.platform : chosenPlat;
   }
 
   // 空に散らばる星（星空の背景のとき）。位置は画面の割合
@@ -1123,6 +1149,7 @@ const Game = (() => {
   // 塔が高くなった：新しい背景に届いたら知らせる（main.js が「〇〇に到達！」を出す）
   function reachHeight(h) {
     if (state === "demo" || !(h > peakHeight)) return;
+    syncTheme();
     peakHeight = h;
     const stages = skyStages();
     let i = 0;
@@ -1180,7 +1207,7 @@ const Game = (() => {
       drawClouds(k, sky.cloud);
       ctx.globalAlpha = 1;
     }
-    if (!photo) drawBirds();
+    if (!photo && !(homeActive() && homeScene.birds === false)) drawBirds(); // ハロウィンのホームは、鳥の代わりにこうもり
   }
 
   // ---------- 雲 ----------
@@ -1433,10 +1460,12 @@ const Game = (() => {
       ctx.drawImage(moonImage(), view.left + view.w * 0.85 - size / 2, view.top + view.h * 0.28 - size / 2 - camY * 0.05 * k, size, size);
     }
     if (bgTheme.bats) {
-      // 5羽のこうもりが、ゆっくり輪を描くように飛び回る（「視差効果を減らす」では止まった絵）
+      // 5羽のこうもりが、ゆっくり輪を描くように飛び回る（「視差効果を減らす」では止まった絵）。
+      // ホーム画面では CSS のこうもりもいるので、数を減らす（config.js の events.halloween2026.home.bats）
       const t = reducedMotion.matches ? 0 : performance.now() / 1000;
+      const count = homeActive() && typeof homeScene.bats === "number" ? homeScene.bats : 5;
       ctx.fillStyle = "#140a1f";
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < count; i++) {
         const x = view.left + (((t * (18 + i * 5) + i * 97) % (WORLD_W + 120)) - 60) * k;
         const y = view.top + (0.12 + i * 0.07 + Math.sin(t * 1.3 + i * 2) * 0.03) * view.h;
         drawBat(x, y, (7 + (i % 3) * 2) * k, Math.sin(t * 10 + i * 3));
@@ -1681,7 +1710,7 @@ const Game = (() => {
   }
 
   return {
-    init, start, stop, startDemo, setTitleFx, towerImage, enterPhoto, exitPhoto, photoImage, setForcedShape, setDemoCeiling, setTheme, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
+    init, start, stop, startDemo, setTitleFx, towerImage, enterPhoto, exitPhoto, photoImage, setForcedShape, setDemoCeiling, setTheme, setHomeScene, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
     get platformSize() { return platformSize; }, // 土台と柱の大きさ（プロフィールの見本の絵に使う）
     get state() { return state; },
     get rotations() { return rotations; }, // このゲームで回転を使った回数
