@@ -472,15 +472,25 @@ select {
 }
 
 /* スタートボタン：下から弾んで出てくる → 脈打つように拡大縮小をくり返す */
-.btn-start {
-  min-height: 72px;
-  font-size: 28px;
+/* スタートボタン
+   登場（下からせり上がる）と、脈打つ動きは、外側の .btn-start-wrap に付ける。
+   ボタンそのものにアニメーションを付けて、押したあいだだけ止める（animation: none）書き方にすると、
+   iPhone の Safari では指を離した瞬間にアニメーションが最初からやり直しになり、ボタンが下へ消えるため、
+   「指を離した場所にボタンが無い」ことになって押せなくなる。
+   脈打つ動きは、押せるようになってから（main.js が .ready を付けてから） */
+.btn-start-wrap {
+  width: 100%;
+  animation: rise-up 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) var(--button-at, 0.9s) both;
+}
+
+.btn-start-wrap.ready {
   animation: rise-up 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) var(--button-at, 0.9s) both,
     breathe var(--pulse-time, 1.6s) ease-in-out calc(var(--button-at, 0.9s) + 0.6s) infinite;
 }
 
-.btn-start:disabled {
-  animation: rise-up 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) var(--button-at, 0.9s) both;
+.btn-start {
+  min-height: 72px;
+  font-size: 28px;
 }
 
 @keyframes fade-up {
@@ -497,10 +507,6 @@ select {
 }
 
 /* 押している間は、拡大縮小より「押した見た目」を優先 */
-.btn-start:active:not(:disabled) {
-  animation: none;
-}
-
 /* 右上の小さいボタン（歯車） */
 .btn-corner {
   position: absolute;
@@ -2186,8 +2192,8 @@ select {
   .logo,
   .tagline,
   .best-card,
-  .btn-start,
-  .btn-start:disabled,
+  .btn-start-wrap,
+  .btn-start-wrap.ready,
   .btn-corner,
   .new-record,
   .winner,
@@ -3262,6 +3268,25 @@ select {
     left: auto;
     right: 12%;
   }
+}
+
+/* 読み込みの状況（開発用。load-status.js）。タップは下に通す */
+.load-status {
+  position: fixed;
+  left: 4px;
+  bottom: 4px;
+  z-index: 1000;
+  max-width: min(92vw, 420px);
+  max-height: 45vh;
+  overflow: hidden;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #b9ffb9;
+  background: rgba(0, 0, 0, 0.72);
+  font: 11px/1.45 ui-monospace, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  pointer-events: none;
 }
 
 /* =============================================

@@ -55,15 +55,17 @@ const TitleFx = (() => {
   function applyTiming() {
     const c = conf();
     const chars = Number(document.querySelector(".logo").style.getPropertyValue("--chars")) || 10;
-    const start = c.logoStart ?? 0.15;
-    const step = c.logoStep ?? 0.07;
+    // 書いていなければ def（?? は古い iPhone の Safari で読めないので使わない）
+    const num = (v, def) => (typeof v === "number" ? v : def);
+    const start = num(c.logoStart, 0.15);
+    const step = num(c.logoStep, 0.07);
     const logoDone = start + step * (chars - 1) + 0.5; // 最後の文字が弾み終わるころ
-    const tagline = logoDone + (c.taglineAfter ?? 0.15);
-    const button = tagline + (c.buttonAfter ?? 0.3);
+    const tagline = logoDone + num(c.taglineAfter, 0.15);
+    const button = tagline + num(c.buttonAfter, 0.3);
     const vars = {
       "--logo-start": start, "--logo-step": step, "--logo-done": logoDone,
       "--tagline-at": tagline, "--button-at": button, "--menu-at": button + 0.15,
-      "--float-time": c.floatTime ?? 3.2, "--pulse-time": c.pulseTime ?? 1.6,
+      "--float-time": num(c.floatTime, 3.2), "--pulse-time": num(c.pulseTime, 1.6),
     };
     for (const [k, v] of Object.entries(vars)) $("screen-title").style.setProperty(k, `${Math.round(v * 1000) / 1000}s`);
   }

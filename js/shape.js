@@ -34,11 +34,28 @@ const Shape = (() => {
   };
 
   // ---------- 1. 画像を読み込む ----------
+  // 通信がつまって onload も onerror も来ないときは、IMAGE_TIMEOUT ミリ秒で失敗にする
+  // （1枚のせいで「読み込み中…」のまま、スタートが押せなくならないように。失敗したキャラは飛ばす）
+  const IMAGE_TIMEOUT = 10000;
   function loadImage(src) {
+    const done = LoadStatus.begin(`画像 ${src}`);
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("画像を読み込めませんでした: " + src));
+      const timer = setTimeout(() => {
+        img.onload = img.onerror = null;
+        done(false, "時間切れ");
+        reject(new Error("画像の読み込みが時間切れになりました: " + src));
+      }, IMAGE_TIMEOUT);
+      img.onload = () => {
+        clearTimeout(timer);
+        done(true);
+        resolve(img);
+      };
+      img.onerror = () => {
+        clearTimeout(timer);
+        done(false);
+        reject(new Error("画像を読み込めませんでした: " + src));
+      };
       img.src = src;
     });
   }

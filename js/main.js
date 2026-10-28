@@ -1242,6 +1242,7 @@ ${location.origin}${location.pathname}`), "image/png");
   $("loading").classList.add("done");
 
   if (!shapes.length) {
+    LoadStatus.note("スタート：キャラが1体も読み込めなかったので、押せない");
     $("btn-start").textContent = "キャラ画像を読み込めませんでした";
     return;
   }
@@ -1258,4 +1259,6 @@ ${location.origin}${location.pathname}`), "image/png");
   if (UI.current === "title") Game.startDemo(CONFIG.titleDemo);
   $("btn-start").textContent = "スタート";
   $("btn-start").disabled = false;
+  $("btn-start").parentElement.classList.add("ready"); // 脈打つ動きを始める（style.css の .btn-start-wrap.ready）
+  LoadStatus.note(`スタート：押せる（キャラ ${shapes.length} / ${total}）`);
 })();

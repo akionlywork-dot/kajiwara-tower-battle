@@ -7,14 +7,14 @@
 //   （番号が変わると、新しいファイルを保存しなおし、古いものは消す）
 // =============================================
 
-const VERSION = "1.14.0";
+const VERSION = "1.14.1";
 const CACHE = `kajiwara-tb-${VERSION}`;
 
 // バージョン番号（?v=）を付けて読み込んでいるファイル（index.html と同じもの）
 const VERSIONED = [
   "css/style.css",
   "lib/decomp.min.js", "lib/matter.min.js", "lib/peerjs.min.js", "lib/mqtt.min.js",
-  "config.js", "characters.js", "js/chars.js",
+  "config.js", "characters.js", "js/load-status.js", "js/chars.js",
   "js/settings.js", "js/save.js", "js/audio.js", "js/shape.js", "js/aura.js", "js/platform-art.js", "js/game.js", "js/rules.js",
   "js/cpu.js", "js/challenge.js", "js/card.js", "js/stamps.js", "js/halloween-home.js", "js/halloween.js", "js/title-fx.js", "js/online.js", "js/ui.js", "js/themes.js", "js/frames.js", "js/vs-intro.js", "js/profile.js", "js/data-file.js",
   "js/news.js", "js/events.js", "js/ranking.js", "js/records.js", "js/dex.js", "js/achievements.js",
