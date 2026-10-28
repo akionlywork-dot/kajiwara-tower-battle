@@ -28,6 +28,28 @@ const Records = (() => {
     Save.write();
   }
 
+  // 自分の番に、レアのキャラが出た（実績「まぼろしとの遭遇」など。積めなくても数える）
+  function addDrawn(shape) {
+    if (!shape) return;
+    const s = stats();
+    const rarity = shape.rarity || "N";
+    s.drawn = s.drawn || {};
+    s.drawn[rarity] = (s.drawn[rarity] || 0) + 1;
+    Save.write();
+  }
+
+  // オンライン対戦のリザルトで、スタンプを送った
+  function addStampSent() {
+    stats().stampsSent = (stats().stampsSent || 0) + 1;
+    Save.write();
+  }
+
+  // 挑戦状で、相手のスコアを上回った
+  function addChallengeWin() {
+    stats().challengeWins = (stats().challengeWins || 0) + 1;
+    Save.write();
+  }
+
   // 1人モードが終わった。ハイスコアを更新したら true を返す
   function addSoloResult(score, count, height) {
     const s = stats();
@@ -187,5 +209,5 @@ const Records = (() => {
     return rows ? `<h3 class="section-title">イベント</h3><div class="stat-grid">${rows}</div>` : "";
   }
 
-  return { init, addPiece, addEventResult, eventWins, addSoloResult, addRuleResult, addCpuResult, addOnlineResult, addOpponentResult, opponentRecord, addVersusResult };
+  return { init, addPiece, addDrawn, addStampSent, addChallengeWin, addEventResult, eventWins, addSoloResult, addRuleResult, addCpuResult, addOnlineResult, addOpponentResult, opponentRecord, addVersusResult };
 })();

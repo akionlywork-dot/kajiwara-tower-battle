@@ -7,7 +7,7 @@
 //   （番号が変わると、新しいファイルを保存しなおし、古いものは消す）
 // =============================================
 
-const VERSION = "1.14.2";
+const VERSION = "2.0.0";
 const CACHE = `kajiwara-tb-${VERSION}`;
 
 // バージョン番号（?v=）を付けて読み込んでいるファイル（index.html と同じもの）
@@ -18,7 +18,7 @@ const VERSIONED = [
   "js/settings.js", "js/save.js", "js/audio.js", "js/shape.js", "js/aura.js", "js/platform-art.js", "js/game.js", "js/rules.js",
   "js/cpu.js", "js/challenge.js", "js/card.js", "js/stamps.js", "js/halloween-home.js", "js/halloween.js", "js/title-fx.js", "js/online.js", "js/ui.js", "js/themes.js", "js/frames.js", "js/vs-intro.js", "js/profile.js", "js/data-file.js",
   "js/news.js", "js/events.js", "js/ranking.js", "js/records.js", "js/dex.js", "js/achievements.js",
-  "js/backup.js", "js/admin.js", "js/pwa.js", "js/main.js",
+  "js/backup.js", "js/admin.js", "js/sandbox.js", "js/pwa.js", "js/main.js",
 ].map((p) => `${p}?v=${VERSION}`);
 
 // そのほかに保存しておくファイル
@@ -26,7 +26,7 @@ const OTHERS = [
   "./", "index.html", "manifest.webmanifest", "favicon.svg", "apple-touch-icon.png",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png",
   ...Array.from({ length: 12 }, (_, i) => `images/chara${String(i + 1).padStart(2, "0")}.webp`),
-  "images/maboroshi01.webp",
+  "images/chara13.webp", "images/chara14.webp", "images/chara15.webp",
 ];
 
 // インストールされたとき：ファイルをまとめて保存する

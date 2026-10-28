@@ -117,18 +117,22 @@ const Ranking = (() => {
       json = await DataFile.load("data/ranking.json");
     }
     if (UI.current !== "ranking") return; // 読み込み中に画面を閉じた
-    if (!json || !Array.isArray(json.ranking)) {
+    const divisions = json ? divisionsOf(json, !isOnline()) : null;
+    if (!divisions) {
       box.innerHTML = `<p class="empty-message">ランキングを取得できません。<br>通信できる場所で、もう一度開いてください。</p>`;
       return;
     }
-    // 順位の順に並べる（ファイルの書き順がバラバラでも大丈夫なように）
-    const list = json.ranking.slice().sort((a, b) => a.rank - b.rank);
-    shown = list;
+    // 部門ごとに並べる（部門が1つで名前が無ければ、見出しは出さない）。タップで出すプロフィールのため、全部の行を shown に入れる
+    shown = [].concat(...divisions.map((d) => d.rows));
+    let index = 0;
+    const html = divisions
+      .map((d) => (d.name ? `<h3 class="section-title ranking-division">${UI.escape(d.name)}</h3>` : "") + d.rows.map((r) => rowHTML(r, index++)).join(""))
+      .join("");
     const updated = json.updated ? `<p class="ranking-updated">${UI.escape(json.updated)} 更新</p>` : "";
     box.innerHTML =
       updated +
-      (list.length
-        ? list.map((r, i) => rowHTML(r, i)).join("")
+      (shown.length
+        ? html
         : isOnline()
         ? `<div class="coming-soon"><span>🏆</span><b>まだ記録がありません</b><p>スコアアタックで遊ぶと、ハイスコアがここに載ります。</p></div>`
         : `<div class="coming-soon"><span>🏆</span><b>ランキングは準備中です</b><p>お楽しみに！<br>まずはハイスコアを目指して遊んでみてください。</p></div>`);
@@ -136,12 +140,46 @@ const Ranking = (() => {
     renderMine(json.me || null);
   }
 
+  // 届いたランキングを、部門ごとの並び [{ name, rows }] にする。おかしければ null
+  //   ・ふつうは json.ranking が1つの部門。手で書く ranking.json に divisions: [{ name, ranking }] があれば、部門ごと
+  //   ・順位（rank）は、書いてあればそのまま使い、書いていなければ並び順から決める（手で入れなくてよい）
+  //   ・manual（手で書く ranking.json）のときだけ、"title": "developer" の人に開発者の印（dev）を付ける。
+  //     オンラインのランキング（ゲームから送られてくる称号）には付けない（だれかが「開発者」を名乗れないように）
+  function divisionsOf(json, manual) {
+    const raw = Array.isArray(json.divisions) && json.divisions.length
+      ? json.divisions.filter((d) => d && Array.isArray(d.ranking)).map((d) => ({ name: String(d.name || ""), rows: d.ranking }))
+      : Array.isArray(json.ranking) ? [{ name: "", rows: json.ranking }] : null;
+    if (!raw || !raw.length) return null;
+    return raw.map((d) => {
+      const rows = d.rows.filter((r) => r && typeof r === "object").map((r) => Object.assign({}, r));
+      const hasRank = rows.length && rows.every((r) => Number.isInteger(Number(r.rank)) && Number(r.rank) > 0);
+      if (hasRank) rows.sort((a, b) => a.rank - b.rank);
+      else rows.forEach((r, i) => (r.rank = i + 1)); // 並び順で順位を付ける
+      for (const r of rows) {
+        r.dev = manual && r.title === "developer";
+        if (r.dev) r.title = ""; // 開発者は、称号の札の代わりに専用の印を出す
+      }
+      return { name: d.name, rows };
+    });
+  }
+
+  // 1〜3位の王冠（金・銀・銅）。順位が同じなら、同じ王冠
+  const CROWN_COLORS = { 1: ["#ffe27a", "#d4a019"], 2: ["#f4f7fb", "#9aa3ad"], 3: ["#f2c79c", "#a8662f"] };
+  function crownHTML(rank) {
+    const c = CROWN_COLORS[rank];
+    if (!c) return "";
+    return `<span class="rank-crown" aria-label="${rank}位の王冠"><svg viewBox="0 0 24 16"><defs><linearGradient id="cg${rank}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c[0]}"/><stop offset="1" stop-color="${c[1]}"/></linearGradient></defs><path d="M2 14 1 3l6 5 5-7 5 7 6-5-1 11z" fill="url(#cg${rank})" stroke="rgba(0,0,0,.35)" stroke-width="1"/><circle cx="12" cy="1.8" r="1.3" fill="${c[0]}"/></svg></span>`;
+  }
+
+  // 開発者の印（手で書く ranking.json の "title": "developer" の人だけ。コード風の専用の札）
+  const DEV_BADGE = Frames.titleHTML("開発者", Frames.developer());
+
   // アイコン（写真か、名前の1文字目）に称号の枠を付けた HTML。cls：大きさのクラス
   function avatarHTML(r, cls) {
     const name = String(r.name || "");
     const icon = ICON_PATTERN.test(String(r.icon || "")) ? r.icon : null;
     // 称号の枠：サーバーには称号の文字しか無いので、その文字から実績を探して決める（見つからなければ枠なし）
-    const fc = Frames.avatarClass(Frames.ofTitleText(String(r.title || "")));
+    const fc = Frames.avatarClass(r.dev ? Frames.developer() : Frames.ofTitleText(String(r.title || "")));
     return icon
       ? `<span class="avatar ${cls} ${fc}" style="background-image:url(${icon})"></span>`
       : `<span class="avatar avatar-empty ${cls} ${fc}">${UI.escape([...name][0] || "?")}</span>`;
@@ -153,7 +191,7 @@ const Ranking = (() => {
     const height = Number(r.height);
     const name = String(r.name || "");
     const frame = Frames.ofTitleText(String(r.title || ""));
-    const avatar = avatarHTML(r, "rank-avatar");
+    const avatar = `<span class="rank-avatar-wrap">${crownHTML(Number(r.rank))}${avatarHTML(r, "rank-avatar")}</span>`;
     // 積んだ数・高さ・日付（手で書く ranking.json で書いていない項目は出さない）
     const sub = [];
     if (r.count !== undefined && r.count !== "" && isFinite(Number(r.count))) sub.push(`${Number(r.count)}体`);
@@ -164,8 +202,8 @@ const Ranking = (() => {
         <span class="rank-num">${Number(r.rank)}</span>
         ${avatar}
         <span class="rank-main">
-          <b>${UI.escape(name)}${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
-          ${r.title ? Frames.titleHTML(String(r.title), frame) : `<span class="title-badge title-empty">称号なし</span>`}
+          <b class="rank-name"><span class="rank-name-text">${UI.escape(name)}</span>${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
+          ${r.dev ? `<span class="rank-dev">${DEV_BADGE}</span>` : r.title ? Frames.titleHTML(String(r.title), frame) : `<span class="title-badge title-empty">称号なし</span>`}
           <small>${sub.join("・")}</small>
         </span>
         <span class="rank-score">${Number(r.score)}<small>点</small></span>
@@ -196,8 +234,8 @@ const Ranking = (() => {
       `<div class="rp-head">
         ${avatarHTML(r, "rp-avatar")}
         <span class="rp-who">
-          <b>${UI.escape(name)}${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
-          ${title ? Frames.titleHTML(title, frame) : `<span class="title-badge title-empty">称号なし</span>`}
+          <b>${UI.escape(name)}${r.dev ? DEV_BADGE : ""}${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
+          ${r.dev ? "" : title ? Frames.titleHTML(title, frame) : `<span class="title-badge title-empty">称号なし</span>`}
         </span>
       </div>` +
       (items.length ? `<div class="rp-stats">${items.map(([label, value, cls]) => `<div class="rp-stat ${cls || ""}"><span>${label}</span><b>${value}</b></div>`).join("")}</div>` : "") +
@@ -258,7 +296,7 @@ const Ranking = (() => {
   // 前からハイスコアがある人には、遊ばなくても「送っていいか」を聞いて、自己ベストを載せる。
   // 参加ずみの人は、前に送れなかった記録や、変えた名前・称号・アイコンを送りなおす
   async function atStartup() {
-    if (!isOnline()) return;
+    if (!isOnline() || Admin.unlocked) return; // 管理者モードの記録は、公開のランキングに送らない
     if ((!mem().asked && Save.data.stats.best) || needIconQuestion()) {
       await waitTitle();
       return afterSoloGame();
@@ -276,7 +314,7 @@ const Ranking = (() => {
   // スコアアタック（ふつうのルール）が終わったときに main.js から呼ばれる。
   // 初めてなら「送ってもいいか」を聞く（写真アイコンがある人には、写真を載せるかも聞く）
   async function afterSoloGame() {
-    if (!isOnline()) return;
+    if (!isOnline() || Admin.unlocked) return;
     if (!mem().asked && Save.data.stats.best) {
       mem().asked = true;
       Save.write();
@@ -348,7 +386,7 @@ const Ranking = (() => {
   // 自己ベストが前に送ったものより高いか、名前・称号・写真アイコンが変わったときだけ送る
   async function submitBest() {
     const best = Save.data.stats.best;
-    if (!isOnline() || !Settings.get("ranking") || !best) return;
+    if (!isOnline() || !Settings.get("ranking") || !best || Admin.unlocked) return;
     const p = Save.data.profile;
     const name = Save.playerName(1);
     const title = Profile.titleText(p.titleId);

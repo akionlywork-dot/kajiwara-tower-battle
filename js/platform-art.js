@@ -12,6 +12,8 @@
 //     gold    … 金の板に彫り模様（ゲーム中は、ときどき光が横に走る）。柱は金の円柱
 //     crystal … 宝石のような面と光。柱は水晶の柱
 //     pumpkin … かぼちゃのすじ・顔の模様・つるとはっぱ。柱はつるが巻いた木の柱
+//     steel   … 鉄の板にリベット、ふちに黄色と黒の注意のしま。柱は赤い鉄骨（ななめの筋交い）
+//     cardboard … ダンボールの箱（波の断面・ガムテープ・「天地無用」の印）。柱もダンボールを積んだもの
 //   style を書いていない土台は、色だけの四角（前の描き方）になる。
 //   使う色は、その土台の body（正面）・top（上の面）・pillar（柱）
 // =============================================
@@ -84,6 +86,127 @@ const PlatformArt = (() => {
 
   // ---------- style ごとの描き方 ----------
   const STYLES = {
+    // 鉄骨の台：鉄の板にリベット、上のふちに黄色と黒の注意のしま。柱は赤い鉄骨
+    steel: {
+      platform(ctx, w, h, d) {
+        const g = ctx.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0, shade(d.body, 0.12));
+        g.addColorStop(1, shade(d.body, -0.2));
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, w, h);
+        // 板のつなぎ目と、リベット
+        ctx.strokeStyle = shade(d.body, -0.4);
+        ctx.lineWidth = 1.2;
+        for (let x = 56; x < w; x += 56) line(ctx, x, 8, x, h);
+        for (let x = 6; x < w; x += 14) {
+          ctx.fillStyle = shade(d.body, -0.35);
+          dot(ctx, x, 14, 1.8);
+          dot(ctx, x, h - 9, 1.8);
+          ctx.fillStyle = "rgba(255,255,255,0.35)";
+          dot(ctx, x - 0.5, 13.4, 0.8);
+          dot(ctx, x - 0.5, h - 9.6, 0.8);
+        }
+        bottomShade(ctx, w, h);
+        // 上の面：注意のしま（黄色と黒のななめ）
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, w, 7);
+        ctx.clip();
+        ctx.fillStyle = "#f2c230";
+        ctx.fillRect(0, 0, w, 7);
+        ctx.fillStyle = "#1d1f22";
+        for (let x = -10; x < w + 10; x += 14) {
+          ctx.beginPath();
+          ctx.moveTo(x, 7);
+          ctx.lineTo(x + 7, 0);
+          ctx.lineTo(x + 13, 0);
+          ctx.lineTo(x + 6, 7);
+          ctx.fill();
+        }
+        ctx.restore();
+        ctx.fillStyle = d.top;
+        ctx.fillRect(0, 7, w, 1.5);
+      },
+      // 赤い鉄骨の柱：両側の柱と、ななめの筋交い
+      pillar(ctx, w, h, d) {
+        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = d.pillar;
+        ctx.fillRect(0, 0, 9, h);
+        ctx.fillRect(w - 9, 0, 9, h);
+        ctx.strokeStyle = d.pillar;
+        ctx.lineWidth = 5;
+        for (let y = 0; y < h; y += 40) {
+          line(ctx, 6, y, w - 6, y + 40);
+          line(ctx, w - 6, y, 6, y + 40);
+          ctx.fillRect(0, y, w, 4);
+        }
+        ctx.fillStyle = shade(d.pillar, 0.3);
+        ctx.fillRect(1.5, 0, 2, h);
+        ctx.fillRect(w - 7.5, 0, 2, h);
+        pillarShade(ctx, w, h);
+      },
+    },
+
+    // ダンボールの台：箱の正面に、ガムテープと「天地無用」の印。上の面は、ダンボールの波の断面
+    cardboard: {
+      platform(ctx, w, h, d) {
+        ctx.fillStyle = d.body;
+        ctx.fillRect(0, 0, w, h);
+        // 紙のすじ（うすい横線）
+        ctx.strokeStyle = shade(d.body, -0.08);
+        ctx.lineWidth = 1;
+        for (let y = 12; y < h; y += 5) line(ctx, 0, y, w, y);
+        // ガムテープ（真ん中を縦に）
+        ctx.fillStyle = "rgba(214, 170, 105, 0.95)";
+        ctx.fillRect(w / 2 - 14, 6, 28, h - 6);
+        ctx.fillStyle = "rgba(255,255,255,0.18)";
+        ctx.fillRect(w / 2 - 14, 6, 28, 3);
+        // 「天地無用」の矢印の印（左）と、こわれもののグラスの印（右）
+        ctx.strokeStyle = shade(d.body, -0.55);
+        ctx.fillStyle = shade(d.body, -0.55);
+        ctx.lineWidth = 1.6;
+        for (const ax of [w * 0.18, w * 0.18 + 10]) {
+          line(ctx, ax, h - 6, ax, 15);
+          ctx.beginPath();
+          ctx.moveTo(ax - 4, 19);
+          ctx.lineTo(ax, 13);
+          ctx.lineTo(ax + 4, 19);
+          ctx.fill();
+        }
+        const gx = w * 0.8;
+        ctx.beginPath();
+        ctx.moveTo(gx - 6, 13);
+        ctx.lineTo(gx + 6, 13);
+        ctx.quadraticCurveTo(gx + 6, 22, gx, 23);
+        ctx.quadraticCurveTo(gx - 6, 22, gx - 6, 13);
+        ctx.stroke();
+        line(ctx, gx, 23, gx, h - 7);
+        line(ctx, gx - 5, h - 7, gx + 5, h - 7);
+        bottomShade(ctx, w, h);
+        // 上の面：波の断面（ダンボールの切り口）
+        ctx.fillStyle = d.top;
+        ctx.fillRect(0, 0, w, 6);
+        ctx.strokeStyle = shade(d.top, -0.3);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = 0; x <= w; x += 2) ctx.lineTo(x, 3 + Math.sin(x * 0.8) * 2);
+        ctx.stroke();
+      },
+      // ダンボールの箱を積んだ柱
+      pillar(ctx, w, h, d) {
+        for (let y = 0, i = 0; y < h; y += 34, i++) {
+          ctx.fillStyle = shade(d.pillar, (i % 2) * 0.06);
+          ctx.fillRect(0, y, w, 33);
+          ctx.fillStyle = "rgba(214, 170, 105, 0.9)"; // ガムテープ
+          ctx.fillRect(0, y + 13, w, 7);
+          ctx.fillStyle = shade(d.pillar, -0.3);
+          ctx.fillRect(0, y + 33, w, 1);
+        }
+        pillarShade(ctx, w, h);
+      },
+    },
+
     // 色だけの四角（style を書いていない土台）
     plain: {
       platform(ctx, w, h, d) {

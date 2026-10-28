@@ -16,10 +16,22 @@ const Themes = (() => {
   const list = (kind) => (window.GAME_CONFIG.themes || {})[kind] || [];
   const chosen = () => Save.data.cosmetics;
 
+  // その背景・土台をごほうびにしている実績（unlock: "achievement" のとき。achievements.json の reward）
+  function rewardOf(def) {
+    if (typeof Achievements === "undefined") return null;
+    const kind = list("platforms").includes(def) ? "platforms" : "backgrounds";
+    return Achievements.rewardOf(kind, def.id);
+  }
+
   // 解放ずみか（条件なし、条件の実績を達成ずみ、またはイベントの勝利数が届いた）
   function isUnlocked(def) {
     const u = def.unlock;
     if (!u) return true;
+    if (u === "achievement") {
+      // achievements.json の reward で決める（実績を読み込めていなければ、解放しない）
+      const a = rewardOf(def);
+      return !!a && !!Save.data.achievements[a.id];
+    }
     if (typeof u === "object") return Records.eventWins(u.event) >= (u.wins || 1);
     return !!Save.data.achievements[u];
   }
@@ -47,7 +59,8 @@ const Themes = (() => {
   // 解放条件の説明（例：「実績『10体積み』を達成」）
   function conditionText(def) {
     if (def.unlock && typeof def.unlock === "object") return `${LimitedEvents.nameOf(def.unlock.event)}で${def.unlock.wins || 1}勝`;
-    const a = typeof Achievements !== "undefined" ? Achievements.find(def.unlock) : null;
+    const a = def.unlock === "achievement" ? rewardOf(def) : typeof Achievements !== "undefined" ? Achievements.find(def.unlock) : null;
+    if (a && a.hidden && !Save.data.achievements[a.id]) return "隠し実績を達成"; // 隠し実績は、名前も出さない
     return a ? `実績「${a.name}」を達成` : "ある実績を達成";
   }
 
@@ -56,7 +69,8 @@ const Themes = (() => {
     const ids = newAchievements.map((a) => a.id);
     for (const kind of Object.keys(KINDS)) {
       for (const def of list(kind)) {
-        if (def.unlock && ids.includes(def.unlock)) {
+        const by = def.unlock === "achievement" ? rewardOf(def) : null;
+        if ((def.unlock && ids.includes(def.unlock)) || (by && ids.includes(by.id))) {
           UI.toast(`🎨 新しい${KINDS[kind].label}「<b>${UI.escape(def.name)}</b>」が解放されました`);
         }
       }

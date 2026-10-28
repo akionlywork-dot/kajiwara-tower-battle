@@ -61,6 +61,9 @@ const Card = (() => {
 
     const useIcon = info.icon && Settings.get("cardIcon");
     const avatar = useIcon ? await loadImage(info.icon) : null;
+    // 称号の飾り（カボチャなど。星なら null）
+    const decoSrc = info.frame ? Frames.decorationImage(info.frame.decoration) : null;
+    decoImg = decoSrc ? await loadImage(decoSrc) : null;
     canvas = draw(SIZES[sizeId], sizeId, avatar);
     canvas.toBlob((blob) => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -246,15 +249,25 @@ const Card = (() => {
   // ---------- 称号の枠（frames.js の rank。画面の CSS と同じ形・同じ色を、キャンバスに描く） ----------
   // 形はどの格も同じ（輪＋てっぺんの小さな星）。色は style.css の「格ごとの色」と同じ
   //   color：輪・星の色、dark：輪の外側のふち・札のふち、light：札の上側の明るい色、text：札の文字の色
-  //   rainbow：虹色（輪・星・札）、badge：札の塗り（ふだんは light → color）
+  //   rainbow：虹色（輪・星・札）、badge：札の塗り（ふだんは light → color。badgeAcross なら左から右へ）
+  //   ring：輪の塗り（札と同じ色にするとき。上から下へ。無ければ color）
   const FRAME_COLORS = {
     bronze: { color: "#cd8a4f", dark: "#6e4019", light: "#f2c79c", text: "#3d2208" },
     silver: { color: "#c9d1da", dark: "#6f7984", light: "#ffffff", text: "#2b3a55" },
     gold: { color: "#ffd84d", dark: "#a87700", light: "#fff3b0", text: "#4a3500", glow: "rgba(255, 216, 77, 0.9)" },
     legend: { color: "#b65cf0", dark: "#4a2470", light: "#ffffff", text: "#ffffff", rainbow: true },
-    event: { color: "#ff8a1f", dark: "#3b1458", light: "#ffc27a", text: "#ffb15c", badge: ["#5a2380", "#3b1458"] },
+    event: { color: "#ff8a1f", dark: "#3b1458", light: "#ffc27a", text: "#ffb15c", badge: ["#5a2380", "#3b1458"], ring: ["#5a2380", "#3b1458"] },
+    mythic: { color: "#fff6d6", dark: "#fff6d6", light: "#ffffff", text: "#ffffff", glow: "rgba(255, 246, 214, 0.95)", badge: ["#2a1660", "#4b2a9a", "#1d4f8a"], badgeAcross: true, ring: ["#4b2a9a", "#2a1660", "#1d4f8a"] },
+    secret: { color: "#8f5bff", dark: "#1a0b2e", light: "#c9a8ff", text: "#f3e6ff", badge: ["#3a1a66", "#1a0b2e"], ring: ["#3a1a66", "#1a0b2e"] },
   };
   const RAINBOW = ["#ff5d73", "#ffc21a", "#4cd964", "#3d8bff", "#b65cf0", "#ff5d73"];
+  let decoImg = null; // 称号の飾りの画像（カボチャなど。星なら null。render で読み込む）
+
+  // グラデーションに、色を等間隔に並べる
+  function stops(g, colors) {
+    colors.forEach((c, i) => g.addColorStop(colors.length > 1 ? i / (colors.length - 1) : 0, c));
+    return g;
+  }
 
   // 虹色（輪・星は丸く回る虹、対応していないブラウザでは、ななめの虹色）
   function rainbow(ctx, cx, cy, r) {
@@ -265,6 +278,7 @@ const Card = (() => {
 
   // アイコンのまわりの枠（枠なしなら、前と同じ白い輪）。太さ・星の大きさは、画面の CSS と同じ割合
   function drawFrameRing(ctx, cx, cy, r, frame) {
+    if (frame && frame.rank === "dev") return drawDevRing(ctx, cx, cy, r);
     const f = frame && FRAME_COLORS[frame.rank];
     if (!f) {
       ring(ctx, cx, cy, r, "#fff", 4);
@@ -281,15 +295,16 @@ const Card = (() => {
     }
     ring(ctx, cx, cy, r + w / 2 + edge / 2, f.dark, w + edge * 2);
     ctx.restore();
-    ring(ctx, cx, cy, r + w / 2, f.rainbow ? rainbow(ctx, cx, cy, r) : f.color, w);
-    // てっぺんに並ぶ星（格の数だけ。画面の CSS と同じ大きさ・並び）
+    ring(ctx, cx, cy, r + w / 2, f.rainbow ? rainbow(ctx, cx, cy, r) : f.ring ? stops(ctx.createLinearGradient(0, cy - r, 0, cy + r), f.ring) : f.color, w);
+    // ふちに並ぶ星（格の数だけ。画面の CSS と同じ大きさ・並び。frames.js の STAR_LAYOUT）
     const n = Frames.starCount(frame.rank);
-    const size = d * 0.3; // 星1つの幅
-    const sr = size / 2;
-    const sy = cy - r - w * 0.4;
+    const lay = Frames.starLayout(n);
+    const sr = (d * lay.s) / 2;
+    const starR = d * 0.52; // 星の真ん中を置く円の半径
+    const sy = cy - starR; // 虹色のぬりの基準（いちばん上）
     const fill = f.rainbow ? (() => {
       // 虹：星の列の左から右へ（画面の CSS と同じ）
-      const g = ctx.createLinearGradient(cx - sr * n, 0, cx + sr * n, 0);
+      const g = ctx.createLinearGradient(cx - starR, 0, cx + starR, 0);
       RAINBOW.slice(0, -1).forEach((c, i, a) => g.addColorStop(i / (a.length - 1), c));
       return g;
     })() : (() => {
@@ -298,11 +313,52 @@ const Card = (() => {
       g.addColorStop(1, f.color);
       return g;
     })();
-    for (let i = 0; i < n; i++) {
-      const sx = cx + (i - (n - 1) / 2) * size;
-      star(ctx, sx, sy, sr + edge, f.dark);
-      star(ctx, sx, sy, sr, fill);
+    for (const deg of lay.angles) {
+      const t = (deg * Math.PI) / 180;
+      const sx = cx + starR * Math.sin(t);
+      const syy = cy - starR * Math.cos(t);
+      if (decoImg) {
+        ctx.drawImage(decoImg, sx - sr, syy - sr, sr * 2, sr * 2); // 称号の飾り（カボチャなど）
+        continue;
+      }
+      star(ctx, sx, syy, sr + edge, f.dark);
+      star(ctx, sx, syy, sr, fill);
     }
+  }
+
+  // 開発者の枠：黒っぽい輪に、緑に光るふち。ふちの外側に </> と 0・1 を並べる（画面の .frame-dev と同じ）
+  function drawDevRing(ctx, cx, cy, r) {
+    const d = r * 2;
+    const w = Math.max(2, d * 0.07);
+    ctx.save();
+    ctx.shadowColor = "rgba(57, 255, 136, 0.8)";
+    ctx.shadowBlur = d * 0.12;
+    ring(ctx, cx, cy, r + w + 1, "#39ff88", 2);
+    ctx.restore();
+    ring(ctx, cx, cy, r + w / 2, "#0b1410", w);
+    // ふちに沿った文字
+    const text = "</> 1 0 1 1 0 </> 0 1 0 0 1 </> 1 1 0 1 0 </> 0 0 1 0 1";
+    const R = r + w + d * 0.1;
+    const size = Math.max(9, d * 0.11);
+    ctx.save();
+    ctx.font = `bold ${size}px Menlo, Consolas, monospace`;
+    ctx.fillStyle = "#39ff88";
+    ctx.shadowColor = "rgba(57, 255, 136, 0.7)";
+    ctx.shadowBlur = 4;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const step = (size * 0.66) / R; // 1文字ぶんの角度
+    let a = -Math.PI / 2 - (step * text.length) / 2;
+    for (const ch of text) {
+      if (a > Math.PI * 1.5 - step) break; // 1周を超えない
+      ctx.save();
+      ctx.translate(cx + R * Math.cos(a), cy + R * Math.sin(a));
+      ctx.rotate(a + Math.PI / 2);
+      ctx.fillText(ch, 0, 0);
+      ctx.restore();
+      a += step;
+    }
+    ctx.restore();
   }
 
   function ring(ctx, cx, cy, r, style, width) {
@@ -329,6 +385,7 @@ const Card = (() => {
   // 称号の札（枠と同じ色。星は枠の方に付く）
   function titlePill(ctx, text, x, y, fontSize, frame) {
     const f = frame && FRAME_COLORS[frame.rank];
+    if (frame && frame.rank === "dev") return devPill(ctx, text, x, y, fontSize);
     if (!f) return pill(ctx, text, x, y, fontSize, COLOR.gold, "#2b3a55"); // 枠なしなら、前と同じ金色
     const label = text;
     ctx.font = `bold ${fontSize}px ${FONT}`;
@@ -339,16 +396,36 @@ const Card = (() => {
       bg = ctx.createLinearGradient(x, y, x + pw, y);
       RAINBOW.forEach((c, i) => bg.addColorStop(i / (RAINBOW.length - 1), c));
     } else {
-      bg = ctx.createLinearGradient(0, y, 0, y + h);
-      const [top, bottom] = f.badge || [f.light, f.color];
-      bg.addColorStop(0, top);
-      bg.addColorStop(1, bottom);
+      bg = stops(f.badgeAcross ? ctx.createLinearGradient(x, y, x + pw, y) : ctx.createLinearGradient(0, y, 0, y + h), f.badge || [f.light, f.color]);
     }
     pill(ctx, label, x, y, fontSize, bg, f.text);
     ctx.strokeStyle = f.dark;
     ctx.lineWidth = 2;
     roundRect(ctx, x + 1, y + 1, pw - 2, h - 2, (h - 2) / 2);
     ctx.stroke();
+  }
+
+  // 開発者の札（コード風：黒地に緑の文字と </>）
+  function devPill(ctx, text, x, y, fontSize) {
+    const label = `</> ${text}_`;
+    ctx.font = `bold ${fontSize}px Menlo, Consolas, monospace`;
+    const h = fontSize + 16;
+    const pw = ctx.measureText(label).width + 32;
+    ctx.save();
+    ctx.shadowColor = "rgba(57, 255, 136, 0.7)";
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = "#07110c";
+    roundRect(ctx, x, y, pw, h, 8);
+    ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = "#39ff88";
+    ctx.lineWidth = 2;
+    roundRect(ctx, x + 1, y + 1, pw - 2, h - 2, 8);
+    ctx.stroke();
+    ctx.fillStyle = "#39ff88";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, x + 16, y + h / 2 + 1);
   }
 
   // 丸い札（称号・モード）

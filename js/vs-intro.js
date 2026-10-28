@@ -166,14 +166,16 @@ const VsIntro = (() => {
     const counts = Achievements.counts();
     const online = s.online || { plays: 0, wins: 0 };
     const lastRank = Save.data.ranking.lastRank;
+    // 管理者モードの端末は、データを書きかえられるので、ハイスコア・順位・実績の数・対戦成績を送らない
+    const admin = Admin.unlocked;
     return {
       title: Profile.titleText(p.titleId),
       rank: frame ? frame.rank : null,
       ev: frame ? frame.event : null,
-      best: s.best ? s.best.score : null,
-      rankNo: Ranking.joined() && lastRank ? lastRank : null,
-      ach: counts ? [counts.got, counts.total] : null,
-      online: [online.wins, online.plays - online.wins],
+      best: !admin && s.best ? s.best.score : null,
+      rankNo: !admin && Ranking.joined() && lastRank ? lastRank : null,
+      ach: !admin && counts ? [counts.got, counts.total] : null,
+      online: admin ? null : [online.wins, online.plays - online.wins],
       id: await Ranking.opponentKey(),
       icon: Settings.get("onlineIcon") && p.icon ? await Profile.smallIcon(p.icon) : "",
       card: cardBgId(),
@@ -217,7 +219,8 @@ const VsIntro = (() => {
     if (!p || typeof p !== "object") return out;
     const int = (v, max) => (Number.isInteger(v) && v >= 0 && v <= max ? v : null);
     out.title = typeof p.title === "string" ? p.title.slice(0, 20) : "";
-    out.frame = out.title ? Frames.clean(p.rank, p.ev) : null;
+    // 枠：称号の文字から実績を探して決める（飾りも分かる）。見つからなければ、届いた rank で
+    out.frame = out.title ? Frames.ofTitleText(out.title) || Frames.clean(p.rank, p.ev) : null;
     out.best = int(p.best, 9999999);
     out.rankNo = int(p.rankNo, 9999999) || null;
     if (Array.isArray(p.ach) && int(p.ach[0], 9999) !== null && int(p.ach[1], 9999) !== null && p.ach[0] <= p.ach[1]) out.ach = [p.ach[0], p.ach[1]];

@@ -126,11 +126,14 @@ const Profile = (() => {
   let pickId = null;
   // 格の見出し（上から、むずかしい順）
   const RANK_GROUPS = [
+    ["dev", "開発者"],
+    ["mythic", "まぼろし"],
     ["legend", "レジェンド"],
     ["gold", "ゴールド"],
     ["silver", "シルバー"],
     ["bronze", "ブロンズ"],
     ["event", "期間限定"],
+    ["secret", "隠し"],
   ];
 
   function openTitles() {
@@ -159,7 +162,7 @@ const Profile = (() => {
     // 一覧：いちばん上に「称号なし」、その下に格ごと
     const all = typeof Achievements !== "undefined" ? Achievements.titleList() : [];
     if (typeof Admin !== "undefined" && Admin.unlocked) {
-      all.unshift({ id: "developer", title: "開発者", rank: "legend", got: true, description: "管理者モードの端末だけの称号" });
+      all.unshift({ id: "developer", title: "開発者", rank: "dev", got: true, description: "管理者モードの端末だけの称号" });
     }
     let html = rowHTML({ id: "", none: true });
     for (const [rank, label] of RANK_GROUPS) {
@@ -182,9 +185,9 @@ const Profile = (() => {
       // 隠し実績は、取り方も「？？？」。期間が終わったものは、もう取れないことを書く
       const how = a.hidden ? "？？？" : UI.escape(a.description);
       const note = a.closed ? `<span class="limited-tag">期間限定（終了）</span>` : a.event ? `<span class="limited-tag">期間限定</span>` : "";
-      return `<div class="title-row locked">${myAvatarHTML(`frame frame-locked ${Frames.starsClass(a.rank)}`)}<span class="title-row-main"><span class="title-badge ranked rank-locked">？？？</span><small>${how} ${note}</small></span></div>`;
+      return `<div class="title-row locked">${myAvatarHTML(`frame frame-locked ${Frames.starsClass(a.rank)} ${Frames.decoClass(a.decoration)}`)}<span class="title-row-main"><span class="title-badge ranked rank-locked">？？？</span><small>${how} ${note}</small></span></div>`;
     }
-    const frame = Frames.clean(a.rank, a.event);
+    const frame = a.id === "developer" ? Frames.developer() : Frames.ofAchievement(a);
     return `<button class="title-row ${selected ? "selected" : ""}" data-title="${UI.escape(a.id)}">${myAvatarHTML(Frames.avatarClass(frame))}<span class="title-row-main">${Frames.titleHTML(a.title, frame)}</span>${mark}</button>`;
   }
 

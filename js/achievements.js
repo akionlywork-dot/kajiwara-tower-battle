@@ -21,11 +21,27 @@
 //   quickStreak  … ひとりモードの1回のゲームで、1手 seconds 秒以内で value 体続けて積んだ
 //   edgeLanding  … 土台の端から ratio（土台の幅に対する割合）以内の所に着地させて、積めた
 //   eventWins    … イベント event のステージで value 回勝った   例 { "type": "eventWins", "event": "halloween2026", "value": 3 }
+//   flipPlaced   … 1回のゲームで、反転したキャラを value 体積んだ
+//   noRotateFlip … ひとりモードの1回のゲームで、回転も反転も使わずに value 体積んだ
+//   afterBig     … ビッグ（variant: "big"）のキャラを積んだあと、同じゲームでさらに value 体積んだ
+//   buzzerBeater … オンライン対戦で、制限時間の残り seconds 秒以内に落として、積めた
+//   challengeWins… 挑戦状で、相手のスコアを上回った回数が value 回
+//   stampsSent   … オンライン対戦のリザルトで、スタンプを value 回送った
+//   rarityDrawn  … レア度 rarity のキャラが、自分の番に value 回出た（積めなくてもよい）
+//   dexAll       … 条件に合うキャラを、全部図鑑に登録した   例 { "type": "dexAll", "rarity": "MR" } / { "type": "dexAll", "variant": true }
+//   fallFirst    … ひとりモードで、1体目で落とした
+//   dejaVu       … 1回のゲームで、同じキャラが1体おきに3回出た（A→？→A→？→A）
+//   flipStreak   … 1体を落とす前に、反転を value 回続けて押した
+//   exactHeight  … タワーの高さが、ちょうど value m（画面の表示の数字。小数2けた）のときに積めた
+//   ※ 管理者モードの自由配置モードでは、実績の判定をしない（記録の処理を通らないため）
 //
 // そのほかの項目：
 //   category … 実績画面の分類（見出し）。同じ分類の実績をまとめて表示する
 //   hidden   … true にすると、達成するまで名前・説明・称号を「？？？」で表示する（隠し実績）
-//   rank     … 称号の枠の種類："bronze" / "silver" / "gold" / "legend" / "event"（frames.js）
+//   rank     … 称号の枠の種類："bronze" / "silver" / "gold" / "legend" / "mythic"（まぼろし・星5つ）/ "event" / "secret"（隠し）（frames.js）
+//   decoration … （省略可）アイコンのふちに並べる飾り："star"（星。省略したとき）/ "pumpkin"（カボチャ）（frames.js の DECORATIONS）
+//   reward   … （省略可）ごほうびの背景・土台。{ "background": "背景の id" } か { "platform": "土台の id" }。
+//              その背景・土台は、config.js の themes で unlock: "achievement" と書いておく（見た目の色は config.js）
 //   event    … イベントの id を書くと期間限定の実績になる。期間中・達成ずみならふつうに表示し、
 //              期間外で未達成なら「期間限定（終了）」と表示して、全体の達成数（〇 / 〇）に数えない
 // =============================================
@@ -45,7 +61,7 @@ const Achievements = (() => {
   }
 
   // ---------- 条件の判定 ----------
-  // game: 今のゲームの状況 { mode, rule, count, height, score, rotations, aimTimes, edge }。ゲーム中でなければ null
+  // game: 今のゲームの状況（main.js の gameStatus）。ゲーム中でなければ null
   function isMet(cond, game) {
     const s = Save.data.stats;
     const v = cond.value || 0;
@@ -65,12 +81,41 @@ const Achievements = (() => {
         return !!game && typeof game.edge === "number" && game.edge <= (cond.ratio || 0.05);
       case "ruleScore":
         return ruleScoreMet(cond.rule, v, game);
+      case "flipPlaced":
+        return !!game && (game.flipPlaced || 0) >= v;
+      case "noRotateFlip":
+        return solo && game.rotations === 0 && game.flips === 0 && game.count >= v;
+      case "afterBig":
+        return !!game && (game.afterBig || 0) >= v;
+      case "buzzerBeater":
+        return !!game && typeof game.buzzer === "number" && game.buzzer <= (cond.seconds || 1) * 1000;
+      case "fallFirst":
+        return solo && !!game.over && game.count === 0;
+      case "dejaVu":
+        return !!game && hasDejaVu(game.drawn || []);
+      case "flipStreak":
+        return !!game && (game.flipStreak || 0) >= v;
+      case "exactHeight":
+        return !!game && (game.heights || []).some((h) => h.toFixed(2) === v.toFixed(2));
       default: {
         // 累計の条件（今の数と、目標の数）
         const p = progress(cond);
         return !!p && p.now >= p.goal;
       }
     }
+  }
+
+  // 同じキャラが1体おきに3回出たか（出た順のキャラの ID の並び。A→？→A→？→A）
+  function hasDejaVu(ids) {
+    for (let i = 4; i < ids.length; i++) {
+      if (ids[i] && ids[i] === ids[i - 2] && ids[i] === ids[i - 4]) return true;
+    }
+    return false;
+  }
+
+  // dexAll の条件に合うキャラ（rarity：レア度、variant：サイズ違い。期間限定のキャラはのぞく）
+  function dexTargets(cond) {
+    return (window.CHARACTERS || []).filter((c) => !c.event && (!cond.rarity || c.rarity === cond.rarity) && (!cond.variant || !!c.variant));
   }
 
   // 1手ごとの時間の並びの中で、limit ミリ秒以内が一番長く続いた数
@@ -123,6 +168,17 @@ const Achievements = (() => {
         return { now: Records.eventWins(cond.event), goal: v };
       case "rarityPlaced":
         return { now: (s.placed || {})[cond.rarity] || 0, goal: v || 1 };
+      case "rarityDrawn":
+        return { now: (s.drawn || {})[cond.rarity] || 0, goal: v || 1 };
+      case "challengeWins":
+        return { now: s.challengeWins || 0, goal: v || 1 };
+      case "stampsSent":
+        return { now: s.stampsSent || 0, goal: v || 1 };
+      case "dexAll": {
+        const list = dexTargets(cond);
+        // 全部そろえる条件なので、対象のキャラがいないときは達成にしない
+        return { now: list.filter((c) => Save.data.dex[c.id]).length, goal: list.length || 1 };
+      }
       case "auraPlaced": {
         const auras = cond.auras || [];
         return { now: auras.filter((a) => ((s.placedAura || {})[a] || 0) > 0).length, goal: auras.length };
@@ -157,6 +213,22 @@ const Achievements = (() => {
     return (defs || []).find((a) => a.id === id) || null;
   }
 
+  // ごほうびに、その背景・土台（id）を持つ実績（無ければ null。themes.js が解放を決めるのに使う）
+  function rewardOf(kind, id) {
+    const key = kind === "platforms" ? "platform" : "background";
+    return (defs || []).find((a) => a.reward && a.reward[key] === id) || null;
+  }
+
+  // 実績のごほうびの説明（例：「背景『オーロラ』」。無ければ ""）
+  function rewardText(a) {
+    if (!a.reward) return "";
+    const themes = window.GAME_CONFIG.themes || {};
+    const name = (kind, id) => ((themes[kind] || []).find((d) => d.id === id) || {}).name || id;
+    if (a.reward.background) return `背景「${name("backgrounds", a.reward.background)}」`;
+    if (a.reward.platform) return `土台「${name("platforms", a.reward.platform)}」`;
+    return "";
+  }
+
   // 称号の文字から実績を探す（ランキングの称号の枠を決めるのに使う）。無ければ null
   function findByTitle(title) {
     return (defs || []).find((a) => a.title === title) || null;
@@ -180,6 +252,7 @@ const Achievements = (() => {
         title: a.title,
         rank: a.rank,
         event: a.event || null,
+        decoration: a.decoration || "star",
         hidden: !!a.hidden,
         description: a.description || "",
         got: !!unlocked()[a.id],
@@ -254,7 +327,7 @@ const Achievements = (() => {
         <span class="ach-main">
           <b>${secret ? "？？？" : UI.escape(a.name)}${a.event ? ` <span class="limited-tag">期間限定</span>` : ""}</b>
           <small>${secret ? "？？？（隠し実績）" : UI.escape(a.description || "")}</small>
-          <span class="ach-title">称号「${UI.escape(at ? a.title : "？？？")}」</span>
+          <span class="ach-title">称号「${UI.escape(at ? a.title : "？？？")}」${a.reward ? `<span class="ach-reward">＋ ${secret ? "？？？" : UI.escape(rewardText(a))}</span>` : ""}</span>
           ${bar}
         </span>
         ${date ? `<span class="ach-date">${date.getMonth() + 1}/${date.getDate()}</span>` : ""}
@@ -271,5 +344,5 @@ const Achievements = (() => {
     if (typeof Profile !== "undefined") Profile.refresh();
   }
 
-  return { init, load, check, counts, titleList, unlockedList, find, findByTitle, setAll };
+  return { init, load, check, counts, titleList, unlockedList, find, findByTitle, rewardOf, setAll };
 })();

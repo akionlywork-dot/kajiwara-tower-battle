@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140">
+  <!-- 開発者の枠（frame-dev）：アイコンのふちに沿って並ぶ </> と 0・1。アイコンの外側（半径 58）に沿って文字を置く -->
+  <defs>
+    <path id="r" d="M70 12a58 58 0 1 1 -0.01 0"/>
+  </defs>
+  <text font-family="Menlo, Consolas, 'Courier New', monospace" font-size="13" font-weight="bold" fill="#39ff88" letter-spacing="1.2">
+    <textPath href="#r">&lt;/&gt; 1 0 1 1 0 &lt;/&gt; 0 1 0 0 1 &lt;/&gt; 1 1 0 1 0 &lt;/&gt; 0 0 1 0 1</textPath>
+  </text>
+</svg>

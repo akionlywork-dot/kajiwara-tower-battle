@@ -404,14 +404,17 @@ const Shape = (() => {
     return options;
   }
 
-  // 形のデータを scale 倍に拡大したものを返す（特殊ルール「ジャイアント」などで使う）
-  // 一度作ったものは覚えておき、同じ倍率なら使い回す
-  const scaledCache = new Map();
+  // 形のデータを scale 倍に拡大したものを返す（特殊ルール「ジャイアント」・サイズ違いのキャラで使う）
+  // 一度作ったものは、元の形ごと・倍率ごとに覚えておき、使い回す
+  // （元の形そのもので見分ける。ID で見分けると、まだ ID の無い形どうしが混ざってしまうため）
+  const scaledCache = new WeakMap(); // 元の形 → Map（倍率 → 大きさを変えた形）
   function scaled(shape, scale) {
-    const key = (shape.id || shape.file) + "@" + scale;
-    if (!scaledCache.has(key)) {
+    if (!scaledCache.has(shape)) scaledCache.set(shape, new Map());
+    const byScale = scaledCache.get(shape);
+    const key = scale;
+    if (!byScale.has(key)) {
       const mul = (p) => ({ x: p.x * scale, y: p.y * scale });
-      scaledCache.set(
+      byScale.set(
         key,
         Object.assign({}, shape, {
           w: shape.w * scale,
@@ -421,8 +424,28 @@ const Shape = (() => {
         })
       );
     }
-    return scaledCache.get(key);
+    return byScale.get(key);
   }
 
-  return { create, spawnBody, optionsFrom, scaled };
+  // 左右を反転した形を返す（もう一度呼ぶと、元に戻った形）。
+  // 当たり判定の頂点は、重心を通るたての線で左右を入れかえる（x → -x。頂点の並び順も逆にして、向きをそろえる）。
+  // 画像は、描くときに同じ線で左右反転する（game.js の drawSprite が shape.flip を見る）。
+  // 一度作ったものは覚えておく（特殊ルールで大きくした形などにも使えるよう、形ごとに覚える）
+  const flippedCache = new WeakMap();
+  function flipped(shape) {
+    if (shape.unflipped) return shape.unflipped; // 反転した形 → 元の形
+    if (!flippedCache.has(shape)) {
+      flippedCache.set(
+        shape,
+        Object.assign({}, shape, {
+          flip: true,
+          unflipped: shape,
+          parts: shape.parts.map((part) => part.map((p) => ({ x: -p.x, y: p.y })).reverse()),
+        })
+      );
+    }
+    return flippedCache.get(shape);
+  }
+
+  return { create, spawnBody, optionsFrom, scaled, flipped };
 })();

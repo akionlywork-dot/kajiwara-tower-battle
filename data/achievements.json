@@ -61,6 +61,45 @@
       }
     },
     {
+      "id": "flip10",
+      "name": "鏡の世界",
+      "title": "鏡の魔術師",
+      "rank": "silver",
+      "description": "1回のゲームで、反転したキャラを10体積んだ",
+      "category": "積む",
+      "condition": {
+        "type": "flipPlaced",
+        "value": 10
+      }
+    },
+    {
+      "id": "pure10",
+      "name": "まっすぐ一直線",
+      "title": "素直な心",
+      "rank": "silver",
+      "description": "スコアアタックか特殊ルールで、回転も反転も使わずに10体積んだ",
+      "category": "積む",
+      "condition": {
+        "type": "noRotateFlip",
+        "value": 10
+      }
+    },
+    {
+      "id": "big_base5",
+      "name": "縁の下の力持ち",
+      "title": "土台職人",
+      "rank": "gold",
+      "description": "ビッグのキャラを積んだあと、同じゲームでさらに5体積んだ",
+      "category": "積む",
+      "condition": {
+        "type": "afterBig",
+        "value": 5
+      },
+      "reward": {
+        "platform": "steel"
+      }
+    },
+    {
       "id": "height3",
       "name": "高さ3m",
       "title": "高所の住人",
@@ -133,6 +172,18 @@
       }
     },
     {
+      "id": "challenge_win",
+      "name": "挑戦状キラー",
+      "title": "返り討ち",
+      "rank": "silver",
+      "description": "挑戦状で、相手のスコアを上回った",
+      "category": "スコア",
+      "condition": {
+        "type": "challengeWins",
+        "value": 1
+      }
+    },
+    {
       "id": "rule_all500",
       "name": "ルール制覇",
       "title": "オールラウンダー",
@@ -155,6 +206,45 @@
       "condition": {
         "type": "ruleScore",
         "rule": "wind",
+        "value": 1500
+      }
+    },
+    {
+      "id": "rule_tilt1500",
+      "name": "傾きに負けない",
+      "title": "バランス職人",
+      "rank": "silver",
+      "description": "特殊ルール「傾く土台」で1500点以上をとった",
+      "category": "特殊ルール",
+      "condition": {
+        "type": "ruleScore",
+        "rule": "tilt",
+        "value": 1500
+      }
+    },
+    {
+      "id": "rule_slippery1500",
+      "name": "つるつる克服",
+      "title": "すべらない人",
+      "rank": "silver",
+      "description": "特殊ルール「つるつる」で1500点以上をとった",
+      "category": "特殊ルール",
+      "condition": {
+        "type": "ruleScore",
+        "rule": "slippery",
+        "value": 1500
+      }
+    },
+    {
+      "id": "rule_giant1500",
+      "name": "巨人の肩の上",
+      "title": "巨人使い",
+      "rank": "silver",
+      "description": "特殊ルール「ジャイアント」で1500点以上をとった",
+      "category": "特殊ルール",
+      "condition": {
+        "type": "ruleScore",
+        "rule": "giant",
         "value": 1500
       }
     },
@@ -221,6 +311,30 @@
       }
     },
     {
+      "id": "stamp1",
+      "name": "ひとこと",
+      "title": "おしゃべり",
+      "rank": "bronze",
+      "description": "オンライン対戦のリザルトで、スタンプを送った",
+      "category": "オンライン",
+      "condition": {
+        "type": "stampsSent",
+        "value": 1
+      }
+    },
+    {
+      "id": "buzzer",
+      "name": "ギリギリセーフ",
+      "title": "ブザービーター",
+      "rank": "gold",
+      "description": "オンライン対戦で、制限時間の残り1秒以内に落として積めた",
+      "category": "オンライン",
+      "condition": {
+        "type": "buzzerBeater",
+        "seconds": 1
+      }
+    },
+    {
       "id": "rare_sr",
       "name": "レアハンター",
       "title": "幸運の持ち主",
@@ -249,6 +363,34 @@
       }
     },
     {
+      "id": "size_all",
+      "name": "伸び縮み自在",
+      "title": "サイズマスター",
+      "rank": "gold",
+      "description": "サイズ違い（ミニ・ビッグ）のキャラを、全部図鑑に登録した",
+      "category": "レア",
+      "condition": {
+        "type": "dexAll",
+        "variant": true
+      },
+      "reward": {
+        "background": "wonderland"
+      }
+    },
+    {
+      "id": "mr_first",
+      "name": "まぼろしとの遭遇",
+      "title": "まぼろしを見た者",
+      "rank": "gold",
+      "description": "★5（まぼろし）のキャラが出た（積めなくてもよい）",
+      "category": "レア",
+      "condition": {
+        "type": "rarityDrawn",
+        "rarity": "MR",
+        "value": 1
+      }
+    },
+    {
       "id": "dex_half",
       "name": "図鑑 半分",
       "title": "図鑑コレクター",
@@ -270,6 +412,21 @@
         "type": "dexComplete"
       },
       "category": "図鑑"
+    },
+    {
+      "id": "mr_dex",
+      "name": "まぼろし図鑑",
+      "title": "幻想の収集家",
+      "rank": "mythic",
+      "description": "★5（まぼろし）のキャラを、全部図鑑に登録した",
+      "category": "図鑑",
+      "condition": {
+        "type": "dexAll",
+        "rarity": "MR"
+      },
+      "reward": {
+        "background": "aurora"
+      }
     },
     {
       "id": "plays10",
@@ -360,10 +517,68 @@
       }
     },
     {
+      "id": "fall_first",
+      "name": "出オチ",
+      "title": "出オチ芸人",
+      "rank": "secret",
+      "decoration": "question",
+      "hidden": true,
+      "description": "スコアアタックか特殊ルールで、1体目で落とした",
+      "category": "隠し",
+      "condition": {
+        "type": "fallFirst"
+      },
+      "reward": {
+        "platform": "cardboard"
+      }
+    },
+    {
+      "id": "deja_vu",
+      "name": "デジャヴ",
+      "title": "既視感",
+      "rank": "secret",
+      "decoration": "question",
+      "hidden": true,
+      "description": "1回のゲームで、同じキャラが1体おきに3回出た（A→？→A→？→A）",
+      "category": "隠し",
+      "condition": {
+        "type": "dejaVu"
+      }
+    },
+    {
+      "id": "flip_spam",
+      "name": "優柔不断",
+      "title": "迷える子羊",
+      "rank": "secret",
+      "decoration": "question",
+      "hidden": true,
+      "description": "1体を落とす前に、反転を10回続けて押した",
+      "category": "隠し",
+      "condition": {
+        "type": "flipStreak",
+        "value": 10
+      }
+    },
+    {
+      "id": "just_one",
+      "name": "ジャストワン",
+      "title": "ぴったり屋",
+      "rank": "secret",
+      "decoration": "question",
+      "hidden": true,
+      "description": "タワーの高さが、ちょうど 1.00m のときに積めた",
+      "category": "隠し",
+      "condition": {
+        "type": "exactHeight",
+        "value": 1
+      }
+    },
+    {
       "id": "pumpkin_king",
       "name": "かぼちゃの王",
       "title": "パンプキング",
       "rank": "event",
+      "decoration": "pumpkin",
       "description": "ハロウィンイベントのおばけ屋敷で、CPU「つよい」に3勝した",
       "category": "イベント",
       "event": "halloween2026",

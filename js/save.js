@@ -9,7 +9,7 @@ const Save = (() => {
   const KEY = "stack.save";
   // 保存データの形のバージョン。データの形を変えたら数字を1つ上げ、
   // 下の migrate() に「古い形 → 新しい形」に直す処理を足す
-  const VERSION = 2; // 2：図鑑を、画像のファイル名ではなくキャラの ID で記録するように
+  const VERSION = 3; // 2：図鑑を、画像のファイル名ではなくキャラの ID で記録するように / 3：床アレルギー（chara10）をミニ床アレルギー（chara10_small）に
   // バックアップファイルの目印（このゲームのファイルかどうかの確認に使う）
   const APP_ID = "kajiwara-tower-battle";
 
@@ -48,6 +48,9 @@ const Save = (() => {
         ruleBest: {}, // 特殊ルールごとのハイスコア（ルール名 → { score, count, height }）
         placed: {}, // レア度ごとの、積んだキャラの数（レア度 → 数。例 { SR: 3 }）
         placedAura: {}, // ★4のオーラの種類ごとの、積んだ数（例 { light: 1, dark: 2 }）
+        drawn: {}, // レア度ごとの、自分の番に出た数（積めなくても数える。例 { MR: 1 }）
+        stampsSent: 0, // オンライン対戦のリザルトで送ったスタンプの数
+        challengeWins: 0, // 挑戦状で、相手のスコアを上回った回数
       },
       // 実績の世代番号（config.js の achievementsEpoch）。config の番号の方が大きければ、1回だけ実績と戦績をリセットする
       //   epochResetNotice：リセットしたことを、次にタイトル画面が出たときに知らせるか
@@ -88,6 +91,18 @@ const Save = (() => {
         dex[key.includes("/") ? Chars.idFromFile(key) : key] = date;
       }
       saved.dex = dex;
+    }
+    // 2 → 3：★1「床アレルギー」（chara10）が、★3「ミニ床アレルギー」（chara10_small）になった。
+    //   図鑑の登録とスタンプを、新しい ID に直す（登録していた人のデータが消えないように）
+    if (saved.version < 3) {
+      const RENAMED = { chara10: "chara10_small" };
+      if (saved.dex && typeof saved.dex === "object") {
+        for (const [from, to] of Object.entries(RENAMED)) {
+          if (saved.dex[from] && !saved.dex[to]) saved.dex[to] = saved.dex[from];
+          delete saved.dex[from];
+        }
+      }
+      if (Array.isArray(saved.stamps)) saved.stamps = saved.stamps.map((id) => RENAMED[id] || id);
     }
     saved.version = VERSION;
     return saved;
@@ -209,5 +224,5 @@ const Save = (() => {
     return data.profile.name || "プレイヤー";
   }
 
-  return { data, write, playerName, exportData, checkImport, importData };
+  return { data, write, playerName, exportData, checkImport, importData, defaults };
 })();

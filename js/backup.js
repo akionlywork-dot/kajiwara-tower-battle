@@ -71,5 +71,5 @@ const Backup = (() => {
     location.reload(); // 読み込んだデータで、すべての画面を作り直す
   }
 
-  return { init };
+  return { init, exportFile };
 })();

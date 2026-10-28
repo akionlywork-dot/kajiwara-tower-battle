@@ -60,6 +60,7 @@
     Game.setDebug((CONFIG.devMode || Admin.unlocked) && Settings.get("debug"));
     // 管理者モード：イベント期間中として表示（確認用）
     LimitedEvents.setPreview((CONFIG.devMode || Admin.unlocked) && Settings.get("eventPreview"));
+    Admin.applyDisplay(); // 管理者モード：FPS・キャラの数と高さ・読み込み状況の表示
     if (Game.playing && !isCpuTurn()) Game.setTurnTimeLimit(turnTimeLimit());
   }
 
@@ -181,6 +182,7 @@
     droppedShape = null;
     aimTimes = [];
     lastEdge = null;
+    resetAchievementCounts();
     // 挑戦中は挑戦状と同じ順番、そうでなければ新しい順番
     seed = challenge && mode === "solo" && ruleId === challenge.rule ? challenge.seed : Challenge.newSeed();
     UI.clearConfetti();
@@ -197,6 +199,11 @@
         onLand: () => playSe("place"),
         onRare: (shape, info) => {
           showRareBanner(shape, info);
+          // 自分の番に出たレアを数える（CPU・オンライン対戦の相手の番はのぞく）
+          if (!isCpuTurn() && !(mode === "online" && player !== myPlayer())) {
+            Records.addDrawn(shape);
+            Achievements.check(gameStatus());
+          }
           if (mode === "online") Online.send({ t: "rare", id: shape.id });
         },
         onSettled: onSettled,
@@ -205,7 +212,7 @@
         onGameOver: showResult,
       },
       // 制限時間はオンライン対戦だけ（ホストが数えて、時間切れなら相手の手番でもホストが落とす）
-      { turnTimeLimit: turnTimeLimit(), rule: Rules.get(ruleId), seed }
+      { turnTimeLimit: turnTimeLimit(), rule: Rules.get(ruleId), seed, fair: mode === "online" }
     );
     applySettings();
     Sound.startBgm();
@@ -234,6 +241,7 @@
   function onSettled(stats) {
     stacked++;
     maxHeight = Math.max(maxHeight, stats.height);
+    countForAchievements(droppedShape, stats.height, lastDropper === myPlayer());
     aimTimes.push(stats.aimMs);
     lastEdge = stats.edge;
     Records.addPiece(droppedShape);
@@ -252,6 +260,29 @@
     if (isCpuTurn()) runCpuTurn();
     else if (cpuLevel) startHumanTurn();
     else if (mode === "online") Game.setInputEnabled(!isRemoteTurn()); // 相手の手番は操作できない
+  }
+
+  // ---------- 実績のための数（このゲームの分） ----------
+  // 反転して積んだ数・ビッグを積んでからの数・積んだときの高さ・制限時間ギリギリ（残りミリ秒）
+  let achieve = null;
+  function resetAchievementCounts() {
+    achieve = { flipPlaced: 0, bigAt: null, heights: [], buzzer: null, over: false };
+  }
+  resetAchievementCounts();
+
+  // 自分の番号（オンライン対戦は自分の側、ほかは 1。CPU は 2）
+  function myPlayer() {
+    return mode === "online" && online ? online.me : 1;
+  }
+
+  // 1体積めたとき。mine：自分が落としたキャラか（オンライン対戦の相手・CPU の分は、ギリギリの判定に使わない）
+  function countForAchievements(shape, height, mine) {
+    if (shape && shape.flip) achieve.flipPlaced++;
+    if (shape && shape.variant === "big" && achieve.bigAt === null) achieve.bigAt = stacked;
+    achieve.heights.push(height);
+    if (achieve.heights.length > 4) achieve.heights.shift();
+    const left = Game.lastDropLeft;
+    if (mode === "online" && mine && typeof left === "number" && left > 0) achieve.buzzer = Math.min(achieve.buzzer ?? Infinity, left);
   }
 
   // ---------- CPU対戦 ----------
@@ -293,6 +324,11 @@
     const plan = await CPU.think(cpuLevel, () => token !== gameToken || !Game.playing);
     showThinking(false);
     if (!plan || token !== gameToken) return;
+    // 反転する置き方なら、まず反転
+    if (plan.flip) {
+      if (!(await waitPlaying(200, token))) return;
+      Game.flip();
+    }
     // 1回ずつ回す
     for (let i = 0; i < plan.steps; i++) {
       if (!(await waitPlaying(160, token))) return;
@@ -526,9 +562,9 @@
     } else if (msg.t === "rtt-ack") {
       onRttAck(msg);
     } else if (msg.t === "pose" && isRemoteTurn()) {
-      Game.setHeldPose(msg.x, msg.a); // 相手が動かしているキャラ
+      Game.setHeldPose(msg.x, msg.a, msg.f); // 相手が動かしているキャラ（f：反転）
     } else if (msg.t === "drop" && isRemoteTurn()) {
-      Game.setHeldPose(msg.x, msg.a);
+      Game.setHeldPose(msg.x, msg.a, msg.f);
       Game.drop();
     } else if (msg.t === "rematch") {
       onRematchMessage(msg); // 相手が「もう一度」を押した・取り消した
@@ -618,6 +654,8 @@
       stacked = Math.max(stacked, msg.n);
       maxHeight = Math.max(maxHeight, msg.h);
       Records.addPiece(shapesById[msg.id] || null); // 知らない ID なら、レア度は数えない
+      // 積んだのが自分なら（手番が相手に移った）、実績のための数も数える（ギリギリの判定は、自分で落としたときの残り時間）
+      countForAchievements(shapesById[msg.id] || null, msg.h, msg.p !== online.me);
       if (msg.id) Dex.register(msg.id); // 知らない ID なら何もしない
       Achievements.check(gameStatus());
       updateHud();
@@ -652,6 +690,7 @@
     player = first === 2 ? 2 : 1;
     stacked = 0;
     maxHeight = 0;
+    resetAchievementCounts();
     online.countedTurns = 0; // 手番の交代を数えなおす（重ねて届いた知らせを見分けるため）
     UI.clearConfetti();
     Stamps.end(); // スタンプはリザルトのあいだだけ
@@ -659,7 +698,7 @@
     Game.startRemote({
       dropOnRelease: () => Settings.get("release"),
       // 自分の手番で「落とす」を押したら、位置と角度をホストに送る
-      onRemoteDrop: (x, a) => sendImportant({ t: "drop", x, a }),
+      onRemoteDrop: (x, a, f) => sendImportant({ t: "drop", x, a, f }),
       onSkyStage: showSkyStage,
     });
     Game.setInputEnabled(true);
@@ -673,10 +712,10 @@
       if (!online || mode !== "online" || isRemoteTurn()) return;
       const pose = Game.heldPose();
       if (!pose) return;
-      const key = `${Math.round(pose.x)},${pose.angle.toFixed(3)}`;
+      const key = `${Math.round(pose.x)},${pose.angle.toFixed(3)},${pose.flip}`;
       if (key === lastPoseSent) return; // 動いていなければ送らない
       lastPoseSent = key;
-      Online.send({ t: "pose", x: pose.x, a: pose.angle });
+      Online.send({ t: "pose", x: pose.x, a: pose.angle, f: pose.flip });
     }, 100);
   }
 
@@ -694,7 +733,18 @@
   // 今のゲームの状況（実績の判定に使う）
   //   rotations：回転を使った回数、aimTimes：1手ごとにかかった時間、edge：最後に積んだキャラの、土台の端からの距離
   function gameStatus() {
-    return { mode, rule: ruleId, count: stacked, height: maxHeight, score: calcScore(), rotations: Game.rotations, aimTimes, edge: lastEdge };
+    return {
+      mode, rule: ruleId, count: stacked, height: maxHeight, score: calcScore(), rotations: Game.rotations, aimTimes, edge: lastEdge,
+      // 新しい実績のための数（achievements.js の条件の説明を参照）
+      flips: Game.flips,
+      flipStreak: Game.flipStreak,
+      drawn: Game.drawn,
+      flipPlaced: achieve.flipPlaced,
+      afterBig: achieve.bigAt === null ? 0 : stacked - achieve.bigAt,
+      heights: achieve.heights,
+      buzzer: achieve.buzzer,
+      over: achieve.over,
+    };
   }
 
   // 特殊ルールの名前の札（ふつうのルールなら ""）
@@ -721,11 +771,12 @@
   function showRareBanner(shape, info) {
     const el = $("rare-banner");
     const ultimate = info.stars >= 4;
+    const legendary = info.stars >= 5; // ★5（まぼろし）：画面が虹色に光る、いちばん豪華な演出
     // 文字は config.js のレア度の名前 ＋「！」（★2は1つ、★3は2つ、★4は3つ）。例「めっちゃレア！！」
     const label = info.name + "！".repeat(Math.max(1, Math.min(3, info.stars - 1)));
     el.innerHTML = `<span>${label}</span><small>${UI.escape(shape.name)}</small>`;
     el.style.setProperty("--rare-color", info.color);
-    el.className = ultimate ? `rare-banner ultimate aura-${shape.aura || "light"}` : info.stars >= 3 ? "rare-banner super" : "rare-banner";
+    el.className = legendary ? "rare-banner ultimate legendary" : ultimate ? `rare-banner ultimate aura-${shape.aura || "light"}` : info.stars >= 3 ? "rare-banner super" : "rare-banner";
     el.style.animation = "none"; // アニメーションを最初から
     void el.offsetWidth;
     el.style.animation = "";
@@ -733,9 +784,9 @@
       const flash = $("flash");
       flash.className = "";
       void flash.offsetWidth;
-      flash.className = "on";
+      flash.className = legendary ? "on legendary" : "on";
     }
-    Sound.play(ultimate ? "ultimate" : "rare");
+    Sound.play(legendary ? "legendary" : ultimate ? "ultimate" : "rare");
   }
 
   // 塔が高くなって、新しい背景に届いた（config.js の sky）
@@ -760,8 +811,10 @@
     $("turn-banner").className = "hidden";
     const box = $("result-content");
 
+    achieve.over = true; // 実績「出オチ」（1体目で落とした）
     if (mode === "solo") {
       const score = calcScore();
+      if (challenge && score > challenge.score) Records.addChallengeWin(); // 実績「挑戦状キラー」
       // 戦績に記録（ハイスコアも更新）。特殊ルールのハイスコアは、ルールごとに別に記録する
       const isNew = ruleId
         ? Records.addRuleResult(ruleId, score, stacked, maxHeight)
@@ -844,7 +897,11 @@
     $("btn-challenge").firstChild.textContent = challenge ? "挑戦状を送り返す" : "挑戦状を送る";
     // スタンプ：オンライン対戦のリザルトだけで使える（送るのはキャラの ID だけ）
     if (mode === "online" && online) {
-      Stamps.begin((id) => Online.send({ t: "stamp", id }), opponentName());
+      Stamps.begin((id) => {
+        Online.send({ t: "stamp", id });
+        Records.addStampSent(); // 実績「ひとこと」
+        Achievements.check(null);
+      }, opponentName());
     } else Stamps.end();
     resetRematch(); // 「もう一度」の希望は、試合ごとに最初から
     // 戦績を記録したあとで、実績を判定する（「10回プレイ」「対戦で10勝」など）
@@ -1030,6 +1087,15 @@
     $("challenge-later").onclick = () => $("challenge-popup").classList.remove("active");
   }
 
+  // サイズ違いの倍率（config.js の sizeVariants）。大きくしすぎて土台からはみ出さないよう、長い方の辺を maxSize までにする
+  function variantScale(variant, shape) {
+    const conf = CONFIG.sizeVariants || {};
+    const scale = Number(conf[variant]) || 1;
+    const longest = Math.max(shape.w, shape.h) * scale;
+    const max = Number(conf.maxSize) || 200;
+    return longest > max ? max / Math.max(shape.w, shape.h) : scale;
+  }
+
   // ---------- ボタン ----------
   // data-open="〇〇" のボタン → その画面を開く（タイトルのメニューなど）
   // data-back="〇〇" のボタン → その画面に戻る（各画面の「もどる」）
@@ -1067,6 +1133,7 @@
   // CPU の手番では、人のボタン操作は受け付けない
   on("btn-rotate", () => !isCpuTurn() && !isRemoteTurn() && Game.rotate());
   on("btn-drop", () => !isCpuTurn() && !isRemoteTurn() && Game.drop());
+  on("btn-flip", () => !isCpuTurn() && !isRemoteTurn() && Game.flip());
   // ポーズ
   on("btn-resume", resumeGame);
   on("btn-restart", () => startGame(mode, ruleId, cpuLevel));
@@ -1144,10 +1211,18 @@ ${location.origin}${location.pathname}`), "image/png");
   function applyAdmin() {
     $("setting-debug-row").classList.toggle("hidden", !(CONFIG.devMode || Admin.unlocked));
     $("setting-admin-row").classList.toggle("hidden", !Admin.unlocked);
+    $("btn-admin-home").classList.toggle("hidden", !Admin.unlocked); // ホームの 🛠（管理者メニュー）
     applySettings();
     Profile.refresh();
   }
   Admin.onChange = applyAdmin;
+  Admin.onStartSandbox = () => {
+    // 自由配置モード（管理者モード）：対戦中なら終わらせてから始める
+    goTitle();
+    Game.stop();
+    Sandbox.start();
+  };
+  Sandbox.init(goTitle);
   $("setting-debug-row").classList.toggle("hidden", !CONFIG.devMode);
   Admin.init().then(applyAdmin);
   applySettings();
@@ -1174,6 +1249,7 @@ ${location.origin}${location.pathname}`), "image/png");
   // 実績の定義を読み込んだら、称号の表示を最新にし、すでに条件を満たしている実績を達成にする
   Achievements.load().then(() => {
     Profile.refresh();
+    Themes.apply(); // 実績のごほうびの背景・土台は、実績を読み込んでから決まる
     Achievements.check(null);
   });
   News.load(); // お知らせを裏で読み込んでおく（未読の赤い点のため）
@@ -1212,10 +1288,14 @@ ${location.origin}${location.pathname}`), "image/png");
   const results = await Promise.all(
     window.CHARACTERS.map(async (c) => {
       try {
-        const options = Shape.optionsFrom(c);
-        const key = `${c.file}|${c.size || DEFAULT_SIZE}|${JSON.stringify(options)}`;
-        if (!shapeCache[key]) shapeCache[key] = Shape.create(c.file, c.size || DEFAULT_SIZE, options);
-        const shape = Object.assign({}, await shapeCache[key]);
+        // サイズ違い（variant）は、元のキャラの当たり判定の設定・大きさで形を作ってから、同じ倍率で大きく・小さくする
+        const src = c.variant ? window.CHARACTERS.find((x) => x.file === c.file && !x.shared) || c : c;
+        const options = Shape.optionsFrom(src);
+        const key = `${c.file}|${src.size || DEFAULT_SIZE}|${JSON.stringify(options)}`;
+        if (!shapeCache[key]) shapeCache[key] = Shape.create(c.file, src.size || DEFAULT_SIZE, options);
+        const base = await shapeCache[key];
+        const shape = Object.assign({}, c.variant ? Shape.scaled(base, variantScale(c.variant, base)) : base);
+        shape.variant = c.variant || null; // サイズ違いなら "big" / "small"
         shape.id = c.id; // キャラの ID（図鑑・スタンプ・オンライン対戦で、キャラを見分ける）
         shape.name = c.name;
         shape.file = c.file; // 画像の場所

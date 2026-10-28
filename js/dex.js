@@ -81,11 +81,16 @@ const Dex = (() => {
   }
 
   // 1体分のカード（レア度は、未登録のキャラでも★だけ見せる。「レアがまだいる！」と分かるように）
+  //   ★5（まぼろし）は専用の枠。まだ登録していない★5は、シルエットではなく「？」にする（どんな姿かは秘密）
+  //   サイズ違い（variant）は、絵を大きく・小さく見せて「BIG」「MINI」の札を付ける
   function cardHTML(c, r, no) {
     const got = !!registered()[c.id];
+    const legend = r.stars >= 5;
+    const img = legend && !got ? `<span class="dex-question">？</span>` : `<img src="${UI.escape(c.file)}" alt="">`;
+    const size = c.variant === "big" || c.variant === "small" ? `<em class="dex-size dex-size-${c.variant}">${c.variant === "big" ? "BIG" : "MINI"}</em>` : "";
     return `
-      <button class="dex-card ${got ? "" : "dex-locked"} ${r.id !== "N" ? "dex-rare" : ""}" style="--rare-color:${r.color}" data-id="${UI.escape(c.id)}" ${got ? "" : "disabled"}>
-        <span class="dex-img ${auraClass(c)}"><img src="${UI.escape(c.file)}" alt=""></span>
+      <button class="dex-card ${got ? "" : "dex-locked"} ${r.id !== "N" ? "dex-rare" : ""} ${legend ? "dex-legend" : ""}" style="--rare-color:${r.color}" data-id="${UI.escape(c.id)}" ${got ? "" : "disabled"}>
+        <span class="dex-img ${auraClass(c)} ${c.variant ? "dex-variant-" + c.variant : ""}">${img}${size}</span>
         <span class="dex-no">No.${String(no).padStart(2, "0")} <span class="rarity-stars">${"★".repeat(r.stars)}</span></span>
         <b class="dex-name">${got ? UI.escape(c.name) : "？？？"}</b>
       </button>`;
@@ -109,7 +114,7 @@ const Dex = (() => {
     const date = new Date(registered()[id]);
     const r = rarityOf(c);
     $("dex-popup-content").innerHTML =
-      `<div class="dex-detail-img ${auraClass(c)}"><img src="${UI.escape(c.file)}" alt=""></div>` +
+      `<div class="dex-detail-img ${auraClass(c)} ${c.variant ? "dex-variant-" + c.variant : ""} ${r.stars >= 5 ? "dex-detail-legend" : ""}"><img src="${UI.escape(c.file)}" alt=""></div>` +
       `<h3 class="dex-detail-name">${UI.escape(c.name)}</h3>` +
       `<span class="rarity-label" style="--rare-color:${r.color}">${"★".repeat(r.stars)} ${UI.escape(r.name)}</span>` +
       `<p class="dex-detail-text">${UI.escape(c.description || "")}</p>` +

@@ -6,42 +6,78 @@
 // 形はどの格も同じ（輪＋てっぺんの小さな星）で、違うのは色だけ：
 //   bronze … 銅色 ／ silver … 銀色 ／ gold … 金色・ときどき光が走る
 //   legend … 虹色（輪がゆっくり回る） ／ event … オレンジ×紫（期間限定の実績）
+//   mythic … まぼろし（★5 をそろえた称号）。虹の輪が回り、まわりが白く光る。星5つ
+//   secret … 隠し（隠し実績）。紫×黒。ふちには星の代わりに「？」（decoration: "question"）
 // 称号を選んでいない・実績が見つからないときは、枠なし。
 // 見た目は style.css の「称号の枠」（色は CSS の変数で切りかえる。動く枠は CSS のアニメーションで、「視差効果を減らす」では止まる）。
 // リザルトカードの画像の枠は card.js が、ここで決めた rank を見て描く
 // =============================================
 
 const Frames = (() => {
-  const RANKS = ["bronze", "silver", "gold", "legend", "event"];
-  // 枠のてっぺんに並べる星の数（格が上がるほど増える。期間限定はゴールドと同じ）
-  const STARS = { bronze: 1, silver: 2, gold: 3, legend: 4, event: 3 };
+  const RANKS = ["bronze", "silver", "gold", "legend", "mythic", "event", "secret"];
+  // 枠のてっぺんに並べる星の数（格が上がるほど増える。期間限定・隠しはゴールドと同じ）
+  const STARS = { bronze: 1, silver: 2, gold: 3, legend: 4, mythic: 5, event: 3, secret: 3 };
   const EVENT_PATTERN = /^[a-z0-9_-]{1,40}$/; // イベントの id として使ってよい形（CSS のクラス名に使うため）
 
-  // 枠 { rank, event } を正しい形にする（オンライン対戦で相手から届いたものにも使う）。おかしければ null
-  function clean(rank, event) {
+  // アイコンのふちに並べる飾り（称号ごと。achievements.json の decoration。書いていなければ star）。
+  // 星以外は images/decorations/ の画像を、星と同じ場所・同じ数に並べる（style.css の .deco-〇〇・card.js）
+  // 開発者の称号だけは、星やカボチャではなく、専用のコード風の枠（rank "dev"。下の developer）
+  const DECORATIONS = {
+    star: null, // 星（枠の色の星）
+    pumpkin: "images/decorations/pumpkin.svg", // カボチャ（パンプキング）
+    snow: "images/decorations/snowflake.svg", // 雪の結晶（今は使っている称号なし。足すときに）
+    question: "images/decorations/question.svg", // 「？」（隠し実績の称号）
+  };
+  const decoOf = (d) => (Object.prototype.hasOwnProperty.call(DECORATIONS, d) ? d : "star");
+
+  // 枠 { rank, event, decoration } を正しい形にする（オンライン対戦で相手から届いたものにも使う）。おかしければ null。
+  // 開発者の枠（"dev"）はここでは作らない（相手から届いたものを、開発者の枠にしないため）
+  function clean(rank, event, decoration) {
     if (!RANKS.includes(rank)) return null;
-    return { rank, event: rank === "event" && EVENT_PATTERN.test(String(event || "")) ? event : null };
+    return { rank, event: rank === "event" && EVENT_PATTERN.test(String(event || "")) ? event : null, decoration: decoOf(decoration) };
+  }
+
+  // 実績（achievements.json の1つ）の枠
+  function ofAchievement(a) {
+    return a ? clean(a.rank, a.event, a.decoration) : null;
+  }
+
+  // 開発者の枠（管理者モードの端末の称号「開発者」と、手で書く ranking.json の "title": "developer" の人だけ）
+  function developer() {
+    return { rank: "dev", event: null, decoration: "developer" };
   }
 
   // 称号（実績の id）の枠。称号を選んでいなければ null
   function ofTitleId(id) {
     if (!id) return null;
-    if (id === "developer") return clean("legend"); // 管理者モードの称号「開発者」
-    const a = typeof Achievements !== "undefined" ? Achievements.find(id) : null;
-    return a ? clean(a.rank, a.event) : null;
+    if (id === "developer") return typeof Admin !== "undefined" && Admin.unlocked ? developer() : null; // 管理者モードの端末だけ
+    return ofAchievement(typeof Achievements !== "undefined" ? Achievements.find(id) : null);
   }
 
-  // 称号の文字から、枠を決める（ランキングのように、称号の文字しか分からないとき）。見つからなければ null
+  // 称号の文字から、枠を決める（ランキング・オンライン対戦の相手のように、称号の文字しか分からないとき）。見つからなければ null。
+  // 「開発者」の文字が届いても、開発者の枠にはしない（だれでも名乗れてしまうため）
   function ofTitleText(text) {
     if (!text) return null;
-    if (text === "開発者") return clean("legend");
-    const a = typeof Achievements !== "undefined" ? Achievements.findByTitle(text) : null;
-    return a ? clean(a.rank, a.event) : null;
+    return ofAchievement(typeof Achievements !== "undefined" ? Achievements.findByTitle(text) : null);
   }
 
-  // アイコンに付けるクラス名（枠なしなら ""）。stars-〇 は、枠のてっぺんの星の数
+  // アイコンに付けるクラス名（枠なしなら ""）。stars-〇 はふちの飾りの数、deco-〇〇 は星以外の飾り
   function avatarClass(f) {
-    return f ? `frame frame-${f.rank} stars-${STARS[f.rank] || 1}${f.event ? ` frame-ev-${f.event}` : ""}` : "";
+    if (!f) return "";
+    if (f.rank === "dev") return "frame frame-dev";
+    const deco = f.decoration && f.decoration !== "star" ? ` deco-${f.decoration}` : "";
+    return `frame frame-${f.rank} stars-${STARS[f.rank] || 1}${deco}${f.event ? ` frame-ev-${f.event}` : ""}`;
+  }
+
+  // 飾りのクラス（称号を選ぶ画面の、まだ取っていない称号の灰色の枠にも、飾りの見本として付ける）
+  function decoClass(decoration) {
+    const d = decoOf(decoration);
+    return d === "star" ? "" : `deco-${d}`;
+  }
+
+  // 飾りの画像の場所（星なら null。リザルトカードの画像に使う）
+  function decorationImage(decoration) {
+    return DECORATIONS[decoOf(decoration)];
   }
 
   // 星の数のクラス（称号を選ぶ画面の、まだ取っていない称号の灰色の枠にも使う）
@@ -51,7 +87,7 @@ const Frames = (() => {
 
   // アイコンの要素に枠を付けなおす
   function applyAvatar(el, f) {
-    el.className = el.className.replace(/\b(frame(-[\w-]+)?|stars-\d)\b/g, "").replace(/\s+/g, " ").trim();
+    el.className = el.className.replace(/\b(frame(-[\w-]+)?|stars-\d|deco-[\w-]+)\b/g, "").replace(/\s+/g, " ").trim();
     if (f) el.className += " " + avatarClass(f);
   }
 
@@ -60,11 +96,26 @@ const Frames = (() => {
     return STARS[rank] || 1;
   }
 
+  // 星の並び（数ごと）：s＝星の大きさ（アイコンの直径に対する割合）、angles＝置く角度（真上が 0 度、右がプラス）。
+  // 数が増えるほど小さく・間を詰めて、重ならないようにする。style.css の .stars-〇 の数値も、この表から計算したもの
+  const STAR_LAYOUT = {
+    1: { s: 0.34, angles: [0] },
+    2: { s: 0.3, angles: [-20, 20] },
+    3: { s: 0.27, angles: [-34, 0, 34] },
+    4: { s: 0.24, angles: [-48, -16, 16, 48] },
+    5: { s: 0.21, angles: [-64, -32, 0, 32, 64] },
+  };
+  function starLayout(n) {
+    return STAR_LAYOUT[n] || STAR_LAYOUT[1];
+  }
+
   // 称号の札（HTML）。称号が無ければ ""。枠があれば、枠と同じ色の札（ranked）にする（星は枠の方に付く）
+  // 開発者は、コード風の専用の札（</> と、点滅するカーソル）
   function titleHTML(text, f) {
     if (!text) return "";
+    if (f && f.rank === "dev") return `<span class="title-badge dev-title"><span class="dev-code">&lt;/&gt;</span>${UI.escape(text)}<span class="dev-caret"></span></span>`;
     return `<span class="title-badge${f ? ` ranked rank-${f.rank}${f.event ? ` rank-ev-${f.event}` : ""}` : ""}">${UI.escape(text)}</span>`;
   }
 
-  return { clean, ofTitleId, ofTitleText, avatarClass, starsClass, starCount, applyAvatar, titleHTML };
+  return { clean, ofAchievement, developer, ofTitleId, ofTitleText, avatarClass, starsClass, decoClass, decorationImage, starCount, starLayout, applyAvatar, titleHTML };
 })();

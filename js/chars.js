@@ -29,11 +29,21 @@ const Chars = (() => {
     seen.add(c.id);
   }
 
-  // 出やすさ（characters.js の weight。書いていなければ config.js のレア度の weight）。0 なら出ない
+  // 出やすさ（%）。0 なら出ない。
+  // config.js の rarity の rate（そのレア度全体の出現率）を、同じレア度のキャラで、characters.js の weight の割合で分け合う
+  // （weight を書いていなければ 1 ＝ 等分。weight: 0 のキャラは出ない）。
+  // ※ 前の書き方（レア度の weight ＝ 1体の出やすさ）も使える（rate が無いとき）
+  const share = (c) => (typeof c.weight === "number" ? Math.max(0, c.weight) : 1);
+  const rarityId = (c) => ((window.GAME_CONFIG.rarity || {})[c.rarity] ? c.rarity : "N");
   function chance(c) {
-    if (typeof c.weight === "number") return c.weight;
-    const r = (window.GAME_CONFIG.rarity || {})[c.rarity] || (window.GAME_CONFIG.rarity || {}).N || {};
-    return typeof r.weight === "number" ? r.weight : 1;
+    const table = window.GAME_CONFIG.rarity || {};
+    const r = table[rarityId(c)] || {};
+    if (typeof r.rate !== "number") {
+      if (typeof c.weight === "number") return c.weight;
+      return typeof r.weight === "number" ? r.weight : 1;
+    }
+    const sum = list.filter((x) => rarityId(x) === rarityId(c)).reduce((n, x) => n + share(x), 0);
+    return sum > 0 ? (r.rate * share(c)) / sum : 0;
   }
 
   // ゲームに出てくるキャラか（出やすさが 0 のキャラ＝まぼろしなど、まだ登場しないキャラは false）

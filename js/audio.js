@@ -109,6 +109,13 @@ const Sound = (() => {
       tone("sawtooth", 160, 50, t, 0.35, 0.3, seGain);
       tone("square", 90, 45, t, 0.25, 0.18, seGain);
       [392, 523, 659, 784].forEach((f) => tone("triangle", f, f, t + 0.05, 0.55, 0.14, seGain));
+    } else if (name === "legendary") {
+      // ★5：ゴォン（低い鐘）→ 駆け上がる2列のキラキラ → 長く響く明るい和音
+      tone("sine", 196, 98, t, 1.2, 0.35, seGain);
+      tone("triangle", 392, 196, t, 0.9, 0.18, seGain);
+      [523, 659, 784, 988, 1175, 1319, 1568, 1976, 2349].forEach((f, i) => tone("sine", f, f, t + 0.12 + i * 0.06, 0.18, 0.18, seGain));
+      [659, 831, 988, 1319].forEach((f, i) => tone("triangle", f, f, t + 0.2 + i * 0.09, 0.2, 0.12, seGain));
+      [1047, 1319, 1568, 2093, 2637].forEach((f) => tone("sine", f, f * 1.005, t + 0.8, 1.6, 0.1, seGain));
     } else if (name === "record") {
       // ハイスコア更新のファンファーレ
       [523, 659, 784, 1047].forEach((f, i) => tone("triangle", f, f, t + i * 0.12, i === 3 ? 0.6 : 0.14, 0.25, seGain));

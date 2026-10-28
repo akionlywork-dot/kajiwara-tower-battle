@@ -5,7 +5,8 @@
 // name : キャラの名前（画面に表示されます）
 // description : （省略可）図鑑に表示する説明文
 // rarity : （省略可）レア度。"N"（ノーマル）/ "R"（レア）/ "SR"（めっちゃレア）/ "UR"（激レア）/ "MR"（まぼろし）。省略すると "N"
-// weight : （省略可）出やすさ。省略するとレア度ごとの値（config.js の rarity）。大きいほどよく出る
+//          レア度ごとの出現率は config.js の rarity の rate（%）。同じレア度のキャラで分け合う
+// weight : （省略可）同じレア度の中での出やすさの割合。省略すると 1（等分）。2 にすると、ほかの2倍出る。0 にすると出ない
 // size : （省略可）画面上での大きさ。画像の長い方の辺の長さ。省略すると 130
 // tolerance : （省略可）当たり判定の細かさ。小さいほど画像の形に忠実。省略すると 0.8
 //             hitbox.html を開くと、全キャラの当たり判定を確認できます
@@ -22,6 +23,10 @@
 //
 // 例） { file: "images/chara13.png", name: "新しいポーズ", description: "説明文", rarity: "R" },
 // 例） { file: "images/chara14.png", name: "激レアポーズ", rarity: "SR", weight: 0.5 },
+// ★3（めっちゃレア）のサイズ違い：今あるキャラの画像を、大きく・小さくした別のキャラ（新しい画像はいらない）
+// variant : "big"（大きい）/ "small"（小さい）。倍率は config.js の sizeVariants。当たり判定も同じ倍率になる
+// 例） { id: "chara05_big", base: "images/chara05.webp", name: "ビッグ台湾案内人", rarity: "SR", variant: "big", description: "説明文" },
+//
 // ※ 新しいキャラは、一番下に足す（図鑑の番号がずれないように）
 window.CHARACTERS = [
   { file: "images/chara01.webp", name: "直立", rarity: "N", description: "黒いTシャツで、まっすぐ立つ。細長いので、積むときは横に寝かせるのがコツ。" },
@@ -33,14 +38,21 @@ window.CHARACTERS = [
   { file: "images/chara07.webp", name: "篠笛教師", rarity: "N", description: "白シャツで棒をかかげる、先生風のポーズ。" },
   { file: "images/chara08.webp", name: "篠笛マスター", rarity: "R", description: "サングラスで前かがみ。何かを吹いている？" },
   { file: "images/chara09.webp", name: "片足バランス", rarity: "N", description: "片足で前のめりにバランスをとる。積むと一番グラグラするかも。" },
-  { file: "images/chara10.webp", name: "床アレルギー", rarity: "N", description: "前かがみで手を床につく。", tolerance: 2, smooth: 4 },
-  { file: "images/chara11.webp", name: "しっぱい", rarity: "SR", description: "剣を振りかぶる、白Tシャツの剣士。" },
+  // ★3 ミニ床アレルギー：前は ★1「床アレルギー」（id "chara10"）。保存データの "chara10" は、save.js が "chara10_small" に直す。
+  // この画像の当たり判定の設定（tolerance・smooth）は、この行のものを使う
+  { id: "chara10_small", file: "images/chara10.webp", name: "ミニ床アレルギー", rarity: "SR", variant: "small", description: "小さくなった床アレルギー。前かがみで手を床につく。", tolerance: 2, smooth: 4 },
+  { file: "images/chara11.webp", name: "虫嫌い", rarity: "SR", description: "剣を振りかぶる、白Tシャツの剣士。" },
   { file: "images/chara12.webp", name: "横ガニ90度", rarity: "R", description: "片足を上げて手を広げる、おどけたポーズ。" },
   // ★4（激レア）：オーラをまとったキャラ（名前・説明文は仮）
-  { id: "chara01_light", base: "images/chara01.webp", name: "光の直立", rarity: "UR", aura: "light", description: "（仮）まばゆい光をまとって、まっすぐ立つ。" },
-  { id: "chara03_dark", base: "images/chara03.webp", name: "闇の体育座り", rarity: "UR", aura: "dark", description: "（仮）闇のもやの中で、じっと座りこむ。" },
-  { id: "chara07_light", base: "images/chara07.webp", name: "光の篠笛教師", rarity: "UR", aura: "light", description: "（仮）光の粒を集めて、棒をかかげる。" },
-  { id: "chara09_dark", base: "images/chara09.webp", name: "闇の片足バランス", rarity: "UR", aura: "dark", description: "（仮）稲妻を走らせながら、片足で立つ。" },
-  // ★5（まぼろし）：まだ登場しない（出る確率 0%）。画像は仮の「？」。登場させるときに画像・名前を書きかえる
-  { file: "images/maboroshi01.webp", name: "？？？", rarity: "MR", description: "（仮）まだだれも見たことがない、まぼろしのキャラ。" },
+  { id: "chara01_light", base: "images/chara01.webp", name: "光の直立", rarity: "UR", aura: "light", description: "まばゆい光をまとって、まっすぐ立つ。" },
+  { id: "chara03_dark", base: "images/chara03.webp", name: "闇の体育座り", rarity: "UR", aura: "dark", description: "闇のもやの中で、じっと座りこむ。" },
+  { id: "chara07_light", base: "images/chara07.webp", name: "光の篠笛教師", rarity: "UR", aura: "light", description: "光の粒を集めて、棒をかかげる。" },
+  { id: "chara09_dark", base: "images/chara09.webp", name: "闇の片足バランス", rarity: "UR", aura: "dark", description: "稲妻を走らせながら、片足で立つ。" },
+  // ★3（めっちゃレア）：サイズ違い（画像は元のキャラのもの。倍率は config.js の sizeVariants）
+  { id: "chara06_big", base: "images/chara06.webp", name: "ビッグエイリアン", rarity: "SR", variant: "big", description: "見上げるほど大きくなったブンリキエイリアン。立てると、ぐらぐら。" },
+  { id: "chara05_big", base: "images/chara05.webp", name: "ビッグ案内人", rarity: "SR", variant: "big", description: "大きな旗をかかげる、見上げるほどの台湾案内人。細長いので、寝かせるのがコツ。" },
+  // ★5（まぼろし）：とても出にくい（config.js の rarity の MR の rate を3体で分け合う）。名前・説明文は仮
+  { file: "images/chara13.webp", name: "スマホ自慢", rarity: "MR", description: "しゃがんで、スマホを見せびらかす。" },
+  { file: "images/chara14.webp", name: "白シャツの伊達男", rarity: "MR", description: "腰に手を当てて、さっそうと歩く。" },
+  { file: "images/chara15.webp", name: "キャプテン", rarity: "MR", description: "ドクロの帽子にサングラス。海の男。" },
 ];

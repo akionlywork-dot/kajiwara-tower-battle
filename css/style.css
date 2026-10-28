@@ -187,7 +187,8 @@ select {
   flex: 1;
   height: 64px;
   border-radius: var(--radius-m);
-  font-size: 22px;
+  font-size: 20px;
+  white-space: nowrap; /* 回転・反転・落とすの3つが、スマホの幅に1行で並ぶように */
 }
 
 .btn-ctrl.btn-primary {
@@ -911,6 +912,63 @@ select {
   margin: 1px 0;
 }
 
+/* ランキングの名前の行：長い名前だけ「…」にして、開発者の印・「あなた」はいつも全部見せる */
+.rank-main b.rank-name {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.rank-name-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rank-name .rank-you {
+  flex-shrink: 0;
+}
+
+/* ランキングの行では、開発者の印は名前のすぐ下（称号の札の場所）に出す */
+.rank-dev {
+  display: block;
+  margin: 1px 0;
+}
+
+.rank-dev .title-badge {
+  margin-left: 0;
+}
+
+/* ランキングの1〜3位の王冠（アイコンの上。ふちの星よりさらに上） */
+.rank-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+.rank-crown {
+  position: absolute;
+  left: 50%;
+  top: -24px;
+  width: 22px;
+  height: 15px;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+}
+
+.rank-crown svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 部門の見出し（手で書く ranking.json に divisions があるとき） */
+.ranking-division {
+  margin: var(--space-m) 0 var(--space-s);
+}
+
 /* 称号を選んでいない人（ランキング） */
 .title-badge.title-empty {
   color: rgba(255, 255, 255, 0.75);
@@ -1059,7 +1117,7 @@ select {
 /* キャラ図鑑 */
 .dex-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr)); /* 3列を同じ幅に（長い名前で列が広がらないように） */
   gap: var(--space-s);
 }
 
@@ -1112,10 +1170,10 @@ select {
 
 .dex-name {
   max-width: 100%;
-  overflow: hidden;
   font-size: 12px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  line-height: 1.3;
+  text-align: center;
+  overflow-wrap: anywhere; /* 長い名前（ビッグブンリキエイリアンなど）は、切らずに折り返す */
 }
 
 .dex-detail-img {
@@ -1202,6 +1260,17 @@ select {
   color: inherit;
 }
 
+/* 実績のごほうび（背景・土台。achievements.json の reward） */
+.ach-reward {
+  margin-left: 6px;
+  color: #8fe3ff;
+}
+
+.ach-locked .ach-reward {
+  color: inherit;
+  opacity: 0.85;
+}
+
 .ach-date {
   flex-shrink: 0;
   font-size: 11px;
@@ -1275,6 +1344,100 @@ select {
   letter-spacing: -1px;
   color: var(--rare-color);
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+/* ★5（まぼろし）の図鑑のカード：虹色の枠と、ゆっくり回る光 */
+.dex-card.dex-legend {
+  position: relative;
+  border: 3px solid transparent;
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    conic-gradient(from var(--legend-angle, 0deg), #ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0, #ff5d73) border-box;
+  box-shadow: 0 0 14px rgba(126, 240, 255, 0.55);
+  animation: legend-border 4s linear infinite;
+}
+
+@property --legend-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes legend-border {
+  to { --legend-angle: 360deg; }
+}
+
+/* まだ見つけていない★5は、シルエットではなく「？」 */
+.dex-question {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 40px;
+  font-weight: bold;
+  color: #7ef0ff;
+  text-shadow: 0 0 10px rgba(126, 240, 255, 0.8);
+}
+
+/* サイズ違いのキャラ：絵を大きく・小さく見せて、「BIG」「MINI」の札 */
+.dex-img {
+  position: relative;
+}
+
+.dex-variant-big img {
+  transform: scale(1.15);
+}
+
+.dex-variant-small img {
+  transform: scale(0.65);
+}
+
+.dex-size {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  padding: 0 5px;
+  border-radius: 6px;
+  color: #fff;
+  background: #ff7a59;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: bold;
+  line-height: 1.6;
+}
+
+.dex-size-small {
+  background: #3d9bff;
+}
+
+/* 出現率のテスト（管理者メニュー） */
+.admin-draw table {
+  width: 100%;
+  margin: var(--space-s) 0;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.admin-draw th,
+.admin-draw td {
+  padding: 3px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.admin-draw .admin-draw-rarity th,
+.admin-draw .admin-draw-rarity td {
+  padding-top: 8px;
+  font-weight: bold;
+  color: var(--color-gold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dex-card.dex-legend {
+    animation: none;
+  }
 }
 
 .dex-card.dex-rare {
@@ -2300,6 +2463,187 @@ select {
   background: rgba(0, 0, 0, 0.25);
 }
 
+/* ホームの右上（歯車の左）の 🛠：管理者メニュー（管理者モードの端末だけ） */
+.btn-admin-home {
+  right: calc(var(--space-m) + var(--safe-right) + 46px + var(--space-s));
+  font-size: 20px;
+}
+
+/* 管理者メニューの、チェックボックスの一覧 */
+.admin-checks {
+  display: grid;
+  gap: 2px;
+  margin: var(--space-s) 0;
+  padding: var(--space-s) var(--space-m);
+  border-radius: var(--radius-s);
+  background: var(--color-panel);
+}
+
+.admin-checks label,
+.admin-check-backup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  min-height: 36px;
+  font-size: 14px;
+}
+
+.admin-checks small {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.admin-checks input,
+.admin-check-backup input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+}
+
+.admin-check-backup {
+  margin-bottom: var(--space-s);
+}
+
+.admin-wide {
+  width: 100%;
+  margin-top: var(--space-s);
+}
+
+.admin-wide:disabled {
+  opacity: 0.45;
+}
+
+/* 出現率のテスト：回数の入力とボタンを横に並べる */
+.admin-draw-form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-s);
+}
+
+.admin-draw-form .field {
+  flex: 1;
+  margin-top: 0;
+}
+
+.admin-draw-form .btn {
+  height: 48px;
+}
+
+.admin-draw td {
+  line-height: 1.3;
+}
+
+.admin-draw .admin-diff-big {
+  color: #ff8a8a;
+  font-weight: bold;
+}
+
+/* 管理者モード：画面の上の札（「デバッグ中・記録されません」「テスト日付：10/31」）。タップは下に通す */
+#admin-flags {
+  position: absolute;
+  top: calc(4px + var(--safe-top));
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  gap: 6px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.admin-flag {
+  padding: 3px 10px;
+  border-radius: var(--radius-round);
+  font-size: 12px;
+  font-weight: bold;
+  color: #2b1d00;
+  background: #ffd84d;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.admin-flag-date {
+  color: #fff;
+  background: #7b4dff;
+}
+
+/* 管理者モード：左上の数値（FPS・キャラの数と高さ） */
+.admin-hud {
+  position: absolute;
+  top: calc(30px + var(--safe-top));
+  left: calc(4px + var(--safe-left));
+  z-index: 60;
+  margin: 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: #b9ffb9;
+  background: rgba(0, 0, 0, 0.6);
+  font: 11px/1.45 ui-monospace, Menlo, Consolas, monospace;
+  pointer-events: none;
+}
+
+/* ---------- 自由配置モード（sandbox.js） ---------- */
+/* 遊んでいるあいだは、ふつうのゲームの表示（スコア・操作ボタン）を消す */
+body.sandbox-on .game-ui,
+body.sandbox-on #turn-banner,
+body.sandbox-on #rare-banner {
+  display: none !important;
+}
+
+#sandbox-ui {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  padding: var(--space-s) calc(var(--space-m) + var(--safe-right)) calc(var(--space-s) + var(--safe-bottom)) calc(var(--space-m) + var(--safe-left));
+  background: linear-gradient(to top, rgba(20, 30, 55, 0.85), rgba(20, 30, 55, 0.6));
+}
+
+.sandbox-top {
+  display: flex;
+  gap: var(--space-s);
+}
+
+.sandbox-top select {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 var(--space-s);
+  border: 0;
+  border-radius: var(--radius-s);
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--color-text-dark);
+  background: #fff;
+}
+
+.sandbox-info {
+  margin: 6px 0;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.sandbox-tools {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.sandbox-tools .btn {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.sandbox-tools .btn:disabled {
+  opacity: 0.45;
+}
+
+/* 読み込み状況（load-status.js）は、自由配置モードのボタンの帯より上に出す */
+body.sandbox-on .load-status {
+  bottom: calc(150px + var(--safe-bottom));
+}
+
 /* 合言葉から作った番号（コピーしやすいように、選択できる文字にする） */
 .admin-made {
   margin-top: var(--space-m);
@@ -2924,6 +3268,44 @@ select {
   animation: ultimate-flash 0.6s ease-out;
 }
 
+/* ★5（まぼろし）：虹色の光が回りながら、画面全体が長めに光る */
+#flash.on.legendary {
+  background:
+    radial-gradient(circle at 50% 34%, #ffffff 0, rgba(255, 255, 255, 0.9) 18%, transparent 55%),
+    conic-gradient(from 0deg at 50% 34%, rgba(255, 93, 115, 0.6), rgba(255, 194, 26, 0.6), rgba(76, 217, 100, 0.6), rgba(61, 139, 255, 0.6), rgba(182, 92, 240, 0.6), rgba(255, 93, 115, 0.6));
+  animation: legendary-flash 1.6s ease-out;
+}
+
+@keyframes legendary-flash {
+  0% { opacity: 1; filter: hue-rotate(0deg); }
+  30% { opacity: 0.9; }
+  100% { opacity: 0; filter: hue-rotate(160deg); }
+}
+
+.rare-banner.legendary {
+  animation: rare-pop 3s ease-out forwards;
+}
+
+.rare-banner.legendary span {
+  padding: 8px 28px;
+  font-size: 40px;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 2px 4px rgba(0, 0, 0, 0.5);
+  background: linear-gradient(100deg, #ff5d73, #ffc21a 20%, #ffffff 35%, #4cd964 50%, #3d8bff 70%, #b65cf0) 0 0 / 240% 100%;
+  box-shadow: 0 0 40px #7ef0ff, 0 0 90px rgba(182, 92, 240, 0.8), 0 0 140px rgba(255, 194, 26, 0.6);
+  animation: ultimate-shine 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #flash.on.legendary {
+    animation: ultimate-flash 0.8s ease-out;
+  }
+
+  .rare-banner.legendary span {
+    animation: none;
+  }
+}
+
 @keyframes ultimate-flash {
   0% { opacity: 0.95; }
   100% { opacity: 0; }
@@ -3323,6 +3705,7 @@ select {
      --frame-light … 札の上側の明るい色 ／ --frame-text … 札の文字の色
      --frame-star  … 星の塗り（ふだんは輪の色。虹色など特別なときだけ書く）
      --frame-badge … 札の塗り（ふだんは light → color のグラデーション）
+     --frame-ring  … （まぼろし・期間限定・隠しだけ）輪の塗り。札と同じ色にする（下の「札と同じ色の輪」）
    枠の太さ・星の大きさは、アイコンの大きさ（--av）に合わせて変わる
    ============================================= */
 .avatar { --av: 38px; }
@@ -3341,7 +3724,20 @@ select {
   --frame-star: linear-gradient(90deg, #ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0);
   --frame-badge: linear-gradient(90deg, #ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0, #ff5d73) 0 0 / 300% 100%;
 }
-.frame-event, .rank-event { --frame-color: #ff8a1f; --frame-dark: #3b1458; --frame-light: #ffc27a; --frame-text: #ffb15c; --frame-badge: linear-gradient(#5a2380, #3b1458); }
+/* まぼろし：夜空色の札に、虹の星（輪は虹が回り、白く光る。下の「まぼろしの枠」） */
+/* まぼろし：輪も札も夜空色（紺→紫→青）で、ふちはクリーム色。星もクリーム色で光る */
+.frame-mythic, .rank-mythic {
+  --frame-color: #fff6d6;
+  --frame-dark: #fff6d6;
+  --frame-text: #ffffff;
+  --frame-star: linear-gradient(#ffffff, #fff6d6);
+  --frame-badge: linear-gradient(90deg, #2a1660, #4b2a9a, #1d4f8a, #2a1660) 0 0 / 300% 100%;
+  --frame-ring: conic-gradient(#2a1660, #4b2a9a, #1d4f8a, #2a1660, #4b2a9a, #1d4f8a, #2a1660);
+}
+/* 隠し：紫×黒（ふちには「？」。achievements.json の decoration: "question"）。輪も札と同じ紫→黒 */
+.frame-secret, .rank-secret { --frame-color: #8f5bff; --frame-dark: #1a0b2e; --frame-light: #c9a8ff; --frame-text: #f3e6ff; --frame-badge: linear-gradient(#3a1a66, #1a0b2e); --frame-ring: linear-gradient(#3a1a66, #1a0b2e); }
+/* 期間限定：輪も札と同じ紫。星（飾り）は札の文字と同じオレンジ */
+.frame-event, .rank-event { --frame-color: #ff8a1f; --frame-dark: #3b1458; --frame-light: #ffc27a; --frame-text: #ffb15c; --frame-badge: linear-gradient(#5a2380, #3b1458); --frame-ring: linear-gradient(#5a2380, #3b1458); }
 /* まだ取っていない称号（称号を選ぶ画面だけ） */
 .frame-locked, .rank-locked { --frame-color: #9aa1aa; --frame-dark: #5d636b; --frame-light: #c4c9cf; --frame-text: #3a3f46; }
 
@@ -3353,26 +3749,143 @@ select {
   box-shadow: 0 0 0 max(1px, calc(var(--av) * 0.025)) var(--frame-dark);
 }
 
-/* てっぺんに並ぶ星（格の数だけ。.stars-〇 で数を決める。星の形を横にくり返したもの） */
-.stars-1 { --frame-stars: 1; }
-.stars-2 { --frame-stars: 2; }
-.stars-3 { --frame-stars: 3; }
-.stars-4 { --frame-stars: 4; }
+/* ふちに並ぶ星（格の数だけ。.stars-〇 で数を決める）
+   丸いアイコンのふちに沿って、円のてっぺんから左右に等間隔で並べる。数が増えるほど、星を小さく・間を詰める。
+   --p1〜--p4：星の置き場所（::after の箱の左上から）、--sz：星の大きさ。どちらもアイコンの大きさ（--av）に対する割合なので、
+   どの大きさのアイコンでも同じ並びになる。称号の飾り（.deco-〇〇。下の「称号の飾り」）も、同じ場所に置く。
+   この数値は、星の角度と大きさの表から計算して作ったもの（1つ：真上 / 2つ：±20度 / 3つ：0・±34度 / 4つ：±16・±48度 / 5つ：0・±32・±64度） */
+.stars-1 { --sz: calc(var(--av) * 0.34); --p1: calc(var(--av) * 0.63) calc(var(--av) * 0.11); --p2: -9999px -9999px; --p3: -9999px -9999px; --p4: -9999px -9999px; --p5: -9999px -9999px; }
+.stars-2 { --sz: calc(var(--av) * 0.3); --p1: calc(var(--av) * 0.4721) calc(var(--av) * 0.1614); --p2: calc(var(--av) * 0.8279) calc(var(--av) * 0.1614); --p3: -9999px -9999px; --p4: -9999px -9999px; --p5: -9999px -9999px; }
+.stars-3 { --sz: calc(var(--av) * 0.27); --p1: calc(var(--av) * 0.3742) calc(var(--av) * 0.2339); --p2: calc(var(--av) * 0.665) calc(var(--av) * 0.145); --p3: calc(var(--av) * 0.9558) calc(var(--av) * 0.2339); --p4: -9999px -9999px; --p5: -9999px -9999px; }
+.stars-4 { --sz: calc(var(--av) * 0.24); --p1: calc(var(--av) * 0.2936) calc(var(--av) * 0.3321); --p2: calc(var(--av) * 0.5367) calc(var(--av) * 0.1801); --p3: calc(var(--av) * 0.8233) calc(var(--av) * 0.1801); --p4: calc(var(--av) * 1.0664) calc(var(--av) * 0.3321); --p5: -9999px -9999px; }
+.stars-5 { --sz: calc(var(--av) * 0.21); --p1: calc(var(--av) * 0.2276) calc(var(--av) * 0.467); --p2: calc(var(--av) * 0.4194) calc(var(--av) * 0.254); --p3: calc(var(--av) * 0.695) calc(var(--av) * 0.175); --p4: calc(var(--av) * 0.9706) calc(var(--av) * 0.254); --p5: calc(var(--av) * 1.1626) calc(var(--av) * 0.467); }
 
 .avatar.frame::after {
-  --star: max(11px, calc(var(--av) * 0.3));
   content: "";
   position: absolute;
-  left: 50%;
-  top: calc(var(--star) * -0.75);
-  width: calc(var(--star) * var(--frame-stars, 1));
-  height: var(--star);
-  transform: translateX(-50%);
+  /* アイコンより、まわりに --av の 0.3 倍だけ広い箱（星がふちからはみ出すぶん）。枠の太さのぶんもずらして、円の真ん中に合わせる */
+  inset: calc(var(--av) * -0.3 - max(2px, calc(var(--av) * 0.07)));
   background: var(--frame-star, linear-gradient(var(--frame-light, var(--frame-color)), var(--frame-color)));
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2 61 37 98 37 68 58 79 93 50 72 21 93 32 58 2 37 39 37Z'/%3E%3C/svg%3E") 0 0 / var(--star) var(--star) repeat-x;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2 61 37 98 37 68 58 79 93 50 72 21 93 32 58 2 37 39 37Z'/%3E%3C/svg%3E") 0 0 / var(--star) var(--star) repeat-x;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2 61 37 98 37 68 58 79 93 50 72 21 93 32 58 2 37 39 37Z'/%3E%3C/svg%3E") var(--p1) / var(--sz) var(--sz) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2 61 37 98 37 68 58 79 93 50 72 21 93 32 58 2 37 39 37Z'/%3E%3C/svg%3E") var(--p2) / var(--sz) var(--sz) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2 61 37 98 37 68 58 79 93 50 72 21 93 32 58 2 37 39 37Z'/%3E%3C/svg%3E") var(--p3) / var(--sz) var(--sz) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2 61 37 98 37 68 58 79 93 50 72 21 93 32 58 2 37 39 37Z'/%3E%3C/svg%3E") var(--p4) / var(--sz) var(--sz) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2 61 37 98 37 68 58 79 93 50 72 21 93 32 58 2 37 39 37Z'/%3E%3C/svg%3E") var(--p5) / var(--sz) var(--sz) no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2 61 37 98 37 68 58 79 93 50 72 21 93 32 58 2 37 39 37Z'/%3E%3C/svg%3E") var(--p1) / var(--sz) var(--sz) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2 61 37 98 37 68 58 79 93 50 72 21 93 32 58 2 37 39 37Z'/%3E%3C/svg%3E") var(--p2) / var(--sz) var(--sz) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2 61 37 98 37 68 58 79 93 50 72 21 93 32 58 2 37 39 37Z'/%3E%3C/svg%3E") var(--p3) / var(--sz) var(--sz) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2 61 37 98 37 68 58 79 93 50 72 21 93 32 58 2 37 39 37Z'/%3E%3C/svg%3E") var(--p4) / var(--sz) var(--sz) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 2 61 37 98 37 68 58 79 93 50 72 21 93 32 58 2 37 39 37Z'/%3E%3C/svg%3E") var(--p5) / var(--sz) var(--sz) no-repeat;
   pointer-events: none;
+}
+
+/* 称号の飾り（achievements.json の decoration。frames.js の DECORATIONS）
+   星の代わりに、ふちの星と同じ場所・同じ数に画像（images/decorations/）を置く。飾りを足すときは、ここに1つ足す */
+.deco-pumpkin { --deco-img: url("../images/decorations/pumpkin.svg"); }
+.deco-snow { --deco-img: url("../images/decorations/snowflake.svg"); }
+.deco-question { --deco-img: url("../images/decorations/question.svg"); }
+
+.avatar.frame[class*="deco-"]::after {
+  -webkit-mask: none;
+  mask: none;
+  background:
+    var(--deco-img) var(--p1) / var(--sz) var(--sz) no-repeat,
+    var(--deco-img) var(--p2) / var(--sz) var(--sz) no-repeat,
+    var(--deco-img) var(--p3) / var(--sz) var(--sz) no-repeat,
+    var(--deco-img) var(--p4) / var(--sz) var(--sz) no-repeat,
+    var(--deco-img) var(--p5) / var(--sz) var(--sz) no-repeat;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+}
+
+/* まだ取っていない称号の見本では、飾りも灰色に */
+.avatar.frame-locked[class*="deco-"]::after {
+  filter: grayscale(1) opacity(0.6);
+}
+
+/* =============================================
+   開発者の枠（.frame-dev）と札（.dev-title）：ほかの称号とちがう「コード風」
+   黒っぽい輪に、緑に光るふち。ふちに沿って </> と 0・1 が並び、ゆっくり回りながら、ときどき点滅する。
+   ふちの光が、輪に沿ってゆっくり流れる。「視差効果を減らす」では動かない
+   ============================================= */
+.avatar.frame.frame-dev {
+  border-color: #0b1410;
+  box-shadow:
+    0 0 0 max(1px, calc(var(--av) * 0.025)) #39ff88,
+    0 0 calc(var(--av) * 0.2) rgba(57, 255, 136, 0.55);
+}
+
+/* ふちに沿った </> と 0・1（images/decorations/code-ring.svg を、アイコンより少し大きく重ねる） */
+.avatar.frame.frame-dev::after {
+  inset: calc(var(--av) * -0.2 - max(2px, calc(var(--av) * 0.07)));
+  -webkit-mask: none;
+  mask: none;
+  background: url("../images/decorations/code-ring.svg") center / 100% 100% no-repeat;
+  filter: drop-shadow(0 0 2px rgba(57, 255, 136, 0.9));
+  animation: dev-ring 24s linear infinite, dev-blink 3.2s steps(1) infinite;
+}
+
+/* ふちを流れる光（緑の光の帯が、輪に沿ってゆっくり回る） */
+.avatar.frame.frame-dev::before {
+  content: "";
+  position: absolute;
+  --ring: max(2px, calc(var(--av) * 0.07));
+  inset: calc(var(--ring) * -1);
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 70%, rgba(57, 255, 136, 0.15) 80%, #b9ffd4 92%, transparent 96%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring) + 0.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring) + 0.5px));
+  animation: frame-spin 5s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes dev-ring {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes dev-blink {
+  0%, 88%, 92%, 100% { opacity: 1; }
+  90% { opacity: 0.35; }
+}
+
+/* 開発者の札：黒地に緑の等幅の文字、頭に </>、うしろに点滅するカーソル */
+.title-badge.dev-title {
+  padding: 0 8px;
+  border: 1px solid #39ff88;
+  border-radius: 4px;
+  color: #39ff88;
+  background: #07110c;
+  box-shadow: 0 0 6px rgba(57, 255, 136, 0.55);
+  font-family: Menlo, Consolas, "Courier New", monospace;
+  text-shadow: 0 0 4px rgba(57, 255, 136, 0.8);
+}
+
+.dev-code {
+  margin-right: 5px;
+  opacity: 0.85;
+}
+
+.dev-caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: -0.12em;
+  background: #39ff88;
+  animation: dev-caret 1s steps(1) infinite;
+}
+
+@keyframes dev-caret {
+  50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar.frame.frame-dev::after,
+  .avatar.frame.frame-dev::before,
+  .dev-caret {
+    animation: none;
+  }
 }
 
 /* 金：ときどき、丸の中をななめの光が通る */
@@ -3417,6 +3930,52 @@ select {
 
 @keyframes frame-spin {
   to { transform: rotate(360deg); }
+}
+
+/* 札と同じ色の輪（まぼろし・期間限定・隠し）：輪の形に切り抜いた --frame-ring を、ふちの上に重ねる（太さは共通の輪と同じ） */
+.avatar.frame-mythic,
+.avatar.frame-event,
+.avatar.frame-secret {
+  border-color: transparent;
+}
+
+.avatar.frame-mythic::before,
+.avatar.frame-event::before,
+.avatar.frame-secret::before {
+  content: "";
+  position: absolute;
+  --ring: max(2px, calc(var(--av) * 0.07));
+  inset: calc(var(--ring) * -1);
+  border-radius: 50%;
+  background: var(--frame-ring);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring) + 0.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring) + 0.5px));
+  pointer-events: none;
+}
+
+/* まぼろしの枠：夜空色の輪がゆっくり回り（札の色が流れるのと同じ）、まわりが白く光ったり弱まったりする。星も光る */
+.avatar.frame-mythic {
+  animation: frame-mythic-glow 2.4s ease-in-out infinite;
+}
+
+.avatar.frame-mythic::before {
+  animation: frame-spin 6s linear infinite;
+}
+
+.avatar.frame-mythic::after {
+  filter: drop-shadow(0 0 calc(var(--av) * 0.04) rgba(255, 246, 214, 0.9));
+}
+
+@keyframes frame-mythic-glow {
+  0%, 100% { box-shadow: 0 0 0 max(1px, calc(var(--av) * 0.025)) var(--frame-dark), 0 0 calc(var(--av) * 0.12) rgba(255, 255, 255, 0.5); }
+  50% { box-shadow: 0 0 0 max(1px, calc(var(--av) * 0.025)) var(--frame-dark), 0 0 calc(var(--av) * 0.3) rgba(255, 246, 214, 0.95); }
+}
+
+/* まぼろしの札：夜空色の上を、ゆっくり色が流れる。文字は白く光る */
+.title-badge.rank-mythic {
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 0 0 1px #fff6d6, 0 0 6px rgba(255, 246, 214, 0.7);
+  animation: badge-rainbow 6s linear infinite;
 }
 
 /* 称号の札（形は全部の格で共通。色だけ変わる） */
@@ -3508,6 +4067,9 @@ select {
 @media (prefers-reduced-motion: reduce) {
   .avatar.frame-gold::before,
   .avatar.frame-legend::before,
+  .avatar.frame-mythic,
+  .avatar.frame-mythic::before,
+  .title-badge.rank-mythic,
   .title-badge.rank-legend,
   .title-badge.rank-gold::after {
     animation: none;

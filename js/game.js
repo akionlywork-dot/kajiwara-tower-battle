@@ -4,7 +4,7 @@
 // =============================================
 
 const Game = (() => {
-  const { Engine, Composite, Bodies, Body, Events } = Matter;
+  const { Engine, Composite, Bodies, Body, Events, Query } = Matter;
 
   // ゲーム内の座標の広さ。横幅は 450 で固定、縦は画面の縦横比に合わせて決める
   const WORLD_W = 450;
@@ -181,6 +181,9 @@ const Game = (() => {
 
     // 特殊ルール（rules.js）。無ければ null
     rule = (opts && opts.rule) || null;
+    // fair：オンライン対戦（相手にも同じキャラが出る）。管理者モードの「次に出すキャラ」や、
+    //   テスト日付・イベントの確認表示を使わず、実際の日付で抽選する（相手に影響しないように）
+    fair = !!(opts && opts.fair);
     if (rule) {
       rule.state = {};
       if (rule.platformOptions) Body.set(platform, rule.platformOptions(rule.params));
@@ -188,7 +191,7 @@ const Game = (() => {
     }
 
     lastShape = null;
-    rotations = 0;
+    resetCounters();
     nextPiece();
   }
 
@@ -481,6 +484,145 @@ const Game = (() => {
     demo.phaseAt = simTime;
   }
 
+  // ---------- 自由配置モード（管理者モード。sandbox.js が使う） ----------
+  // 次に置くキャラ・角度・反転を決めて、画面をタップした場所（空中でもよい）にキャラを置く。
+  // 置いたキャラは、ドラッグで動かす・回す・反転する・消すことができる。物理の計算は止めたり、1コマずつ進めたりできる。
+  // ゲームの記録（ハイスコア・戦績・実績・図鑑）の処理（main.js の onSettled など）は通らないので、何も記録されない
+  const sandbox = {
+    paused: false,
+    next: { id: null, angle: 0, flip: false }, // 次に置くキャラ
+    selected: null, // 選んでいるキャラ（物理のボディ）
+    drag: null, // ドラッグ中 { body, dx, dy }
+  };
+
+  function startSandbox() {
+    callbacks = {};
+    demo = null;
+    rule = null;
+    remote = false;
+    remoteBodies = new Map();
+    held = null;
+    photo = null;
+    paused = false;
+    fair = false;
+    createWorld(PLATFORM_FROM_BOTTOM);
+    setTurnTimeLimit(0);
+    state = "sandbox";
+    Object.assign(sandbox, { paused: false, selected: null, drag: null });
+    if (!sandbox.next.id && shapes.length) sandbox.next.id = shapes[0].id;
+  }
+
+  function sandboxDown(p) {
+    const hit = Query.point(pieces(), p);
+    const body = hit.length ? hit[hit.length - 1] : null;
+    if (body) {
+      // 置いたキャラをつかむ（つかんでいるあいだは、物理で動かないように固定する）
+      sandbox.selected = body;
+      sandbox.drag = { body, dx: body.position.x - p.x, dy: body.position.y - p.y };
+      Body.setStatic(body, true);
+      return;
+    }
+    // 何もない場所：次のキャラを、そこに置く
+    const base = shapeById(sandbox.next.id);
+    if (!base) return;
+    const shape = sandbox.next.flip ? Shape.flipped(base) : base;
+    const b = Shape.spawnBody(shape, p.x, p.y, sandbox.next.angle, BODY_OPTIONS);
+    Composite.add(engine.world, b);
+    sandbox.selected = b;
+  }
+
+  function sandboxMove(p) {
+    const d = sandbox.drag;
+    if (d) Body.setPosition(d.body, { x: p.x + d.dx, y: p.y + d.dy });
+  }
+
+  function sandboxUp() {
+    const d = sandbox.drag;
+    if (!d) return;
+    sandbox.drag = null;
+    Body.setStatic(d.body, false);
+    Body.setVelocity(d.body, { x: 0, y: 0 });
+    Body.setAngularVelocity(d.body, 0);
+  }
+
+  // 選んでいるキャラ（無ければ null。土台の下に落ちて消えたものも null）
+  function sandboxSelected() {
+    const b = sandbox.selected;
+    return b && pieces().includes(b) ? b : null;
+  }
+
+  const sandboxAPI = {
+    // 次に置くキャラ（id・角度・反転）
+    setNext(next) {
+      Object.assign(sandbox.next, next);
+    },
+    get next() {
+      return Object.assign({}, sandbox.next);
+    },
+    // 回す（選んでいるキャラがあればそれを、無ければ次に置くキャラの角度を、45度）
+    rotate() {
+      const b = sandboxSelected();
+      if (b) Body.setAngle(b, b.angle + Math.PI / 4);
+      else sandbox.next.angle = (sandbox.next.angle + Math.PI / 4) % (Math.PI * 2);
+    },
+    // 反転する（選んでいるキャラは、反転した形に入れかえる。無ければ次に置くキャラを反転）
+    flip() {
+      const b = sandboxSelected();
+      if (!b) {
+        sandbox.next.flip = !sandbox.next.flip;
+        return;
+      }
+      const nb = Shape.spawnBody(Shape.flipped(b.shape), b.position.x, b.position.y, b.angle, BODY_OPTIONS);
+      Composite.remove(engine.world, b);
+      Composite.add(engine.world, nb);
+      sandbox.selected = nb;
+    },
+    // 選んでいるキャラを消す
+    remove() {
+      const b = sandboxSelected();
+      if (b) Composite.remove(engine.world, b);
+      sandbox.selected = null;
+    },
+    // 土台以外を全部消す
+    clear() {
+      for (const b of pieces()) Composite.remove(engine.world, b);
+      sandbox.selected = null;
+    },
+    setPaused(on) {
+      sandbox.paused = !!on;
+    },
+    get paused() {
+      return sandbox.paused;
+    },
+    // 止めているあいだに、1コマ（60分の1秒）だけ進める
+    step() {
+      if (state !== "sandbox") return;
+      physicsStep();
+      checkFallen();
+    },
+    get selectedName() {
+      const b = sandboxSelected();
+      return b ? b.shape.name : null;
+    },
+  };
+
+  // 選んでいるキャラの輪郭（黄色の点線）
+  function drawSandboxSelection() {
+    const b = sandboxSelected();
+    if (!b) return;
+    ctx.save();
+    ctx.strokeStyle = "#ffd84d";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    for (const part of b.parts.length > 1 ? b.parts.slice(1) : b.parts) {
+      ctx.beginPath();
+      part.vertices.forEach((v, i) => (i ? ctx.lineTo(v.x, v.y) : ctx.moveTo(v.x, v.y)));
+      ctx.closePath();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   // ---------- ポーズ ----------
   // ポーズ中は物理演算・時計・操作がすべて止まる（描画だけは続ける）
   function pause() {
@@ -500,13 +642,17 @@ const Game = (() => {
   // 次のキャラをランダムに選んで、画面上部に持たせる
   // 管理者モード：次に出すキャラを決めておく（キャラの ID。null ならふつうにランダム）
   let forcedId = null;
+  let fair = false; // オンライン対戦のゲームか（start の opts.fair）
   function setForcedShape(id) {
     forcedId = id;
   }
 
   function nextPiece() {
-    const forced = forcedId && shapeById(forcedId);
+    const forced = !fair && forcedId && shapeById(forcedId);
     held = { shape: ruleShape(forced || randomShape()), x: WORLD_W / 2, angle: 0 };
+    drawn.push(held.shape.id); // 出た順（実績「デジャヴ」）。長くなりすぎないよう、最後の数体だけ残す
+    if (drawn.length > 8) drawn.shift();
+    flipRun = 0;
     clampHeld();
     state = "aim";
     aimStartAt = simTime;
@@ -536,7 +682,7 @@ const Game = (() => {
   // キャラを選ぶ。出やすさ（weight）に合わせて、くじ引きのように選ぶ（同じキャラが2回続かないように）
   function randomShape() {
     // 期間限定のキャラは、イベントの期間中だけ出る（events.js）
-    const open = shapes.filter((s) => LimitedEvents.available(s));
+    const open = shapes.filter((s) => LimitedEvents.available(s, fair));
     const pool = open.length > 1 ? open.filter((s) => s !== lastShape) : open.length ? open : shapes;
     // 出やすさが 0 のキャラ（まぼろしなど、まだ登場しないキャラ）は選ばれない
     const total = pool.reduce((sum, s) => sum + chance(s), 0);
@@ -552,6 +698,22 @@ const Game = (() => {
     }
     lastShape = shape;
     return shape;
+  }
+
+  // 開発者用：n 回抽選して、キャラごとの出た回数を返す（Map：キャラの ID → 回数）。
+  // 本物と同じ選び方（同じキャラが続かない決まりも同じ）。今のゲームの順番には影響しない
+  function drawTest(n) {
+    const saved = { last: lastShape, rand: pieceRandom };
+    pieceRandom = Math.random;
+    lastShape = null;
+    const counts = new Map();
+    for (let i = 0; i < n; i++) {
+      const s = randomShape();
+      counts.set(s.id, (counts.get(s.id) || 0) + 1);
+    }
+    lastShape = saved.last;
+    pieceRandom = saved.rand;
+    return counts;
   }
 
   // レア度の情報（config.js の rarity）。ノーマルや不明なら null
@@ -572,11 +734,42 @@ const Game = (() => {
   // ---------- 操作 ----------
   // このゲームで回転を使った回数（実績「回さず勝負」の判定に使う）
   let rotations = 0;
+  // 実績のための数（このゲームの分。どれも数えるだけなので軽い）
+  let flips = 0; // 反転を使った回数
+  let flipRun = 0; // 今のキャラで、続けて反転を押した回数（ほかの操作をするか、次のキャラで 0 に戻す）
+  let flipStreak = 0; // flipRun の一番多かった数
+  let drawn = []; // 出たキャラの ID（出た順。最後の数体）
+  let lastDropLeft = null; // 最後に落としたときの、制限時間の残り（ミリ秒。制限時間がなければ null）
+
+  function resetCounters() {
+    rotations = flips = flipRun = flipStreak = 0;
+    drawn = [];
+    lastDropLeft = null;
+  }
 
   function rotate() {
     if (paused || state !== "aim" || !held) return;
     held.angle += Math.PI / 4; // 45度
     rotations++;
+    flipRun = 0;
+    clampHeld();
+  }
+
+  // 左右反転（見た目の画像と当たり判定の両方）。反転は、くるっと裏返るアニメーションで見せる
+  const FLIP_MS = 260;
+  function flip() {
+    if (paused || state !== "aim" || !held) return;
+    flipHeld();
+  }
+
+  // 持っているキャラを反転する（アニメーションつき）
+  function flipHeld() {
+    flips++;
+    flipRun++;
+    flipStreak = Math.max(flipStreak, flipRun);
+    const from = held.shape;
+    held.shape = Shape.flipped(from);
+    held.flipAnim = { from, at: performance.now() };
     clampHeld();
   }
 
@@ -606,6 +799,7 @@ const Game = (() => {
     remoteBodies = new Map();
     awaitingDrop = false;
     state = "remote";
+    resetCounters();
   }
 
   // ID のキャラの形（知らない ID なら null。相手が新しいキャラのあるバージョンでも、落ちないように）
@@ -615,8 +809,9 @@ const Game = (() => {
   // ホスト：今の状態を書き出す（小さく送れるよう、数字の配列にする）
   function snapshot() {
     return {
-      b: pieces().map((b) => [b.id, b.shape.id, round(b.position.x, 10), round(b.position.y - platformTop, 10), round(b.angle, 1000)]),
-      h: held && state === "aim" ? [held.shape.id, round(held.x, 10), round(held.angle, 1000)] : null,
+      // [番号, キャラの ID, x, y, 角度, 反転（1 / 0）]
+      b: pieces().map((b) => [b.id, b.shape.id, round(b.position.x, 10), round(b.position.y - platformTop, 10), round(b.angle, 1000), b.shape.flip ? 1 : 0]),
+      h: held && state === "aim" ? [held.shape.id, round(held.x, 10), round(held.angle, 1000), held.shape.flip ? 1 : 0] : null,
       t: turnLimit && state === "aim" ? [Math.round(timeLeft()), turnLimit] : null, // 制限時間 [残り, 全部]（ミリ秒）
     };
   }
@@ -629,12 +824,13 @@ const Game = (() => {
     remoteTime = t ? { left: Math.min(t[0], t[1]), limit: t[1], at: performance.now() } : null;
     const seen = new Set();
     let top = platformTop;
-    for (const [id, charId, x, yRel, a] of snap.b) {
+    for (const [id, charId, x, yRel, a, f] of snap.b) {
       const y = yRel + platformTop;
       let r = remoteBodies.get(id);
       if (!r) {
-        const shape = shapeById(charId);
-        if (!shape) continue; // 知らないキャラは描かない
+        const base = shapeById(charId);
+        if (!base) continue; // 知らないキャラは描かない
+        const shape = f ? Shape.flipped(base) : base;
         r = { shape, x, y, angle: a };
         remoteBodies.set(id, r);
       }
@@ -658,12 +854,13 @@ const Game = (() => {
       return;
     }
     if (awaitingDrop) return; // 自分が落としたキャラが、まだホストで落ちていない
-    const [charId, x, angle] = snap.h;
-    const shape = shapeById(charId);
-    if (!shape) return; // 知らないキャラ
+    const [charId, x, angle, f] = snap.h;
+    const base = shapeById(charId);
+    if (!base) return; // 知らないキャラ
+    const shape = f ? Shape.flipped(base) : base;
     if (myTurn) {
       // 自分の手番：最初の1回だけ受け取り、あとは自分の指で動かす
-      if (!held || held.shape !== shape || state !== "aim") {
+      if (!held || held.shape.id !== shape.id || state !== "aim") {
         held = { shape, x, angle };
         clampHeld();
         state = "aim";
@@ -686,15 +883,17 @@ const Game = (() => {
   }
 
   // ホスト：相手（ゲスト）が動かしているキャラの位置と角度を反映する
-  function setHeldPose(x, angle) {
+  // flip：反転しているか（相手から届いたもの。古いバージョンの相手からは届かないので、そのときはそのまま）
+  function setHeldPose(x, angle, flip) {
     if (!held) return;
     held.angle = angle;
+    if (typeof flip === "boolean" && !!held.shape.flip !== flip) flipHeld();
     moveHeldTo(x);
   }
 
   // 持っているキャラの位置と角度（ゲストが相手に送るため）。持っていなければ null
   function heldPose() {
-    return held && state === "aim" ? { x: held.x, angle: held.angle } : null;
+    return held && state === "aim" ? { x: held.x, angle: held.angle, flip: !!held.shape.flip } : null;
   }
 
   // ---------- CPU 用 ----------
@@ -709,7 +908,8 @@ const Game = (() => {
   // 持っているキャラを位置 x・角度 angle で落としてみて、どうなったかを返す。
   // 塔のキャラも本物と同じように動くので、ぶつかった衝撃で塔が崩れるかも分かる。
   // 本物のゲームには何も影響しない
-  function evaluatePlacement(x, angle) {
+  // flip：true なら、今の向きから左右反転して試す
+  function evaluatePlacement(x, angle, flip = false) {
     if (!held || !engine) return null;
     const sim = Engine.create();
     sim.positionIterations = engine.positionIterations;
@@ -729,13 +929,15 @@ const Game = (() => {
       tower.push(copy);
     }
     // 画面からはみ出さない位置に直してから落とす（本物と同じ）
-    const saved = { x: held.x, angle: held.angle };
+    const saved = { x: held.x, angle: held.angle, shape: held.shape };
     held.angle = angle;
+    if (flip) held.shape = Shape.flipped(held.shape);
     moveHeldTo(x);
     const startX = held.x;
     const piece = Shape.spawnBody(held.shape, held.x, camY + holdY(), angle, pieceOptions());
     held.x = saved.x;
     held.angle = saved.angle;
+    held.shape = saved.shape;
     Composite.add(sim.world, piece);
 
     // 本物と同じ細かさで計算する（落下速度の上限・小さな揺れを弱める処理も同じ）
@@ -817,9 +1019,11 @@ const Game = (() => {
 
   function drop() {
     if (paused || state !== "aim" || !held) return false;
+    lastDropLeft = timeLeft();
+    flipRun = 0;
     if (remote) {
       // ゲスト：自分では落とさず、位置と角度をホストに送ってもらう（main.js 経由）
-      if (callbacks.onRemoteDrop) callbacks.onRemoteDrop(held.x, held.angle);
+      if (callbacks.onRemoteDrop) callbacks.onRemoteDrop(held.x, held.angle, !!held.shape.flip);
       held = null;
       state = "remote";
       awaitingDrop = true;
@@ -845,7 +1049,7 @@ const Game = (() => {
     // オーラの粒を動かす（ポーズ中・フォトモード中は止める）
     frameDt = engine && !paused ? Math.min(time - lastTime, 100) / 1000 : 0;
     Aura.update(frameDt);
-    if (engine && !paused) {
+    if (engine && !paused && !(state === "sandbox" && sandbox.paused)) {
       // 画面のリフレッシュレート（60Hz/120Hz）に関係なく、一定の速さで物理演算を進める
       acc += Math.min(time - lastTime, 100);
       while (acc >= STEP_MS && engine) {
@@ -1068,11 +1272,12 @@ const Game = (() => {
       ctx.lineTo(held.x, platformTop);
       ctx.stroke();
       ctx.setLineDash([]);
-      drawSprite(held.shape, held.x, y, held.angle, 1, "strong", true); // 持っている間は、オーラを強く
+      drawHeldSprite(held, y); // 持っている間は、オーラを強く
       if (debug) drawHeldDebug(held, y);
       drawTimer(held.x, y);
     }
 
+    if (state === "sandbox") drawSandboxSelection();
     Aura.drawFront(ctx); // オーラの粒（光の粒・もや・キラッ）と稲妻
     if (debug) drawDebug();
     ctx.restore();
@@ -1301,6 +1506,7 @@ const Game = (() => {
       ctx.globalAlpha = 1;
     }
     if (bgTheme.moon || bgTheme.bats) drawHalloweenSky(k);
+    if (bgTheme.aurora) drawAurora(k);
     if (sky.clouds > 0) {
       ctx.globalAlpha = Math.min(1, sky.clouds);
       drawClouds(k, sky.cloud);
@@ -1494,6 +1700,42 @@ const Game = (() => {
     return c;
   }
 
+  // オーロラ（背景「オーロラ」）：空の上の方に、緑と水色の光の帯が3本、ゆっくりゆらめく。上に登るほど薄くなる。
+  // 「視差効果を減らす」では止まった絵
+  function drawAurora(k) {
+    const fade = Math.max(0, 1 - skyHeight / 3);
+    if (fade <= 0) return;
+    const t = reducedMotion.matches ? 0 : performance.now() / 1000;
+    const bands = [
+      { y: 0.16, amp: 0.035, h: 0.16, color: "76, 255, 170", speed: 0.35 },
+      { y: 0.24, amp: 0.03, h: 0.12, color: "90, 210, 255", speed: 0.25 },
+      { y: 0.11, amp: 0.025, h: 0.1, color: "190, 120, 255", speed: 0.45 },
+    ];
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const [i, b] of bands.entries()) {
+      const top = (x) => view.top + view.h * (b.y + b.amp * Math.sin(x * 5 + t * b.speed + i * 2) + b.amp * 0.5 * Math.sin(x * 11 - t * b.speed * 1.7));
+      const g = ctx.createLinearGradient(0, view.top + view.h * (b.y - b.amp), 0, view.top + view.h * (b.y + b.h));
+      g.addColorStop(0, `rgba(${b.color}, 0)`);
+      g.addColorStop(0.25, `rgba(${b.color}, ${0.32 * fade})`);
+      g.addColorStop(1, `rgba(${b.color}, 0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      const steps = 24;
+      for (let s = 0; s <= steps; s++) {
+        const x = s / steps;
+        ctx.lineTo(view.left + x * view.w, top(x));
+      }
+      for (let s = steps; s >= 0; s--) {
+        const x = s / steps;
+        ctx.lineTo(view.left + x * view.w, top(x) + view.h * b.h);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   // 満月とこうもり。上に登るほど薄くなる（高さで変わる背景に入れかわっていく）
   function drawHalloweenSky(k) {
     const fade = Math.max(0, 1 - skyHeight / 3);
@@ -1605,7 +1847,25 @@ const Game = (() => {
     ctx.textBaseline = "alphabetic";
   }
 
-  // 画像を、重心 (x, y) を中心に angle だけ回して描く
+  // 持っているキャラ。反転したばかりなら、横に縮んでから裏返って広がるアニメーション（半分まで来たら絵を入れかえる）
+  function drawHeldSprite(h, y) {
+    const a = h.flipAnim;
+    const t = a ? (performance.now() - a.at) / FLIP_MS : 1;
+    if (t >= 1) {
+      h.flipAnim = null;
+      drawSprite(h.shape, h.x, y, h.angle, 1, "strong", true);
+      return;
+    }
+    const sx = Math.max(0.04, Math.abs(Math.cos(Math.PI * t))); // 1 → 0 → 1
+    ctx.save();
+    ctx.translate(h.x, y);
+    ctx.scale(sx, 1);
+    ctx.translate(-h.x, -y);
+    drawSprite(t < 0.5 ? a.from : h.shape, h.x, y, h.angle, 1, "strong", true);
+    ctx.restore();
+  }
+
+  // 画像を、重心 (x, y) を中心に angle だけ回して描く。shape.flip なら左右反転して描く
   // aura：レア度のオーラの強さ（"strong"＝持っている間・落ちている間 / "rest"＝積んだあと / null＝なし）。
   // オーラの光は aura.js が、一度作った画像を貼るだけなので軽い。
   // emit が true なら、オーラの粒（光の粒・もや・キラッ）も出す（ゲーム画面だけ。写真・画像には出さない）
@@ -1614,6 +1874,7 @@ const Game = (() => {
     ctx.globalAlpha = alpha;
     ctx.translate(x, y);
     ctx.rotate(angle);
+    if (shape.flip) ctx.scale(-1, 1); // 左右反転（当たり判定の頂点も、同じ線で反転してある。shape.js の flipped）
     if (aura) Aura.drawBack(ctx, shape, aura);
     // 画像の左上は「重心から com だけ左上」にある
     ctx.drawImage(shape.img, -shape.com.x, -shape.com.y, shape.w, shape.h);
@@ -1678,7 +1939,17 @@ const Game = (() => {
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     };
 
+    // 自由配置モード（管理者モード）：タップした場所にキャラを置く・置いたキャラをドラッグで動かす
+    const worldPoint = (e) => {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) / viewScale, y: camY + (e.clientY - r.top) / viewScale };
+    };
     canvas.addEventListener("pointerdown", (e) => {
+      if (state === "sandbox") {
+        canvas.setPointerCapture(e.pointerId);
+        sandboxDown(worldPoint(e));
+        return;
+      }
       if (photo) {
         canvas.setPointerCapture(e.pointerId);
         fingers.set(e.pointerId, local(e));
@@ -1692,6 +1963,7 @@ const Game = (() => {
       canvas.setPointerCapture(e.pointerId);
     });
     canvas.addEventListener("pointermove", (e) => {
+      if (state === "sandbox") return sandboxMove(worldPoint(e));
       if (photo) {
         if (!fingers.has(e.pointerId)) return;
         const prev = fingers.get(e.pointerId);
@@ -1715,6 +1987,7 @@ const Game = (() => {
       moveBy(dx);
     });
     canvas.addEventListener("pointerup", () => {
+      if (state === "sandbox") return sandboxUp();
       if (!dragging) return;
       dragging = false;
       // 「指を離したら落とす」設定のときは、ドラッグのあとに指を離すと落とす
@@ -1754,10 +2027,15 @@ const Game = (() => {
   }
 
   return {
-    init, start, stop, startDemo, setTitleFx, towerImage, enterPhoto, exitPhoto, photoImage, setForcedShape, setDemoCeiling, setTheme, setHomeScene, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
+    init, start, stop, startDemo, flip, drawTest, startSandbox, sandbox: sandboxAPI, setTitleFx, towerImage, enterPhoto, exitPhoto, photoImage, setForcedShape, setDemoCeiling, setTheme, setHomeScene, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
     get platformSize() { return platformSize; }, // 土台と柱の大きさ（プロフィールの見本の絵に使う）
     get state() { return state; },
     get rotations() { return rotations; }, // このゲームで回転を使った回数
+    // 実績のための数：反転を使った回数・続けて反転を押した一番多い数・出たキャラの ID（最後の数体）・最後に落としたときの制限時間の残り
+    get flips() { return flips; },
+    get flipStreak() { return flipStreak; },
+    get drawn() { return drawn.slice(); },
+    get lastDropLeft() { return lastDropLeft; },
     get paused() { return paused; },
     get heldX() { return held ? held.x : WORLD_W / 2; }, // 持っているキャラの位置
     // ゲーム中（ポーズできる状態）か
@@ -1769,8 +2047,9 @@ const Game = (() => {
       rule: rule && { id: rule.id, state: rule.state },
       platformAngle: platform ? platform.angle : 0,
       platformFriction: platform ? platform.friction : 0,
-      held: held && { x: held.x, angle: held.angle, name: held.shape.name },
-      bodies: engine ? pieces().map((b) => ({ x: Math.round(b.position.x), y: Math.round(b.position.y), top: Math.round(b.bounds.min.y), speed: b.speed, angularSpeed: b.angularSpeed, name: b.shape.name, rough: b.shape.rough })) : [],
+      held: held && { x: held.x, angle: held.angle, name: held.shape.name, flip: !!held.shape.flip },
+      bodies: engine ? pieces().map((b) => ({ x: Math.round(b.position.x), y: Math.round(b.position.y), top: Math.round(b.bounds.min.y), speed: b.speed, angularSpeed: b.angularSpeed, name: b.shape.name, rough: b.shape.rough, flip: !!b.shape.flip })) : [],
+      remote: remote ? [...remoteBodies.values()].map((r) => ({ name: r.shape.name, flip: !!r.shape.flip })) : [],
     }),
   };
 })();

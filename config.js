@@ -7,7 +7,7 @@ window.GAME_CONFIG = {
   achievementsEpoch: 2,
 
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v1.14.2",
+  version: "v2.0.0",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -103,9 +103,15 @@ window.GAME_CONFIG = {
       // ハロウィンイベントのごほうび（1勝目）。moon: 大きな満月、bats: こうもりが飛び回る
       // unlock に { event, wins } を書くと、そのイベントの勝利数で解放される（イベントが終わっても使える）
       { id: "halloween_night", name: "ハロウィンの夜", unlock: { event: "halloween2026", wins: 1 }, top: "#1c0b33", bottom: "#5b2a86", cloud: "#4a2d6b", ground: "#2e1f3a", groundDark: "#1d1426", stars: true, moon: true, bats: true },
+      // 実績のごほうび（unlock: "achievement"）：どの実績で解放されるかは、data/achievements.json の reward に書く
+      //   ふしぎの国 … 実績「伸び縮み自在」（サイズ違いを全部図鑑に） ／ オーロラ … 実績「まぼろし図鑑」（★5 を全部図鑑に）
+      //   aurora: true … 空に、ゆらめくオーロラの光の帯
+      { id: "wonderland", name: "ふしぎの国", unlock: "achievement", top: "#b98aff", bottom: "#ffd3ec", cloud: "#fff2fb", ground: "#8fd4a8", groundDark: "#6fb88c" },
+      { id: "aurora", name: "オーロラ", unlock: "achievement", top: "#020b1f", bottom: "#123d52", cloud: "#26485c", ground: "#1e3b3a", groundDark: "#132826", stars: true, aurora: true },
     ],
     // 土台：body（正面）・top（上の面）・pillar（柱）の色と、style（描き方。js/platform-art.js）
     //   style："wood"（木）/ "stone"（石積み）/ "ice"（氷・つらら）/ "gold"（金・彫り模様・光が走る）/ "crystal"（宝石）/ "pumpkin"（かぼちゃ）
+    //          / "steel"（鉄骨・リベット）/ "cardboard"（ダンボール・ガムテープ）
     //   style を書かないと、色だけの四角になる。当たり判定は、どの style でも同じ四角
     platforms: [
       { id: "wood", name: "木の台", unlock: null, style: "wood", body: "#8a5a3b", top: "#6fbf4a", pillar: "#9a6b45" },
@@ -116,6 +122,9 @@ window.GAME_CONFIG = {
       { id: "diamond", name: "ダイヤの台", unlock: "cpu_hard_streak3", style: "crystal", body: "#7fd6f2", top: "#f2fdff", pillar: "#6ab3cf" },
       // ハロウィンイベントのごほうび（2勝目）
       { id: "pumpkin", name: "かぼちゃの台", unlock: { event: "halloween2026", wins: 2 }, body: "#f07b14", top: "#4f8a2b", style: "pumpkin", pillar: "#7a5a3a" },
+      // 実績のごほうび（data/achievements.json の reward）：鉄骨の台 … 実績「縁の下の力持ち」 ／ ダンボールの台 … 隠し実績
+      { id: "steel", name: "鉄骨の台", unlock: "achievement", style: "steel", body: "#56606b", top: "#9aa4ae", pillar: "#c0392b" },
+      { id: "cardboard", name: "ダンボールの台", unlock: "achievement", style: "cardboard", body: "#c79a5e", top: "#dcb47c", pillar: "#b88a50" },
     ],
   },
 
@@ -140,19 +149,30 @@ window.GAME_CONFIG = {
     ],
   },
 
-  // キャラのレア度（characters.js の rarity に "N" / "R" / "SR" を書く）
-  //   weight : 出やすさ。数が大きいほどよく出る（キャラごとに characters.js の weight で上書きできる）
+  // キャラのレア度（characters.js の rarity に "N" / "R" / "SR" / "UR" / "MR" を書く）
+  //   rate   : そのレア度全体の出現率（%）。同じレア度のキャラで分け合う（初めは等分。
+  //            characters.js の weight で、レア度の中の割合を変えられる。weight: 0 のキャラは出ない）。
+  //            合計が 100 でなくても、合計に対する割合になる（例：全部 2 倍にしても同じ）
   //   color  : 光る色・図鑑の色
   //   stars  : 図鑑に表示する★の数
+  //   ※ 管理者モードの「出現率のテスト」で、1万回抽選した実際の回数を確かめられる
   rarity: {
-    N: { name: "ノーマル", weight: 10, color: "#b9c4d6", stars: 1 },
-    R: { name: "レア", weight: 4, color: "#3d9bff", stars: 2 },
-    SR: { name: "めっちゃレア", weight: 1, color: "#ffc21a", stars: 3 },
-    // ★4：オーラをまとったキャラ（characters.js の aura）。出ると「激レア！！！」
-    UR: { name: "激レア", weight: 0.5, color: "#ff5ec8", stars: 4 },
-    // ★5：まぼろし。まだ登場しない（weight が 0 なので出ない）。図鑑には「？？？」として並ぶ。
-    //   登場させるときは weight を 0 より大きくする（キャラごとに characters.js の weight で決めてもよい）
-    MR: { name: "まぼろし", weight: 0, color: "#7ef0ff", stars: 5 },
+    N: { name: "ふつう", rate: 79.89, color: "#b9c4d6", stars: 1 },
+    R: { name: "レア", rate: 15, color: "#3d9bff", stars: 2 },
+    // ★3：サイズ違いのキャラ（characters.js の variant）も、このレア度
+    SR: { name: "めっちゃレア", rate: 5, color: "#ffc21a", stars: 3 },
+    // ★4：オーラをまとったキャラ（characters.js の aura）
+    UR: { name: "みたことない", rate: 0.1, color: "#ff5ec8", stars: 4 },
+    // ★5：まぼろし。出ると、画面が虹色に光る専用の演出（「まぼろし！！！」）。図鑑では専用の枠、まだのキャラは「？」
+    MR: { name: "まぼろし", rate: 0.01, color: "#7ef0ff", stars: 5 },
+  },
+
+  // サイズ違いのキャラ（characters.js の variant: "big" / "small"）
+  //   画像は元のキャラのものを使い回し、見た目と当たり判定を同じ倍率で大きく・小さくする
+  sizeVariants: {
+    big: 1.5, // 大きいバージョン（ビッグ〇〇）の倍率
+    small: 0.6, // 小さいバージョン（ミニ〇〇）の倍率
+    maxSize: 200, // 大きくしたときの上限（画像の長い方の辺。土台の幅は 280。これより大きくならないように倍率を下げる）
   },
 
   // CPU対戦の強さ（ふたりで → CPUと）
@@ -294,6 +314,7 @@ window.GAME_CONFIG = {
     stamp: "", // スタンプを送った・届いたとき
     ultimate: "", // ★4（激レア）が出たとき
     vs: "", // オンライン対戦の、試合の前の「VS」
+    legendary: "", // ★5（まぼろし）が出たとき
     bgm: "", // BGM（くり返し再生される）
   },
 };

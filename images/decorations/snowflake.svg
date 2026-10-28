@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 季節の飾り：クリスマスの雪の結晶（プロフィール画像のふちの星の代わりに出る） -->
+  <g fill="none" stroke-linecap="round">
+    <g stroke="#2a6fb0" stroke-width="7" opacity=".55">
+      <path d="M32 5v54M8.6 18.5l46.8 27M8.6 45.5l46.8-27"/>
+    </g>
+    <g stroke="#e9f6ff" stroke-width="4">
+      <path d="M32 5v54M8.6 18.5l46.8 27M8.6 45.5l46.8-27"/>
+      <path d="M32 13l-6-6M32 13l6-6M32 51l-6 6M32 51l6 6"/>
+      <path d="M15.5 22.5l-8.2 2.2M15.5 22.5l-2.2-8.2M48.5 41.5l8.2-2.2M48.5 41.5l2.2 8.2"/>
+      <path d="M15.5 41.5l-8.2-2.2M15.5 41.5l-2.2 8.2M48.5 22.5l8.2 2.2M48.5 22.5l2.2-8.2"/>
+    </g>
+  </g>
+  <circle cx="32" cy="32" r="4.5" fill="#bfe6ff"/>
+</svg>

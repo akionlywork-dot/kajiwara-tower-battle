@@ -21,7 +21,7 @@ const CPU = (() => {
   // 次の描画まで待つ（計算を少しずつ区切って、画面が固まらないようにする）
   const nextFrame = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-  // 置き方を考える。{ x, steps（何回 45度回すか） } を返す
+  // 置き方を考える。{ x, steps（何回 45度回すか）, flip（反転するか） } を返す
   // isCancelled: ゲームが終わったなどで、考えるのをやめるときに true を返す関数
   async function think(level, isCancelled) {
     const p = window.GAME_CONFIG.cpu[level];
@@ -29,8 +29,11 @@ const CPU = (() => {
 
     // 1. 候補を作って、ばらばらに並べかえ、強さに合わせた数だけ使う
     const candidates = [];
+    // 反転（左右を入れかえる）した置き方も候補に入れる
     for (const x of Game.candidateXs()) {
-      for (let steps = 0; steps < ANGLE_STEPS; steps++) candidates.push({ x, steps });
+      for (let steps = 0; steps < ANGLE_STEPS; steps++) {
+        for (const flip of [false, true]) candidates.push({ x, steps, flip });
+      }
     }
     shuffle(candidates);
     const tries = candidates.slice(0, p.candidates);
@@ -41,8 +44,8 @@ const CPU = (() => {
     for (const c of tries) {
       if (isCancelled()) return null;
       if (results.length && performance.now() - startedAt > p.maxThink * 1000) break;
-      const r = Game.evaluatePlacement(c.x, (c.steps * Math.PI) / 4);
-      results.push({ x: r ? r.x : c.x, steps: c.steps, score: scoreOf(r) });
+      const r = Game.evaluatePlacement(c.x, (c.steps * Math.PI) / 4, c.flip);
+      results.push({ x: r ? r.x : c.x, steps: c.steps, flip: c.flip, score: scoreOf(r) });
       await nextFrame();
     }
 
@@ -60,7 +63,7 @@ const CPU = (() => {
     // 4. 計算が早く終わっても、決まった時間は「考え中」にする
     const rest = p.thinkTime * 1000 - (performance.now() - startedAt);
     if (rest > 0) await new Promise((resolve) => setTimeout(resolve, rest));
-    return { x, steps: pick.steps };
+    return { x, steps: pick.steps, flip: pick.flip };
   }
 
   function shuffle(list) {
