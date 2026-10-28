@@ -170,6 +170,23 @@ const Achievements = (() => {
     return { got: counted.filter((a) => unlocked()[a.id]).length, total: counted.length };
   }
 
+  // 称号の一覧（称号を選ぶ画面に使う）。まだ取っていないものも含めて、json の順に
+  //   [{ id, title, rank, event, hidden, description, got（取ったか）, closed（期間が終わって、もう取れないか）}]
+  function titleList() {
+    return (defs || [])
+      .filter((a) => a.title)
+      .map((a) => ({
+        id: a.id,
+        title: a.title,
+        rank: a.rank,
+        event: a.event || null,
+        hidden: !!a.hidden,
+        description: a.description || "",
+        got: !!unlocked()[a.id],
+        closed: closed(a),
+      }));
+  }
+
   // 達成した実績の一覧 [{ id, title }]（プロフィールの称号の選択肢に使う）
   function unlockedList() {
     return (defs || []).filter((a) => unlocked()[a.id]).map((a) => ({ id: a.id, title: a.title }));
@@ -254,5 +271,5 @@ const Achievements = (() => {
     if (typeof Profile !== "undefined") Profile.refresh();
   }
 
-  return { init, load, check, counts, unlockedList, find, findByTitle, setAll };
+  return { init, load, check, counts, titleList, unlockedList, find, findByTitle, setAll };
 })();

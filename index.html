@@ -36,7 +36,7 @@
   <!-- アプリとしてインストールするための設定（PWA） -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="css/style.css?v=1.12.0">
+  <link rel="stylesheet" href="css/style.css?v=1.13.0">
 </head>
 <body>
   <div id="app">
@@ -250,6 +250,25 @@
       </div>
     </section>
 
+    <!-- ===== 称号を選ぶ画面（profile.js）=====
+         上に今選んでいる称号の見本、その下に格ごとの称号の一覧。タップで見本が変わり、「これにする」で決める -->
+    <section id="screen-titles" class="screen screen-dim page">
+      <div class="page-inner">
+        <header class="page-header">
+          <button class="btn btn-icon" data-back="profile" aria-label="もどる">‹</button>
+          <h2>称号を選ぶ</h2>
+        </header>
+        <div id="title-preview" class="title-preview"></div>
+        <div class="page-body">
+          <div id="title-list"></div>
+        </div>
+        <div class="page-footer title-actions">
+          <button class="btn btn-sub" data-back="profile">もどる</button>
+          <button id="btn-title-ok" class="btn btn-primary">これにする</button>
+        </div>
+      </div>
+    </section>
+
     <!-- ===== ポーズ画面 ===== -->
     <section id="screen-pause" class="screen screen-dim">
       <div class="screen-inner">
@@ -433,10 +452,11 @@
             <span>名前<small>10文字まで</small></span>
             <input id="input-name" type="text" maxlength="10" placeholder="プレイヤー" autocomplete="off">
           </label>
-          <label class="field">
+          <!-- 称号：今のアイコン＋枠＋称号の札。押すと、称号を選ぶ画面へ -->
+          <div class="field">
             <span>称号<small>実績を達成すると選べる</small></span>
-            <select id="select-title"></select>
-          </label>
+            <button id="btn-title-pick" class="title-pick" aria-label="称号を選ぶ"></button>
+          </div>
           <!-- 背景と土台（中身は themes.js が作る。種類と解放条件は config.js の themes） -->
           <h3 class="section-title">背景</h3>
           <div id="theme-backgrounds" class="theme-grid"></div>
@@ -683,7 +703,7 @@
             <h3 class="section-title">オンライン対戦の接続</h3>
             <pre id="admin-net" class="admin-net"></pre>
             <button id="btn-admin-net" class="btn btn-small btn-sub">更新</button>
-            <p class="page-note">称号「開発者」は、プロフィールの称号から選べます（管理者モードの端末だけ）。</p>
+            <p class="page-note">称号「開発者」は、プロフィールの「称号」から開く、称号を選ぶ画面で選べます（管理者モードの端末だけ）。</p>
             <button id="btn-admin-lock" class="btn btn-small btn-danger">管理者モードを終わる</button>
           </div>
         </div>
@@ -720,46 +740,46 @@
 
   <!-- ?v= のあとの番号：更新したら config.js の version と一緒に上げる（スマホに古いファイルが残らないように） -->
   <!-- ライブラリ（lib/ に同梱） -->
-  <script src="lib/decomp.min.js?v=1.12.0"></script>
-  <script src="lib/matter.min.js?v=1.12.0"></script>
-  <script src="lib/peerjs.min.js?v=1.12.0"></script>
-  <script src="lib/mqtt.min.js?v=1.12.0"></script>
+  <script src="lib/decomp.min.js?v=1.13.0"></script>
+  <script src="lib/matter.min.js?v=1.13.0"></script>
+  <script src="lib/peerjs.min.js?v=1.13.0"></script>
+  <script src="lib/mqtt.min.js?v=1.13.0"></script>
   <!-- 設定ファイル -->
-  <script src="config.js?v=1.12.0"></script>
-  <script src="characters.js?v=1.12.0"></script>
-  <script src="js/chars.js?v=1.12.0"></script>
+  <script src="config.js?v=1.13.0"></script>
+  <script src="characters.js?v=1.13.0"></script>
+  <script src="js/chars.js?v=1.13.0"></script>
   <!-- ゲーム本体 -->
-  <script src="js/settings.js?v=1.12.0"></script>
-  <script src="js/save.js?v=1.12.0"></script>
-  <script src="js/audio.js?v=1.12.0"></script>
-  <script src="js/shape.js?v=1.12.0"></script>
-  <script src="js/aura.js?v=1.12.0"></script>
-  <script src="js/platform-art.js?v=1.12.0"></script>
-  <script src="js/game.js?v=1.12.0"></script>
-  <script src="js/rules.js?v=1.12.0"></script>
-  <script src="js/cpu.js?v=1.12.0"></script>
-  <script src="js/challenge.js?v=1.12.0"></script>
-  <script src="js/card.js?v=1.12.0"></script>
-  <script src="js/stamps.js?v=1.12.0"></script>
-  <script src="js/halloween-home.js?v=1.12.0"></script>
-  <script src="js/halloween.js?v=1.12.0"></script>
-  <script src="js/title-fx.js?v=1.12.0"></script>
-  <script src="js/online.js?v=1.12.0"></script>
-  <script src="js/ui.js?v=1.12.0"></script>
-  <script src="js/themes.js?v=1.12.0"></script>
-  <script src="js/frames.js?v=1.12.0"></script>
-  <script src="js/profile.js?v=1.12.0"></script>
-  <script src="js/data-file.js?v=1.12.0"></script>
-  <script src="js/news.js?v=1.12.0"></script>
-  <script src="js/events.js?v=1.12.0"></script>
-  <script src="js/ranking.js?v=1.12.0"></script>
-  <script src="js/records.js?v=1.12.0"></script>
-  <script src="js/dex.js?v=1.12.0"></script>
-  <script src="js/achievements.js?v=1.12.0"></script>
-  <script src="js/vs-intro.js?v=1.12.0"></script>
-  <script src="js/backup.js?v=1.12.0"></script>
-  <script src="js/admin.js?v=1.12.0"></script>
-  <script src="js/pwa.js?v=1.12.0"></script>
-  <script src="js/main.js?v=1.12.0"></script>
+  <script src="js/settings.js?v=1.13.0"></script>
+  <script src="js/save.js?v=1.13.0"></script>
+  <script src="js/audio.js?v=1.13.0"></script>
+  <script src="js/shape.js?v=1.13.0"></script>
+  <script src="js/aura.js?v=1.13.0"></script>
+  <script src="js/platform-art.js?v=1.13.0"></script>
+  <script src="js/game.js?v=1.13.0"></script>
+  <script src="js/rules.js?v=1.13.0"></script>
+  <script src="js/cpu.js?v=1.13.0"></script>
+  <script src="js/challenge.js?v=1.13.0"></script>
+  <script src="js/card.js?v=1.13.0"></script>
+  <script src="js/stamps.js?v=1.13.0"></script>
+  <script src="js/halloween-home.js?v=1.13.0"></script>
+  <script src="js/halloween.js?v=1.13.0"></script>
+  <script src="js/title-fx.js?v=1.13.0"></script>
+  <script src="js/online.js?v=1.13.0"></script>
+  <script src="js/ui.js?v=1.13.0"></script>
+  <script src="js/themes.js?v=1.13.0"></script>
+  <script src="js/frames.js?v=1.13.0"></script>
+  <script src="js/profile.js?v=1.13.0"></script>
+  <script src="js/data-file.js?v=1.13.0"></script>
+  <script src="js/news.js?v=1.13.0"></script>
+  <script src="js/events.js?v=1.13.0"></script>
+  <script src="js/ranking.js?v=1.13.0"></script>
+  <script src="js/records.js?v=1.13.0"></script>
+  <script src="js/dex.js?v=1.13.0"></script>
+  <script src="js/achievements.js?v=1.13.0"></script>
+  <script src="js/vs-intro.js?v=1.13.0"></script>
+  <script src="js/backup.js?v=1.13.0"></script>
+  <script src="js/admin.js?v=1.13.0"></script>
+  <script src="js/pwa.js?v=1.13.0"></script>
+  <script src="js/main.js?v=1.13.0"></script>
 </body>
 </html>

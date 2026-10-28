@@ -2,12 +2,12 @@
 // frames.js
 // 称号の枠（アイコンのまわりの枠と、称号の札のデザイン）
 //
-// 枠は、選んでいる称号の実績の rank（data/achievements.json）で決まる：
-//   bronze … 銅色の細い枠 ／ silver … 銀色・角に小さな飾り ／ gold … 金色・ときどき光が走る
-//   legend … 虹色がゆっくり変わる ／ event … イベントごとの専用デザイン（実績の "event" で決まる。
-//            halloween2026 はかぼちゃとこうもり）
+// 枠は、選んでいる称号の実績の rank（data/achievements.json）で決まる。
+// 形はどの格も同じ（輪＋てっぺんの小さな星）で、違うのは色だけ：
+//   bronze … 銅色 ／ silver … 銀色 ／ gold … 金色・ときどき光が走る
+//   legend … 虹色（輪がゆっくり回る） ／ event … オレンジ×紫（期間限定の実績）
 // 称号を選んでいない・実績が見つからないときは、枠なし。
-// 見た目は style.css の「称号の枠」（動く枠は CSS のアニメーション。「視差効果を減らす」では止まる）。
+// 見た目は style.css の「称号の枠」（色は CSS の変数で切りかえる。動く枠は CSS のアニメーションで、「視差効果を減らす」では止まる）。
 // リザルトカードの画像の枠は card.js が、ここで決めた rank を見て描く
 // =============================================
 
@@ -48,10 +48,10 @@ const Frames = (() => {
     if (f) el.className += " " + avatarClass(f);
   }
 
-  // 称号の札（HTML）。称号が無ければ ""
+  // 称号の札（HTML）。称号が無ければ ""。枠があれば、枠と同じ色の札（ranked）にする
   function titleHTML(text, f) {
     if (!text) return "";
-    return `<span class="title-badge${f ? ` rank-${f.rank}${f.event ? ` rank-ev-${f.event}` : ""}` : ""}">${UI.escape(text)}</span>`;
+    return `<span class="title-badge${f ? ` ranked rank-${f.rank}${f.event ? ` rank-ev-${f.event}` : ""}` : ""}">${UI.escape(text)}</span>`;
   }
 
   return { clean, ofTitleId, ofTitleText, avatarClass, applyAvatar, titleHTML };

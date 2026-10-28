@@ -26,12 +26,21 @@ const Profile = (() => {
       Save.write();
       refresh();
     });
-    // 称号
-    $("select-title").addEventListener("change", (e) => {
-      Save.data.profile.titleId = e.target.value || null;
+    // 称号：押すと、称号を選ぶ画面へ
+    $("btn-title-pick").addEventListener("click", openTitles);
+    $("title-list").addEventListener("click", (e) => {
+      const row = e.target.closest("[data-title]");
+      if (!row) return;
+      pickId = row.dataset.title || null;
+      renderTitles();
+    });
+    $("btn-title-ok").addEventListener("click", () => {
+      Save.data.profile.titleId = pickId;
       Save.write();
       refresh();
+      UI.show("profile");
     });
+    UI.onShow("titles", renderTitles);
     // 写真を選んだ
     $("icon-file").addEventListener("change", (e) => {
       const file = e.target.files[0];
@@ -73,16 +82,6 @@ const Profile = (() => {
   function render() {
     const p = Save.data.profile;
     $("input-name").value = p.name;
-    // 称号の選択肢（達成した実績の称号だけ）
-    const select = $("select-title");
-    select.innerHTML = `<option value="">なし</option>`;
-    for (const a of unlockedTitles()) {
-      const opt = document.createElement("option");
-      opt.value = a.id;
-      opt.textContent = a.title;
-      select.appendChild(opt);
-    }
-    select.value = p.titleId || "";
     renderThemes();
     Stamps.renderSlots();
     refresh();
@@ -108,6 +107,73 @@ const Profile = (() => {
     return a ? a.title : "";
   }
 
+  // ---------- 称号を選ぶ画面 ----------
+  // 選ぶ画面で選んでいる称号（「これにする」を押すまでは保存しない）。null は「称号なし」
+  let pickId = null;
+  // 格の見出し（上から、むずかしい順）
+  const RANK_GROUPS = [
+    ["legend", "レジェンド"],
+    ["gold", "ゴールド"],
+    ["silver", "シルバー"],
+    ["bronze", "ブロンズ"],
+    ["event", "期間限定"],
+  ];
+
+  function openTitles() {
+    pickId = Save.data.profile.titleId || null;
+    // 選んでいた称号が使えなくなっていたら（実績をリセットしたなど）、「称号なし」から
+    if (pickId && !titleText(pickId)) pickId = null;
+    UI.show("titles");
+  }
+
+  // 自分のアイコン（写真か、名前の1文字目）に、クラス cls の枠を付けた HTML
+  function myAvatarHTML(cls) {
+    const p = Save.data.profile;
+    return p.icon
+      ? `<span class="avatar ${cls}" style="background-image:url(${p.icon})"></span>`
+      : `<span class="avatar avatar-empty ${cls}">${UI.escape([...Save.playerName(1)][0] || "?")}</span>`;
+  }
+
+  function renderTitles() {
+    // 上の見本：選んでいる称号の、アイコン＋枠＋名前＋称号の札
+    const frame = Frames.ofTitleId(pickId);
+    const text = titleText(pickId);
+    $("title-preview").innerHTML =
+      myAvatarHTML(`title-preview-avatar ${Frames.avatarClass(frame)}`) +
+      `<span class="title-preview-text"><b>${UI.escape(Save.playerName(1))}</b>${text ? Frames.titleHTML(text, frame) : `<small>称号なし</small>`}</span>`;
+
+    // 一覧：いちばん上に「称号なし」、その下に格ごと
+    const all = typeof Achievements !== "undefined" ? Achievements.titleList() : [];
+    if (typeof Admin !== "undefined" && Admin.unlocked) {
+      all.unshift({ id: "developer", title: "開発者", rank: "legend", got: true, description: "管理者モードの端末だけの称号" });
+    }
+    let html = rowHTML({ id: "", none: true });
+    for (const [rank, label] of RANK_GROUPS) {
+      const list = all.filter((a) => a.rank === rank);
+      if (!list.length) continue;
+      const got = list.filter((a) => a.got).length;
+      html += `<h3 class="section-title title-group">${label}<small>${got} / ${list.length}</small></h3>` + list.map(rowHTML).join("");
+    }
+    $("title-list").innerHTML = html;
+  }
+
+  // 1つ分の行。取ったものはタップで選べる。まだのものは灰色の枠と「？？？」、下に取り方
+  function rowHTML(a) {
+    const selected = (pickId || "") === a.id;
+    const mark = selected ? `<span class="title-check" aria-label="選んでいる">✓</span>` : "";
+    if (a.none) {
+      return `<button class="title-row ${selected ? "selected" : ""}" data-title="">${myAvatarHTML("")}<span class="title-row-main"><b class="title-none">称号なし（枠なし）</b></span>${mark}</button>`;
+    }
+    if (!a.got) {
+      // 隠し実績は、取り方も「？？？」。期間が終わったものは、もう取れないことを書く
+      const how = a.hidden ? "？？？" : UI.escape(a.description);
+      const note = a.closed ? `<span class="limited-tag">期間限定（終了）</span>` : a.event ? `<span class="limited-tag">期間限定</span>` : "";
+      return `<div class="title-row locked">${myAvatarHTML("frame frame-locked")}<span class="title-row-main"><span class="title-badge ranked rank-locked">？？？</span><small>${how} ${note}</small></span></div>`;
+    }
+    const frame = Frames.clean(a.rank, a.event);
+    return `<button class="title-row ${selected ? "selected" : ""}" data-title="${UI.escape(a.id)}">${myAvatarHTML(Frames.avatarClass(frame))}<span class="title-row-main">${Frames.titleHTML(a.title, frame)}</span>${mark}</button>`;
+  }
+
   // 名前・アイコンを表示しているところを、全部最新にする
   function refresh() {
     const p = Save.data.profile;
@@ -120,6 +186,9 @@ const Profile = (() => {
     Frames.applyAvatar($("chip-avatar"), frame);
     $("chip-title").innerHTML = Frames.titleHTML(titleText(p.titleId), frame);
     $("profile-title-badge").innerHTML = Frames.titleHTML(titleText(p.titleId), frame);
+    // プロフィール画面の称号の欄（今のアイコン＋枠＋称号の札。押すと選ぶ画面へ）
+    $("btn-title-pick").innerHTML =
+      badgeHTML() + (titleText(p.titleId) ? "" : `<small class="title-pick-none">称号なし</small>`) + `<span class="title-pick-go">変える ›</span>`;
   }
 
   // 写真アイコンを小さくしたもの（64px の JPEG の文字列）。ランキングとオンライン対戦の相手に送るときに使う。

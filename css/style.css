@@ -3224,47 +3224,63 @@ select {
 }
 
 /* =============================================
-   称号の枠（frames.js）
-   アイコンのまわりの枠（.frame-〇〇）と、称号の札（.title-badge.rank-〇〇）
-   bronze 銅 ／ silver 銀・角に飾り ／ gold 金・ときどき光が走る ／ legend 虹色 ／ event イベント専用
+   アイコンのまわりの枠（.frame）と、称号の札（.title-badge.ranked）
+   形はすべての格で同じ（輪＋てっぺんの小さな星）。違うのは色だけ。
+   色は下の「格ごとの色」で変数を切りかえる。新しい格を足すときは、そこに1行足すだけでよい
+     --frame-color … 輪・星の色 ／ --frame-dark … 輪の外側のふち・札のふち
+     --frame-light … 札の上側の明るい色 ／ --frame-text … 札の文字の色
+     --frame-star  … 星の塗り（ふだんは輪の色。虹色など特別なときだけ書く）
+     --frame-badge … 札の塗り（ふだんは light → color のグラデーション）
+   枠の太さ・星の大きさは、アイコンの大きさ（--av）に合わせて変わる
    ============================================= */
+.avatar { --av: 38px; }
+.avatar-xl { --av: 112px; }
+.rank-avatar { --av: 36px; }
+.vs-avatar { --av: 52px; }
+
+/* 格ごとの色（アイコンの .frame-〇〇 と、札の .rank-〇〇 で同じ色を使う） */
+.frame-bronze, .rank-bronze { --frame-color: #cd8a4f; --frame-dark: #6e4019; --frame-light: #f2c79c; --frame-text: #3d2208; }
+.frame-silver, .rank-silver { --frame-color: #c9d1da; --frame-dark: #6f7984; --frame-light: #ffffff; --frame-text: #2b3a55; }
+.frame-gold, .rank-gold { --frame-color: #ffd84d; --frame-dark: #a87700; --frame-light: #fff3b0; --frame-text: #4a3500; }
+.frame-legend, .rank-legend {
+  --frame-color: #b65cf0;
+  --frame-dark: #4a2470;
+  --frame-text: #ffffff;
+  --frame-star: conic-gradient(#ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0, #ff5d73);
+  --frame-badge: linear-gradient(90deg, #ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0, #ff5d73) 0 0 / 300% 100%;
+}
+.frame-event, .rank-event { --frame-color: #ff8a1f; --frame-dark: #3b1458; --frame-light: #ffc27a; --frame-text: #ffb15c; --frame-badge: linear-gradient(#5a2380, #3b1458); }
+/* まだ取っていない称号（称号を選ぶ画面だけ） */
+.frame-locked, .rank-locked { --frame-color: #9aa1aa; --frame-dark: #5d636b; --frame-light: #c4c9cf; --frame-text: #3a3f46; }
+
+/* 枠の形（全部の格で共通） */
 .avatar.frame {
   position: relative;
+  border-color: var(--frame-color);
+  border-width: max(2px, calc(var(--av) * 0.07));
+  box-shadow: 0 0 0 max(1px, calc(var(--av) * 0.025)) var(--frame-dark);
 }
 
-/* 銅：細い銅色の枠 */
-.avatar.frame-bronze {
-  border-color: #cd8a4f;
-  box-shadow: 0 0 0 1.5px #7a4a22;
-}
-
-/* 銀：銀色の枠と、上下左右の小さなひし形 */
-.avatar.frame-silver {
-  border-color: #eef2f6;
-  box-shadow: 0 0 0 2px #9aa3ad;
-}
-
-.avatar.frame-silver::before,
-.avatar.frame-silver::after {
+/* てっぺんの小さな星 */
+.avatar.frame::after {
   content: "";
   position: absolute;
-  width: 7px;
-  height: 7px;
-  background: #ffffff;
-  box-shadow: 0 0 0 1px #9aa3ad;
-  transform: rotate(45deg);
+  left: 50%;
+  top: calc(var(--av) * -0.24);
+  width: max(13px, calc(var(--av) * 0.36));
+  height: max(13px, calc(var(--av) * 0.36));
+  transform: translateX(-50%);
+  background: var(--frame-star, linear-gradient(var(--frame-light, var(--frame-color)), var(--frame-color)));
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  pointer-events: none;
 }
 
-.avatar.frame-silver::before { top: -5px; left: calc(50% - 3.5px); }
-.avatar.frame-silver::after { bottom: -5px; left: calc(50% - 3.5px); }
-
-/* 金：金色の枠と、ときどき走る光（丸の中を、ななめの光が通る） */
+/* 金：ときどき、丸の中をななめの光が通る */
 .avatar.frame-gold {
-  border-color: #ffd84d;
-  box-shadow: 0 0 0 2px #b8860b, 0 0 10px rgba(255, 216, 77, 0.65);
+  box-shadow: 0 0 0 max(1px, calc(var(--av) * 0.025)) var(--frame-dark), 0 0 calc(var(--av) * 0.25) rgba(255, 216, 77, 0.6);
 }
 
-.avatar.frame-gold::after {
+.avatar.frame-gold::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -3273,6 +3289,7 @@ select {
   background-size: 300% 100%;
   background-position: 100% 0;
   animation: frame-shine 4s ease-in-out infinite;
+  pointer-events: none;
 }
 
 @keyframes frame-shine {
@@ -3280,7 +3297,7 @@ select {
   100% { background-position: -50% 0; }
 }
 
-/* 伝説：虹色の輪が、ゆっくり回る（輪の形に切り抜いた虹を、回すだけ） */
+/* 伝説：虹色の輪が、ゆっくり回る（輪の形に切り抜いた虹を、回すだけ。太さは共通の輪と同じ） */
 .avatar.frame-legend {
   border-color: transparent;
 }
@@ -3288,49 +3305,21 @@ select {
 .avatar.frame-legend::before {
   content: "";
   position: absolute;
-  inset: -4px;
+  --ring: max(2px, calc(var(--av) * 0.07));
+  inset: calc(var(--ring) * -1);
   border-radius: 50%;
   background: conic-gradient(#ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0, #ff5d73);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4.5px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4.5px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring) + 0.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring) + 0.5px));
   animation: frame-spin 6s linear infinite;
+  pointer-events: none;
 }
 
 @keyframes frame-spin {
   to { transform: rotate(360deg); }
 }
 
-/* イベント（ハロウィン）：オレンジの枠と、かぼちゃ・こうもり */
-.avatar.frame-event {
-  border-color: #ff8a1f;
-  box-shadow: 0 0 0 2px #3b1458;
-}
-
-.avatar.frame-ev-halloween2026::before,
-.avatar.frame-ev-halloween2026::after {
-  position: absolute;
-  font-size: 13px;
-  line-height: 1;
-}
-
-.avatar.frame-ev-halloween2026::before { content: "🎃"; right: -6px; bottom: -4px; }
-.avatar.frame-ev-halloween2026::after { content: "🦇"; left: -7px; top: -5px; }
-
-.avatar-xl.frame-ev-halloween2026::before,
-.avatar-xl.frame-ev-halloween2026::after {
-  font-size: 30px;
-}
-
-.avatar-xl.frame-silver::before,
-.avatar-xl.frame-silver::after {
-  width: 12px;
-  height: 12px;
-}
-
-.avatar-xl.frame-silver::before { top: -9px; left: calc(50% - 6px); }
-.avatar-xl.frame-silver::after { bottom: -9px; left: calc(50% - 6px); }
-
-/* 称号の札 */
+/* 称号の札（形は全部の格で共通。色だけ変わる） */
 .title-badge {
   position: relative;
   display: inline-block;
@@ -3348,17 +3337,25 @@ select {
   color: var(--color-gold);
 }
 
-.title-badge.rank-bronze { color: #ffe6cc; background: #8a5428; box-shadow: inset 0 0 0 1px #cd8a4f; }
-.title-badge.rank-silver { color: #2b3a55; background: linear-gradient(#f6f8fb, #b8c0ca); box-shadow: inset 0 0 0 1px #ffffff; }
-.title-badge.rank-gold { color: #4a3500; background: linear-gradient(#ffe98a, #d4a019); }
+.title-badge.ranked {
+  color: var(--frame-text);
+  background: var(--frame-badge, linear-gradient(var(--frame-light), var(--frame-color)));
+  box-shadow: inset 0 0 0 1px var(--frame-dark);
+}
+
+.title-badge.ranked::before {
+  content: "★ "; /* 枠の星と同じ印 */
+  font-size: 0.85em;
+}
+
 .title-badge.rank-legend {
-  color: #ffffff;
-  background: linear-gradient(90deg, #ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0, #ff5d73) 0 0 / 300% 100%;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   animation: badge-rainbow 6s linear infinite;
 }
-.title-badge.rank-event { color: #ffb15c; background: #3b1458; box-shadow: inset 0 0 0 1px #ff8a1f; }
-.title-badge.rank-ev-halloween2026::before { content: "🎃 "; }
+
+.title-badge.rank-event::before {
+  color: var(--frame-color);
+}
 
 /* 金の札：ときどき光が走る */
 .title-badge.rank-gold::after {
@@ -3414,7 +3411,7 @@ select {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .avatar.frame-gold::after,
+  .avatar.frame-gold::before,
   .avatar.frame-legend::before,
   .title-badge.rank-legend,
   .title-badge.rank-gold::after {
@@ -3737,4 +3734,181 @@ select {
   #vs-intro.out .vs-me {
     animation: vs-fade var(--vs-exit) ease reverse forwards;
   }
+}
+
+/* =============================================
+   称号を選ぶ画面（#screen-titles）と、プロフィール画面の称号の欄（.title-pick）
+   ============================================= */
+/* プロフィール画面：今のアイコン＋枠＋称号の札（押すと選ぶ画面へ） */
+.title-pick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  width: 100%;
+  min-height: 60px;
+  padding: 10px var(--space-m) 8px;
+  border: none;
+  border-radius: var(--radius-m);
+  font-family: inherit;
+  color: var(--color-text);
+  text-align: left;
+  background: var(--color-panel);
+  cursor: pointer;
+}
+
+.title-pick:active {
+  filter: brightness(1.15);
+}
+
+.title-pick .player-badge {
+  margin-bottom: 0;
+  background: none;
+  padding: 0;
+  min-width: 0;
+}
+
+.title-pick-none {
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+.title-pick-go {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: bold;
+  opacity: 0.85;
+}
+
+/* 上の見本：大きなアイコン＋枠＋名前＋称号の札 */
+.title-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--space-m);
+  margin: var(--space-s) 0;
+  padding: 20px var(--space-m) var(--space-m);
+  border-radius: var(--radius-m);
+  background: var(--color-panel);
+}
+
+.title-preview-avatar {
+  --av: 84px;
+  width: 84px;
+  height: 84px;
+  font-size: 34px;
+}
+
+.title-preview-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.title-preview-text b {
+  font-size: var(--font-size-l);
+  overflow-wrap: anywhere;
+}
+
+.title-preview-text .title-badge {
+  font-size: 14px;
+  white-space: normal;
+}
+
+.title-preview-text small {
+  opacity: 0.7;
+}
+
+/* 一覧 */
+.title-group small {
+  margin-left: var(--space-s);
+  font-size: 12px;
+  font-weight: normal;
+  opacity: 0.75;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 64px;
+  margin-bottom: var(--space-s);
+  padding: 14px var(--space-m) 10px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-m);
+  font-family: inherit;
+  color: var(--color-text);
+  text-align: left;
+  background: var(--color-panel);
+}
+
+button.title-row {
+  cursor: pointer;
+}
+
+button.title-row:active {
+  transform: scale(0.98);
+}
+
+.title-row.selected {
+  border-color: var(--color-gold);
+  background: rgba(255, 216, 77, 0.16);
+}
+
+.title-row.locked {
+  opacity: 0.75;
+}
+
+.title-row-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.title-row-main .title-badge {
+  font-size: 13px;
+  white-space: normal;
+}
+
+.title-row-main small {
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
+.title-none {
+  font-size: var(--font-size-m);
+}
+
+/* 選んでいる印 */
+.title-check {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: var(--color-text-dark);
+  background: var(--color-gold);
+  font-weight: bold;
+}
+
+/* 下の「もどる」「これにする」 */
+.title-actions {
+  display: flex;
+  gap: var(--space-s);
+}
+
+.title-actions .btn {
+  flex: 1;
+  min-height: 54px;
+  padding: var(--space-s) var(--space-m);
+  border-radius: var(--radius-l);
+  font-size: var(--font-size-m);
 }

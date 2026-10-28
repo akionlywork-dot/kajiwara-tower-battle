@@ -155,9 +155,8 @@ const Card = (() => {
     ctx.font = `bold ${fitFont(ctx, info.name, tw, 46)}px ${FONT}`;
     ctx.fillText(info.name, tx, y + (info.titleText ? 2 : r - 26));
     if (info.titleText) {
-      // 称号の札（称号の枠の色。枠なしなら、前と同じ金色）
-      const f = info.frame && FRAME_COLORS[info.frame.rank];
-      pill(ctx, info.titleText, tx, y + 58, 24, f ? f.pill(ctx, tx, y + 58) : COLOR.gold, f ? f.text : "#2b3a55");
+      // 称号の札（称号の枠と同じ色。枠なしなら、前と同じ金色）
+      titlePill(ctx, info.titleText, tx, y + 58, 24, info.frame);
     }
     // モードは、アイコンの下に
     pill(ctx, info.modeName, x, y + size + 20, 24, "rgba(142,92,240,0.9)", "#fff");
@@ -244,59 +243,56 @@ const Card = (() => {
     ctx.closePath();
   }
 
-  // ---------- 称号の枠（frames.js の rank。画面の CSS と同じ色合いを、キャンバスに描く） ----------
-  //   ring：アイコンのまわりの輪の色、pill：称号の札の塗り、text：札の文字の色
+  // ---------- 称号の枠（frames.js の rank。画面の CSS と同じ形・同じ色を、キャンバスに描く） ----------
+  // 形はどの格も同じ（輪＋てっぺんの小さな星）。色は style.css の「格ごとの色」と同じ
+  //   color：輪・星の色、dark：輪の外側のふち・札のふち、light：札の上側の明るい色、text：札の文字の色
+  //   rainbow：虹色（輪・星・札）、badge：札の塗り（ふだんは light → color）
   const FRAME_COLORS = {
-    bronze: { ring: () => "#cd8a4f", pill: () => "#8a5428", text: "#ffe6cc" },
-    silver: { ring: () => "#e6ebf1", pill: (ctx, x, y) => gradient(ctx, x, y, ["#f6f8fb", "#b8c0ca"]), text: "#2b3a55" },
-    gold: { ring: () => "#ffd84d", pill: (ctx, x, y) => gradient(ctx, x, y, ["#ffe98a", "#d4a019"]), text: "#4a3500" },
-    legend: {
-      ring: (ctx, cx, cy) => rainbow(ctx, cx, cy),
-      pill: (ctx, x, y) => gradient(ctx, x, y, ["#ff5d73", "#ffc21a", "#4cd964", "#3d8bff", "#b65cf0"]),
-      text: "#ffffff",
-    },
-    event: { ring: () => "#ff8a1f", pill: () => "#3b1458", text: "#ffb15c" },
+    bronze: { color: "#cd8a4f", dark: "#6e4019", light: "#f2c79c", text: "#3d2208" },
+    silver: { color: "#c9d1da", dark: "#6f7984", light: "#ffffff", text: "#2b3a55" },
+    gold: { color: "#ffd84d", dark: "#a87700", light: "#fff3b0", text: "#4a3500", glow: "rgba(255, 216, 77, 0.9)" },
+    legend: { color: "#b65cf0", dark: "#4a2470", light: "#ffffff", text: "#ffffff", rainbow: true },
+    event: { color: "#ff8a1f", dark: "#3b1458", light: "#ffc27a", text: "#ffb15c", badge: ["#5a2380", "#3b1458"] },
   };
+  const RAINBOW = ["#ff5d73", "#ffc21a", "#4cd964", "#3d8bff", "#b65cf0", "#ff5d73"];
 
-  function gradient(ctx, x, y, colors) {
-    const g = ctx.createLinearGradient(x, y, x + 260, y + 40);
-    colors.forEach((c, i) => g.addColorStop(i / (colors.length - 1), c));
+  // 虹色（輪・星は丸く回る虹、対応していないブラウザでは、ななめの虹色）
+  function rainbow(ctx, cx, cy, r) {
+    const g = ctx.createConicGradient ? ctx.createConicGradient(0, cx, cy) : ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+    RAINBOW.forEach((c, i) => g.addColorStop(i / (RAINBOW.length - 1), c));
     return g;
   }
 
-  // 虹色の輪（対応していないブラウザでは、ななめの虹色）
-  function rainbow(ctx, cx, cy) {
-    const colors = ["#ff5d73", "#ffc21a", "#4cd964", "#3d8bff", "#b65cf0", "#ff5d73"];
-    const g = ctx.createConicGradient ? ctx.createConicGradient(0, cx, cy) : ctx.createLinearGradient(cx - 60, cy - 60, cx + 60, cy + 60);
-    colors.forEach((c, i) => g.addColorStop(i / (colors.length - 1), c));
-    return g;
-  }
-
-  // アイコンのまわりの輪（枠なしなら、前と同じ白い輪）
+  // アイコンのまわりの枠（枠なしなら、前と同じ白い輪）。太さ・星の大きさは、画面の CSS と同じ割合
   function drawFrameRing(ctx, cx, cy, r, frame) {
     const f = frame && FRAME_COLORS[frame.rank];
-    if (frame && frame.rank === "gold") {
+    if (!f) {
+      ring(ctx, cx, cy, r, "#fff", 4);
+      return;
+    }
+    const d = r * 2; // アイコンの大きさ（CSS の --av）
+    const w = Math.max(2, d * 0.07); // 輪の太さ
+    const edge = Math.max(1, d * 0.025); // 外側のふち
+    ctx.save();
+    if (f.glow) {
       // 金：外側に光のにじみ
-      ctx.save();
-      ctx.shadowColor = "rgba(255, 216, 77, 0.9)";
-      ctx.shadowBlur = 16;
-      ring(ctx, cx, cy, r, "#ffd84d", 6);
-      ctx.restore();
+      ctx.shadowColor = f.glow;
+      ctx.shadowBlur = d * 0.12;
     }
-    ring(ctx, cx, cy, r, f ? f.ring(ctx, cx, cy) : "#fff", f ? 6 : 4);
-    if (frame && frame.rank === "silver") {
-      // 銀：角（上下左右）に小さなひし形の飾り
-      ctx.fillStyle = "#ffffff";
-      for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) diamond(ctx, cx + dx * r, cy + dy * r, 7);
-    }
-    if (frame && frame.rank === "event" && frame.event === "halloween2026") {
-      // ハロウィン：かぼちゃとこうもり
-      ctx.font = `${Math.round(r * 0.6)}px ${FONT}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("🎃", cx + r * 0.75, cy + r * 0.75);
-      ctx.fillText("🦇", cx - r * 0.8, cy - r * 0.8);
-    }
+    ring(ctx, cx, cy, r + w / 2 + edge / 2, f.dark, w + edge * 2);
+    ctx.restore();
+    ring(ctx, cx, cy, r + w / 2, f.rainbow ? rainbow(ctx, cx, cy, r) : f.color, w);
+    // てっぺんの小さな星（輪の外側のふちに、真ん中を合わせる）
+    const sr = d * 0.2;
+    const sy = cy - r - w;
+    star(ctx, cx, sy, sr + edge * 1.5, f.dark);
+    const fill = f.rainbow ? rainbow(ctx, cx, sy, sr) : (() => {
+      const g = ctx.createLinearGradient(0, sy - sr, 0, sy + sr);
+      g.addColorStop(0, f.light);
+      g.addColorStop(1, f.color);
+      return g;
+    })();
+    star(ctx, cx, sy, sr, fill);
   }
 
   function ring(ctx, cx, cy, r, style, width) {
@@ -307,14 +303,42 @@ const Card = (() => {
     ctx.stroke();
   }
 
-  function diamond(ctx, x, y, s) {
+  // 五角の星（真ん中 x, y、外側の半径 r）
+  function star(ctx, x, y, r, style) {
+    ctx.fillStyle = style;
     ctx.beginPath();
-    ctx.moveTo(x, y - s);
-    ctx.lineTo(x + s, y);
-    ctx.lineTo(x, y + s);
-    ctx.lineTo(x - s, y);
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const rr = i % 2 ? r * 0.45 : r;
+      ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
     ctx.closePath();
     ctx.fill();
+  }
+
+  // 称号の札（枠と同じ色。頭に枠と同じ★）
+  function titlePill(ctx, text, x, y, fontSize, frame) {
+    const f = frame && FRAME_COLORS[frame.rank];
+    if (!f) return pill(ctx, text, x, y, fontSize, COLOR.gold, "#2b3a55"); // 枠なしなら、前と同じ金色
+    const label = `★ ${text}`;
+    ctx.font = `bold ${fontSize}px ${FONT}`;
+    const h = fontSize + 16;
+    const pw = ctx.measureText(label).width + 32;
+    let bg;
+    if (f.rainbow) {
+      bg = ctx.createLinearGradient(x, y, x + pw, y);
+      RAINBOW.forEach((c, i) => bg.addColorStop(i / (RAINBOW.length - 1), c));
+    } else {
+      bg = ctx.createLinearGradient(0, y, 0, y + h);
+      const [top, bottom] = f.badge || [f.light, f.color];
+      bg.addColorStop(0, top);
+      bg.addColorStop(1, bottom);
+    }
+    pill(ctx, label, x, y, fontSize, bg, f.text);
+    ctx.strokeStyle = f.dark;
+    ctx.lineWidth = 2;
+    roundRect(ctx, x + 1, y + 1, pw - 2, h - 2, (h - 2) / 2);
+    ctx.stroke();
   }
 
   // 丸い札（称号・モード）
