@@ -1532,6 +1532,49 @@ select {
   color: var(--color-gold);
 }
 
+/* スコアアタックの「ふつう」：いちばん上に大きく（ランキング対象） */
+.rule-row.rule-normal {
+  padding: var(--space-l) var(--space-m);
+  border: 2px solid rgba(255, 216, 77, 0.7);
+  background: linear-gradient(135deg, rgba(255, 93, 115, 0.45), rgba(255, 122, 89, 0.3));
+}
+
+.rule-normal .rule-icon {
+  font-size: 40px;
+}
+
+.rule-normal .rule-main b {
+  font-size: var(--font-size-l);
+}
+
+.rule-normal .rule-best b {
+  font-size: 22px;
+}
+
+/* 「ランキング対象」の札 */
+.ranking-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: var(--radius-round);
+  color: var(--color-text-dark);
+  background: #fff;
+  font-size: 11px;
+  font-weight: bold;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* モード選択のスコアアタックのボタンの、ハイスコア */
+.mode-best {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 0 10px;
+  border-radius: var(--radius-round);
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 /* ゲーム中・リザルトのルール名の札 */
 .rule-tag {
   display: inline-block;

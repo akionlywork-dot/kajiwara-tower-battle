@@ -7,7 +7,7 @@ window.GAME_CONFIG = {
   achievementsEpoch: 2,
 
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v1.11.0",
+  version: "v1.12.0",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -34,21 +34,20 @@ window.GAME_CONFIG = {
   // sequence の順番どおりにキャラが落ちてきて積まれ、全部積んだら土台が傾いて崩れる → 最初から
   // 1体ずつ、止まったらその場で固定するので、毎回同じ形に安定して積み上がる
   titleDemo: {
-    interval: 0.4, // 前のキャラが止まってから、次のキャラが落ちてくるまでの時間（秒）
-    // 落ちてくるキャラの順番
-    //   file  : characters.js に書いたファイル名
-    //   x     : 土台の真ん中からのずれ（右がプラス）
-    //   angle : 角度（度。90 なら右に90度回して横向き）
-    // ※ 組み合わせを変えると、崩れたりはみ出したりすることがあります。
-    //   変えたら必ずタイトル画面で確認してください
+    interval: 0.9, // 次のキャラを落とし始めるまでの間隔（前のキャラを落とし始めてから。秒）。短くすると、何体も同時に落ちてくる
+    holdTime: 3, // 積み終わってから、そのまま見せる時間（秒）
+    fadeTime: 0.8, // 塔がふわっと消えていく時間（秒）。消えたら、順番を入れかえて最初から
+    // 落ちてくるキャラ（1回目はこの順番。2回目からは順番を入れかえる）
+    //   file : characters.js に書いたファイル名
+    // 置く位置と向きは、ゲームが自動で決める（落ちずに、低く・まっすぐ・真ん中に収まる置き方を、試してから選ぶ）
     sequence: [
-      { file: "images/chara01.webp", x: 0, angle: 90 },
-      { file: "images/chara08.webp", x: 0, angle: 90 },
-      { file: "images/chara05.webp", x: -30, angle: 0 },
-      { file: "images/chara03.webp", x: 0, angle: 90 },
-      { file: "images/chara07.webp", x: 0, angle: -90 },
-      { file: "images/chara06.webp", x: 0, angle: -90 },
-      { file: "images/chara02.webp", x: 0, angle: 90 },
+      { file: "images/chara01.webp" },
+      { file: "images/chara08.webp" },
+      { file: "images/chara05.webp" },
+      { file: "images/chara03.webp" },
+      { file: "images/chara07.webp" },
+      { file: "images/chara06.webp" },
+      { file: "images/chara02.webp" },
     ],
   },
 
@@ -78,9 +77,6 @@ window.GAME_CONFIG = {
       count: [1, 4], // 1回の羽数
       speed: 70, // 飛ぶ速さ（ゲーム内の単位。画面の横幅が 450）
     },
-    // デモの塔が崩れて、キャラが地面に落ちたとき
-    shake: { strength: 6, time: 0.45 }, // 画面の揺れ（強さ・続く時間）
-    dust: { count: 12, time: 1.0 }, // 砂ぼこり（粒の数・消えるまでの時間）
   },
 
   // 1人モードのスコア ＝ 積んだ数 × perPiece ＋ タワーの高さ(m) × perMeter

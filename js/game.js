@@ -237,22 +237,28 @@ const Game = (() => {
   }
 
   // ---------- タイトル画面のデモ ----------
-  // config.js の sequence の順番どおりにキャラを落として積む。
-  // 1体落とすごとに、止まるのを待ってからその場で固定する → いつも同じ形に安定して積み上がる。
-  // 全部積んだら固定を外し、土台を傾けて崩す → 最初からくり返し
-  // opts: { interval: 止まってから次が落ちてくるまでの時間（秒）, sequence: [{ file, x, angle }, ...] }
+  // config.js の sequence のキャラを、いい感じに組み合わさるように積んでいく（落ちない・崩さない）。
+  // ・1体ごとに、向き（4通り）と位置（7か所）を見えないところで試し、
+  //   落ちずに、低く・まっすぐ・真ん中に収まる置き方を選ぶ（tryDemoPlacement）
+  // ・選んだ置き方を試したときの動きを記録しておき、見せるときはそのとおりに動かす
+  //   （物理の計算をやりなおさないので、試した結果とずれない ＝ 落ちることがない）
+  // ・前のキャラが落ちきる前に、次のキャラを上から落とし始める（前のキャラが止まる場所は、もう分かっているので）
+  // ・積み終わったら少し見せてから、ふわっと消して、順番を入れかえて最初から
+  // opts: config.js の titleDemo { interval, holdTime, fadeTime, sequence: [{ file }, ...] }
 
-  // 「止まった」とみなすまでに、止まっている必要があるステップ数（60ステップ＝1秒）
-  const DEMO_SETTLE_STEPS = 20;
-  // これだけ待っても止まらなければ、あきらめて次へ（ミリ秒）
-  const DEMO_SETTLE_TIMEOUT = 6000;
-  // キャラを落とし始める高さ（塔のてっぺんから、これだけ上）。
-  // 画面の高さに関係なく落下距離が同じになるので、どの端末でも同じ形に積み上がる。
-  // スマホの縦画面なら、この高さは画面の上の外になる
+  // キャラを落とし始める高さ（塔のてっぺんから、これだけ上）。スマホの縦画面なら、画面の上の外になる
   const DEMO_DROP_HEIGHT = 800;
-  // 塔のてっぺんが、画面の上からこの割合より上まで来たら、残りは落とさずに崩す
-  //（小さい画面で、タイトルロゴに塔が重ならないように）
+  // 塔のてっぺんの上限：画面の上からこの割合の位置か、ハイスコアの表示の下（setDemoCeiling）の、低い方。
+  // 最後のキャラだけは DEMO_OVERSHOOT まで、はみ出してよい（小さい画面で、タイトルロゴに塔が重ならないように）
   const DEMO_TOP_LIMIT = 0.38;
+  const DEMO_OVERSHOOT = 50;
+  // 置き方を試すとき：てっぺんの少し上から、落ちる速さの上限で落とす（本物も、着くころにはこの速さになっている）
+  const DEMO_TRY_GAP = 40;
+  const DEMO_TRY_STEPS = 240; // 1つの置き方を試す長さの上限（ステップ。60ステップ＝1秒）
+  const DEMO_STILL_STEPS = 15; // これだけ続けて止まっていたら「止まった」
+  const DEMO_ANGLES = [0, Math.PI / 2, -Math.PI / 2, Math.PI]; // 試す向き
+  const DEMO_XS = [-80, -55, -30, 0, 30, 55, 80]; // 試す位置（土台の真ん中からのずれ。左右に並べて置けるように、端の近くまで）
+  const DEMO_TRIES_PER_STEP = 1; // 1ステップで試す数（重くならないように、何ステップかに分けて試す）
 
   function startDemo(opts) {
     if (!shapes.length) return;
@@ -261,29 +267,43 @@ const Game = (() => {
     createWorld(DEMO_PLATFORM_FROM_BOTTOM);
     state = "demo";
     demo = {
-      interval: opts.interval * 1000,
-      sequence: buildDemoSequence(opts.sequence),
-      phase: "stack", // "stack"=積んでいる / "collapse"=崩れている
+      opts: opts || {},
+      sequence: [], // この回に積むキャラの形の並び
+      phase: "stack", // "stack"=積んでいる / "hold"=積み終わって見せている / "fade"=消えていく
       phaseAt: 0, // 今の段階になった時刻
-      nextAt: 600, // 次のキャラを落とす時刻
       count: 0, // 何体落としたか
-      current: null, // いま落ちている（まだ固定していない）キャラ
-      spawnedAt: 0,
-      stillSteps: 0,
+      plan: null, // 次のキャラの置き方を試している途中 { shape, tries: [{ x, angle }], i, best }
+      flying: [], // 落ちている途中のキャラ { body, path: [{ x, y, a }], i }
+      nextAt: 600, // 次のキャラを落とし始めてよい時刻
+      alpha: 1, // キャラの濃さ（消えていくとき）
       frozen: false, // 止まった絵にしているか（視差効果を減らす設定のとき）
-      dropOffset: opts.dropOffset || 0, // 確認用：落とし始める高さを少しずらす（安定するか調べるため）
     };
+    newDemoRound(true);
     if (reducedMotion.matches) {
-      // 動きを控えめにする設定なら、裏で一気に全部積んでおいて、あとは動かさない
-      while (demoHasRoom()) {
-        spawnDemoPiece();
-        while (demo.current) {
-          physicsStep();
-          checkDemoPieceSettled();
-        }
+      // 動きを控えめにする設定なら、全部積んだ形を一気に作っておいて、あとは動かさない
+      while (demo.count < demo.sequence.length) {
+        const plan = newDemoPlan(demo.sequence[demo.count]);
+        while (plan.i < plan.tries.length) planDemoStep(plan, plan.tries.length);
+        if (!plan.best) break;
+        launchDemoPiece(plan.best);
+        const f = demo.flying.pop();
+        setDemoPose(f.body, f.path[f.path.length - 1]);
+        demo.count++;
       }
       demo.frozen = true;
     }
+  }
+
+  // 新しい回を始める：キャラの順番を決める（1回目は config の順番、2回目からは入れかえる）
+  function newDemoRound(first) {
+    const seq = buildDemoSequence(demo.opts.sequence);
+    if (!first) {
+      for (let i = seq.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [seq[i], seq[j]] = [seq[j], seq[i]];
+      }
+    }
+    Object.assign(demo, { sequence: seq, count: 0, phase: "stack", alpha: 1, plan: null, flying: [] });
   }
 
   // config.js の sequence（ファイル名か id で指定）を、形データの並びに変換する
@@ -293,39 +313,19 @@ const Game = (() => {
     for (const item of list || []) {
       // ファイル名で書いたときは、その画像の元のキャラ（★4のオーラ版ではなく）
       const shape = item.id ? shapeById(item.id) : shapes.find((s) => s.file === item.file && !s.shared);
-      if (shape) seq.push({ shape, x: item.x || 0, angle: ((item.angle || 0) * Math.PI) / 180 });
+      if (shape) seq.push(shape);
       else console.warn("デモのキャラが見つかりません:", item.id || item.file);
     }
     if (!seq.length) {
-      for (let i = 0; i < 8; i++) seq.push({ shape: randomShape(), x: 0, angle: Math.PI / 2 });
+      for (let i = 0; i < 8; i++) seq.push(randomShape());
     }
     return seq;
   }
 
-  // デモ用：順番どおりに、次のキャラを落とす
-  function spawnDemoPiece() {
-    const item = demo.sequence[demo.count];
-    const y = demoTowerTop() - DEMO_DROP_HEIGHT + (demo.dropOffset || 0);
-    const body = Shape.spawnBody(item.shape, WORLD_W / 2 + item.x, y, item.angle, BODY_OPTIONS);
-    Composite.add(engine.world, body);
-    demo.current = body;
-    demo.spawnedAt = simTime;
-    demo.stillSteps = 0;
-    demo.count++;
-  }
-
-  // 固定ずみのキャラも含めた、塔のてっぺんの y 座標
-  function demoTowerTop() {
-    let top = platformTop;
-    for (const b of pieces()) top = Math.min(top, b.bounds.min.y);
-    return top;
-  }
-
-  // 次のキャラを落としてよいか（まだ順番が残っていて、塔が高くなりすぎていない）
-  function demoHasRoom() {
+  // 塔のてっぺんの上限（ゲーム内の y）
+  function demoCeiling() {
     // 画面の上から DEMO_TOP_LIMIT の位置か、タイトルの文字の下端（setDemoCeiling）の、低い方まで
-    const ceiling = Math.max(worldH * DEMO_TOP_LIMIT, demoCeilingPx / viewScale + 10);
-    return demo.count < demo.sequence.length && demoTowerTop() > ceiling;
+    return Math.max(worldH * DEMO_TOP_LIMIT, demoCeilingPx / viewScale + 10);
   }
 
   // デモの塔がこれより上に伸びないようにする（画面の上からの px）。
@@ -335,53 +335,148 @@ const Game = (() => {
     demoCeilingPx = px;
   }
 
-  // 落としたキャラが止まったら、その場で固定する（台から落ちていたら片付ける）
-  function checkDemoPieceSettled() {
-    const b = demo.current;
-    const still = b.landed && b.speed < 0.05 && b.angularSpeed < 0.002;
-    demo.stillSteps = still ? demo.stillSteps + 1 : 0;
-    if (demo.stillSteps < DEMO_SETTLE_STEPS && simTime - demo.spawnedAt < DEMO_SETTLE_TIMEOUT) return;
-    if (b.bounds.min.y > platformTop) Composite.remove(engine.world, b);
-    else Body.setStatic(b, true);
-    demo.current = null;
-    demo.nextAt = simTime + demo.interval;
+  // 次のキャラの置き方を試す準備（向き × 位置の組み合わせ）
+  function newDemoPlan(shape) {
+    const tries = [];
+    for (const angle of DEMO_ANGLES) for (const x of DEMO_XS) tries.push({ x: WORLD_W / 2 + x, angle });
+    return { shape, tries, i: 0, best: null };
+  }
+
+  // 置き方を n 個試して、いちばん良いものを覚えておく
+  function planDemoStep(plan, n) {
+    for (let k = 0; k < n && plan.i < plan.tries.length; k++, plan.i++) {
+      const t = plan.tries[plan.i];
+      const r = tryDemoPlacement(plan.shape, t.x, t.angle);
+      if (r && (!plan.best || r.cost < plan.best.cost)) plan.best = r;
+    }
+  }
+
+  // 1つの置き方を、本物の世界で（見えないところで）試す。
+  // 落ちている途中のキャラは、止まる場所に置いた状態にしてから試し、終わったら元に戻す。
+  // 返り値：{ shape, path（動きの記録）, cost（小さいほど良い）}。落ちる・止まらない・高くなりすぎる置き方なら null
+  function tryDemoPlacement(shape, x, angle) {
+    const saved = demo.flying.map((f) => ({ x: f.body.position.x, y: f.body.position.y, a: f.body.angle }));
+    for (const f of demo.flying) setDemoPose(f.body, f.path[f.path.length - 1]);
+    const top = demoTowerTop();
+    const body = Shape.spawnBody(shape, x, 0, angle, BODY_OPTIONS);
+    Body.translate(body, { x: 0, y: top - DEMO_TRY_GAP - body.bounds.max.y }); // てっぺんの少し上から
+    Body.setVelocity(body, { x: 0, y: MAX_FALL_SPEED });
+    Composite.add(engine.world, body);
+    const path = [];
+    let still = 0;
+    for (let i = 0; i < DEMO_TRY_STEPS && still < DEMO_STILL_STEPS; i++) {
+      // 本物と同じ細かさで計算する（落下速度の上限・小さな揺れを弱める処理も同じ。動くのはこのキャラだけ）
+      for (let k = 0; k < SUBSTEPS; k++) {
+        limitFallSpeed();
+        Engine.update(engine, STEP_MS / SUBSTEPS);
+        dampSlowBodies();
+      }
+      path.push({ x: body.position.x, y: body.position.y, a: body.angle });
+      still = body.landed && body.speed < 0.05 && body.angularSpeed < 0.002 ? still + 1 : 0;
+      if (body.bounds.min.y > platformTop) break; // 土台より下へ落ちた
+    }
+    const b = { top: body.bounds.min.y, bottom: body.bounds.max.y, left: body.bounds.min.x, right: body.bounds.max.x, x: body.position.x, angle: body.angle };
+    Composite.remove(engine.world, body);
+    demo.flying.forEach((f, i) => setDemoPose(f.body, saved[i]));
+    // 落ちた・止まらなかった・画面からはみ出した・高くなりすぎた置き方は使わない。
+    // 足元が土台の上面より下に出る（土台の横に引っかかっている）置き方も、落ちそうに見えるので使わない
+    if (still < DEMO_STILL_STEPS || b.bottom > platformTop + 4 || b.left < 0 || b.right > WORLD_W) return null;
+    const newTop = Math.min(top, b.top);
+    if (newTop < demoCeiling() - DEMO_OVERSHOOT) return null;
+    // 低く積めるほど良い（すき間にはまる・寝かせる）。真ん中に近いほど、まっすぐ（90度ごとの向き）に近いほど良い。
+    // 少しだけランダムを混ぜて、回ごとに違う組み合わせになるようにする
+    const q = Math.PI / 2;
+    const m = ((b.angle % q) + q) % q;
+    const tilt = Math.min(m, q - m);
+    const cost = (platformTop - newTop) + Math.abs(b.x - WORLD_W / 2) * 0.3 + tilt * 150 + Math.random() * 12;
+    return { shape, path, cost };
+  }
+
+  // 選んだ置き方でキャラを落とし始める（試したときの動きの前に、上からまっすぐ落ちてくる部分を足す）
+  function launchDemoPiece(best) {
+    const first = best.path[0];
+    const speed = Math.max(4, best.path.length > 1 ? best.path[1].y - first.y : 0); // 1ステップに落ちる量
+    const pre = [];
+    for (let y = first.y - DEMO_DROP_HEIGHT; y < first.y; y += speed) pre.push({ x: first.x, y, a: first.a });
+    const path = pre.concat(best.path);
+    const body = Shape.spawnBody(best.shape, path[0].x, path[0].y, path[0].a, BODY_OPTIONS);
+    Body.setStatic(body, true); // 動きは記録どおりに動かす（物理の計算では動かさない）
+    // 止まったときの、てっぺんの高さ（次のキャラを落としてよいかの判断に使う）
+    setDemoPose(body, path[path.length - 1]);
+    const finalTop = body.bounds.min.y;
+    setDemoPose(body, path[0]);
+    Composite.add(engine.world, body);
+    demo.flying.push({ body, path, i: 0, finalTop });
+  }
+
+  function setDemoPose(body, p) {
+    Body.setPosition(body, { x: p.x, y: p.y });
+    Body.setAngle(body, p.a);
+  }
+
+  // 落ちている途中のキャラも、止まる場所にあるとしたときの、塔のてっぺんの y 座標
+  function demoPlannedTop() {
+    let top = platformTop;
+    for (const b of pieces()) {
+      const f = demo.flying.find((x) => x.body === b);
+      top = Math.min(top, f ? f.finalTop : b.bounds.min.y);
+    }
+    return top;
+  }
+
+  // 固定ずみのキャラも含めた、塔のてっぺんの y 座標
+  function demoTowerTop() {
+    let top = platformTop;
+    for (const b of pieces()) top = Math.min(top, b.bounds.min.y);
+    return top;
   }
 
   // デモの進行（物理演算の1ステップごとに呼ばれる）
   function stepDemo() {
     if (!demo || demo.frozen) return;
+    const o = demo.opts;
+    // 落ちている途中のキャラを、記録どおりに1ステップ進める（最後まで来たら、そこで止まる）
+    for (const f of demo.flying) setDemoPose(f.body, f.path[Math.min(++f.i, f.path.length - 1)]);
+    demo.flying = demo.flying.filter((f) => f.i < f.path.length - 1);
+
     if (demo.phase === "stack") {
-      if (demo.current) return checkDemoPieceSettled();
-      if (simTime < demo.nextAt) return;
-      if (demoHasRoom()) {
-        spawnDemoPiece();
-      } else {
-        // 積み終わったら、固定を外して、土台をぐらっと傾けて崩す
-        for (const b of pieces()) Body.setStatic(b, false);
-        demo.phase = "collapse";
+      if (!demo.plan) {
+        // 全部落とした・塔が上限まで来た（止まる場所で数える）なら、積むのはおしまい
+        if (demo.count >= demo.sequence.length || demoPlannedTop() <= demoCeiling() - DEMO_OVERSHOOT) return endDemoStack();
+        demo.plan = newDemoPlan(demo.sequence[demo.count]);
+      }
+      planDemoStep(demo.plan, DEMO_TRIES_PER_STEP);
+      if (demo.plan.i < demo.plan.tries.length || simTime < demo.nextAt) return;
+      const best = demo.plan.best;
+      demo.plan = null;
+      if (!best) return endDemoStack(); // どこにも置けない（塔がいっぱい）
+      launchDemoPiece(best);
+      demo.count++;
+      demo.nextAt = simTime + (o.interval == null ? 0.9 : o.interval) * 1000;
+    } else if (demo.phase === "hold") {
+      // 最後のキャラが止まってから数える
+      if (demo.flying.length) demo.phaseAt = simTime;
+      else if (simTime - demo.phaseAt > (o.holdTime == null ? 3 : o.holdTime) * 1000) {
+        demo.phase = "fade";
         demo.phaseAt = simTime;
       }
     } else {
-      const t = (simTime - demo.phaseAt) / 1000;
-      // 地面まで落ちたキャラ：砂ぼこりと、画面の揺れ（1体につき1回）
-      for (const b of pieces()) {
-        if (!b.hitGround && b.bounds.max.y > groundY()) {
-          b.hitGround = true;
-          landImpact(b.position.x);
-        }
-      }
-      // 最初の0.5秒は左右に揺らし、そのあと一方に傾ける
-      const angle = t < 0.5 ? Math.sin(t * 40) * 0.03 : Math.min(0.5, (t - 0.5) * 0.5);
-      Body.setAngle(platform, angle);
-      // 3.5秒たったら、残っているキャラを片付けて最初から
-      if (t > 3.5) {
+      // ふわっと消して、最初から
+      const t = (simTime - demo.phaseAt) / ((o.fadeTime == null ? 0.8 : o.fadeTime) * 1000);
+      demo.alpha = Math.max(0, 1 - t);
+      if (t >= 1) {
         for (const b of pieces()) Composite.remove(engine.world, b);
-        Body.setAngle(platform, 0);
-        demo.phase = "stack";
-        demo.count = 0;
+        newDemoRound(false);
         demo.nextAt = simTime + 400;
       }
     }
+  }
+
+  // 積み終わった：少し見せてから消す
+  function endDemoStack() {
+    demo.plan = null;
+    demo.phase = "hold";
+    demo.phaseAt = simTime;
   }
 
   // ---------- ポーズ ----------
@@ -907,12 +1002,6 @@ const Game = (() => {
     const dpr = window.devicePixelRatio || 1;
     if (photo) photo.view.h = photo.view.w * (canvas.height / canvas.width); // 画面の形が変わっても合わせる
     const v = photo ? photo.view : { left: 0, top: camY, w: WORLD_W, h: worldH };
-    // タイトルのデモで塔が崩れたときの、画面の揺れ
-    const s = photo ? null : shakeOffset();
-    if (s) {
-      v.left += s.x;
-      v.top += s.y;
-    }
     renderScene(ctx, v, (canvas.width / v.w), !photo);
     // 特殊ルールの表示（風の筋など。画面の座標で描く）
     if (!photo && rule && rule.draw) {
@@ -941,16 +1030,16 @@ const Game = (() => {
     // 積まれたキャラ（レアキャラは、落ちている途中は強く、積んだあとは控えめにオーラを出す）
     if (withUI) Aura.drawSmoke(ctx); // 闇のオーラのもやは、キャラの後ろに
     if (engine) {
+      const alpha = state === "demo" && demo ? demo.alpha : 1; // タイトルのデモで、塔がふわっと消えていくとき
       for (const b of pieces()) {
         const falling = state !== "demo" && b === dropped && !b.landed;
-        drawSprite(b.shape, b.position.x, b.position.y, b.angle, 1, falling ? "strong" : "rest", withUI);
+        drawSprite(b.shape, b.position.x, b.position.y, b.angle, alpha, falling ? "strong" : "rest", withUI);
       }
       // ゲスト：ホストから届いた位置のキャラ
       if (remote) for (const r of remoteBodies.values()) drawSprite(r.shape, r.x, r.y, r.angle, 1, "rest", withUI);
     }
     // 地面はキャラより手前に描く（落ちたキャラが地面の向こうに消えていくように）
     drawGround();
-    if (withUI) drawDust();
     if (!engine || !withUI) {
       ctx.restore();
       ctx = prevCtx;
@@ -1241,14 +1330,12 @@ const Game = (() => {
     ctx.globalAlpha = base;
   }
 
-  // ---------- タイトル画面の演出（鳥・画面の揺れ・砂ぼこり） ----------
+  // ---------- タイトル画面の演出（鳥） ----------
   // タイトル画面が出ているあいだだけ動かす（title-fx.js が setTitleFx でオン・オフする）。
   // 「視差効果を減らす」が ON の端末では出さない。数値は config.js の titleFx
   let titleFxOn = false;
   const birds = []; // { x, y（画面の割合）, vx, size, phase }
-  const dusts = []; // 砂ぼこりの粒 { x, y, vx, vy, r, life }
   let nextBirdAt = 0; // 次に鳥が来る時刻（秒）
-  let shake = { until: 0, time: 1, strength: 0 }; // 画面の揺れ
   const fxNow = () => performance.now() / 1000;
   // [最小, 最大] のあいだのランダムな数（書いていなければ def）
   const between = (range, def) => {
@@ -1260,13 +1347,11 @@ const Game = (() => {
     titleFxOn = on && !reducedMotion.matches;
     if (!titleFxOn) {
       birds.length = 0;
-      dusts.length = 0;
-      shake.until = 0;
     }
     nextBirdAt = fxNow() + between((FX.birds || {}).firstAfter, [2, 4]);
   }
 
-  // 毎フレーム：鳥を飛ばす・砂ぼこりを動かす（dt：秒）
+  // 毎フレーム：鳥を飛ばす（dt：秒）
   function stepTitleFx(dt) {
     if (!titleFxOn) return;
     const conf = FX.birds || {};
@@ -1293,44 +1378,6 @@ const Game = (() => {
       b.phase += dt * 12; // 羽ばたき
       if (b.x < -120 || b.x > WORLD_W + 120) birds.splice(i, 1);
     }
-    for (let i = dusts.length - 1; i >= 0; i--) {
-      const d = dusts[i];
-      d.x += d.vx * dt;
-      d.y += d.vy * dt;
-      d.vx *= 0.95;
-      d.vy *= 0.95;
-      d.r += dt * 26; // ふくらみながら
-      d.life -= dt / ((FX.dust || {}).time || 1); // 消えていく
-      if (d.life <= 0) dusts.splice(i, 1);
-    }
-  }
-
-  // デモの塔が崩れて、キャラが地面に落ちた：砂ぼこりを出して、画面を揺らす
-  function landImpact(x) {
-    if (!titleFxOn) return;
-    const conf = FX.dust || {};
-    const n = conf.count || 12;
-    for (let i = 0; i < n; i++) {
-      // 地面から、もくもくと上に舞い上がる（地面のあたりはスタートボタンに隠れるので、高めに上げる）
-      dusts.push({
-        x: x + (Math.random() - 0.5) * 40,
-        y: groundY() - 4,
-        vx: (Math.random() - 0.5) * 140,
-        vy: -50 - Math.random() * 110,
-        r: 6 + Math.random() * 8,
-        life: 1,
-      });
-    }
-    const s = FX.shake || {};
-    shake = { until: fxNow() + (s.time || 0.45), time: s.time || 0.45, strength: s.strength || 6 };
-  }
-
-  // 画面の揺れの、今のずれ（ゲーム内の単位）。だんだん弱くなる
-  function shakeOffset() {
-    const left = shake.until - fxNow();
-    if (left <= 0) return null;
-    const amp = shake.strength * (left / shake.time);
-    return { x: (Math.random() - 0.5) * 2 * amp, y: (Math.random() - 0.5) * 2 * amp };
   }
 
   // 鳥（羽を上下に動かす「く」の字を2つつなげた形）。色は、選んだ背景の空の色を暗くしたもの
@@ -1349,19 +1396,6 @@ const Game = (() => {
       ctx.quadraticCurveTo(x + b.size * 0.4, y - b.size * 0.2, x + b.size, y - b.size * flap);
       ctx.stroke();
     }
-  }
-
-  // 砂ぼこり（選んだ背景の地面の色を明るくした、ふわっと広がる丸）
-  function drawDust() {
-    if (!dusts.length) return;
-    ctx.fillStyle = mix(bgTheme.groundDark || "#5fa845", "#efe3c8", 0.75);
-    for (const d of dusts) {
-      ctx.globalAlpha = Math.max(0, d.life) * 0.7;
-      ctx.beginPath();
-      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
   }
 
   // ---------- 地面・柱・土台 ----------
@@ -1721,7 +1755,7 @@ const Game = (() => {
     // デバッグ用：ブラウザのコンソールから Game.debugInfo() で中身を確認できる
     debugInfo: () => ({
       state, camY, platformTop,
-      demo: demo && { phase: demo.phase, count: demo.count, settling: !!demo.current },
+      demo: demo && { phase: demo.phase, count: demo.count, flying: demo.flying.length, planning: !!demo.plan },
       rule: rule && { id: rule.id, state: rule.state },
       platformAngle: platform ? platform.angle : 0,
       platformFriction: platform ? platform.friction : 0,

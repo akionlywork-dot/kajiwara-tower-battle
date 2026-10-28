@@ -101,7 +101,7 @@
       "name": "1000点突破",
       "title": "スコアラー",
       "rank": "bronze",
-      "description": "ひとりモードで1000点以上をとった",
+      "description": "スコアアタックで1000点以上をとった",
       "condition": {
         "type": "score",
         "value": 1000
@@ -113,7 +113,7 @@
       "name": "2000点突破",
       "title": "ハイスコアラー",
       "rank": "silver",
-      "description": "ひとりモードで2000点以上をとった",
+      "description": "スコアアタックで2000点以上をとった",
       "category": "スコア",
       "condition": {
         "type": "score",
@@ -125,7 +125,7 @@
       "name": "3000点突破",
       "title": "伝説のスコアラー",
       "rank": "legend",
-      "description": "ひとりモードで3000点以上をとった",
+      "description": "スコアアタックで3000点以上をとった",
       "category": "スコア",
       "condition": {
         "type": "score",
@@ -324,7 +324,7 @@
       "name": "回さず勝負",
       "title": "真っ直ぐな心",
       "rank": "gold",
-      "description": "ひとりモードで、回転を使わずに15体積んだ",
+      "description": "スコアアタックか特殊ルールで、回転を使わずに15体積んだ",
       "category": "隠し",
       "hidden": true,
       "condition": {
@@ -337,7 +337,7 @@
       "name": "早業",
       "title": "電光石火",
       "rank": "gold",
-      "description": "ひとりモードで、1手3秒以内で10体続けて積んだ",
+      "description": "スコアアタックか特殊ルールで、1手3秒以内で10体続けて積んだ",
       "category": "隠し",
       "hidden": true,
       "condition": {

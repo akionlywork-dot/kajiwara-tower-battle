@@ -6,7 +6,7 @@
 //   Google スプレッドシート（Apps Script。server/ranking.gs）にハイスコアを自動で送り、ランキングを読みに行く。
 //   送るのは「名前・称号・スコア・積んだ数・高さ」と、この端末のランダムな番号。
 //   写真アイコンは、本人が「載せる」を選んだときだけ、小さくして送る。
-//   ふつうのルールのひとりモードだけが対象。最初に1回だけ「送ってもいいか」を聞く
+//   スコアアタック（ふつうのルール）だけが対象（特殊ルールは載せない）。最初に1回だけ「送ってもいいか」を聞く
 // ranking.url が "" のとき：
 //   data/ranking.json（手で書きかえて更新する）を表示する。スコアはどこにも送らない
 // =============================================
@@ -115,7 +115,7 @@ const Ranking = (() => {
       (list.length
         ? list.map(rowHTML).join("")
         : isOnline()
-        ? `<div class="coming-soon"><span>🏆</span><b>まだ記録がありません</b><p>ひとりモードで遊ぶと、ハイスコアがここに載ります。</p></div>`
+        ? `<div class="coming-soon"><span>🏆</span><b>まだ記録がありません</b><p>スコアアタックで遊ぶと、ハイスコアがここに載ります。</p></div>`
         : `<div class="coming-soon"><span>🏆</span><b>ランキングは準備中です</b><p>お楽しみに！<br>まずはハイスコアを目指して遊んでみてください。</p></div>`);
     if (json.me) rememberRank(json.me.rank);
     renderMine(json.me || null);
@@ -182,7 +182,7 @@ const Ranking = (() => {
     }
   }
 
-  // ひとりモード（ふつうのルール）が終わったときに main.js から呼ばれる。
+  // スコアアタック（ふつうのルール）が終わったときに main.js から呼ばれる。
   // 初めてなら「送ってもいいか」を聞く（写真アイコンがある人には、写真を載せるかも聞く）
   async function afterSoloGame() {
     if (!isOnline()) return;

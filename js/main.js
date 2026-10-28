@@ -15,7 +15,7 @@
   const $ = (id) => document.getElementById(id);
 
   // ---------- ゲームの進行状況 ----------
-  let mode = "solo"; // "solo"=1人スコアアタック / "versus"=2人対戦
+  let mode = "solo"; // "solo"=ひとりで（スコアアタック・特殊ルール） / "versus"=2人対戦
   let ruleId = null; // 特殊ルールの名前（ふつうのルールなら null）
   let cpuLevel = null; // CPU対戦の強さ（"easy" / "normal" / "hard"）。人どうしなら null
   // オンライン対戦の情報。{ role: "host"|"guest", me: 自分のプレイヤー番号, names: { 1: 名前, 2: 名前 } }
@@ -1030,7 +1030,13 @@
   // タイトル
   on("btn-start", () => UI.show("mode"));
   on("btn-title-settings", () => openSettings("title"));
-  // モード選択
+  // モード選択：「ひとりで」のボタンに、スコアアタック（ふつうのルール）のハイスコアを小さく出す
+  UI.onShow("mode", () => {
+    const best = Save.data.stats.best;
+    $("mode-best").classList.toggle("hidden", !best);
+    $("mode-best").textContent = best ? `スコアアタック ${best.score}点` : "";
+  });
+  // スコアアタック：ふつうのルール（ルールを選ぶ画面のいちばん上）
   on("btn-solo", () => startGame("solo"));
   on("btn-versus", () => startGame("versus"));
   // CPU と対戦（data-cpu に強さ）
@@ -1061,8 +1067,10 @@
     toggleRematch();
   });
 
-  // 特殊ルールを選ぶ画面：rules.js にあるルールを並べる
+  // 「ひとりで」の画面：いちばん上に「スコアアタック」（ふつうのルール）、その下に rules.js にある特殊ルールを並べる
   UI.onShow("rules", () => {
+    const best = Save.data.stats.best;
+    $("normal-best").innerHTML = best ? `ハイスコア<b>${best.score}</b>` : "";
     $("rules-list").innerHTML = Rules.list()
       .map((r) => {
         const best = Save.data.stats.ruleBest[r.id];

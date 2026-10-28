@@ -36,7 +36,7 @@
   <!-- アプリとしてインストールするための設定（PWA） -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="css/style.css?v=1.11.0">
+  <link rel="stylesheet" href="css/style.css?v=1.12.0">
 </head>
 <body>
   <div id="app">
@@ -141,9 +141,9 @@
       <div class="screen-inner">
         <h2 class="screen-title">モードを選ぶ</h2>
         <div class="menu">
-          <button id="btn-solo" class="btn btn-big btn-p1">ひとりで<small>スコアアタック</small></button>
+          <!-- ひとりで：押すと、スコアアタック（ふつうのルール）か特殊ルールを選ぶ画面へ -->
+          <button id="btn-hitori" class="btn btn-big btn-p1" data-open="rules">ひとりで<small>スコアアタック・特殊ルール</small><span id="mode-best" class="mode-best hidden"></span></button>
           <button class="btn btn-big btn-p2" data-open="versus">たいせん<small>ともだちと・CPUと</small></button>
-          <button class="btn btn-big btn-special" data-open="rules">特殊ルール<small>風・傾く土台・つるつる など</small></button>
           <!-- ハロウィンイベント（期間中だけ表示。halloween.js） -->
           <button id="btn-halloween" class="btn btn-big btn-halloween hidden">🎃 ハロウィン<small id="halloween-progress"></small></button>
           <button id="btn-mode-back" class="btn btn-big btn-sub">もどる</button>
@@ -226,16 +226,26 @@
     <!-- CPU が考えている間の表示 -->
     <div id="cpu-thinking" class="cpu-thinking hidden"></div>
 
-    <!-- ===== 特殊ルールを選ぶ画面（中身は rules.js と config.js の rules から作る） ===== -->
+    <!-- ===== ひとりで遊ぶモードを選ぶ画面 =====
+         いちばん上に「スコアアタック」（ふつうのルール。ランキング対象）、その下に特殊ルール（中身は rules.js と config.js の rules から作る） -->
     <section id="screen-rules" class="screen screen-dim page">
       <div class="page-inner">
         <header class="page-header">
           <button class="btn btn-icon" data-back="mode" aria-label="もどる">‹</button>
-          <h2>特殊ルール</h2>
+          <h2>ひとりで</h2>
         </header>
         <div class="page-body">
+          <button id="btn-solo" class="list-row rule-row rule-normal">
+            <span class="rule-icon">🏆</span>
+            <span class="rule-main">
+              <b>スコアアタック <span class="ranking-tag">ランキング対象</span></b>
+              <small>いつものルール。ハイスコアはランキングに載ります</small>
+            </span>
+            <span id="normal-best" class="rule-best"></span>
+          </button>
+          <h3 class="section-title">特殊ルール</h3>
           <div id="rules-list"></div>
-          <p class="page-note">特殊ルールはひとりで遊びます。ハイスコアはルールごとに記録されます。</p>
+          <p class="page-note">特殊ルールのハイスコアは、ルールごとに記録されます（ランキングには載りません）。</p>
         </div>
       </div>
     </section>
@@ -331,7 +341,7 @@
           <!-- オンライン対戦で、相手が「もう一度」を押したときに出る -->
           <p id="rematch-note" class="rematch-note hidden"></p>
           <button id="btn-retry" class="btn btn-big btn-primary">もう一度</button>
-          <!-- 挑戦状：1人モード（特殊ルールも）のときだけ表示 -->
+          <!-- 挑戦状：スコアアタック・特殊ルールのときだけ表示 -->
           <button id="btn-challenge" class="btn btn-big btn-p2 hidden">挑戦状を送る<small>同じ順番のキャラで勝負！</small></button>
           <button id="btn-card" class="btn btn-big btn-special">結果を画像でシェア<small>リザルトカードを作る</small></button>
           <button class="btn btn-big btn-sub" data-photo>📷 フォトモード</button>
@@ -710,46 +720,46 @@
 
   <!-- ?v= のあとの番号：更新したら config.js の version と一緒に上げる（スマホに古いファイルが残らないように） -->
   <!-- ライブラリ（lib/ に同梱） -->
-  <script src="lib/decomp.min.js?v=1.11.0"></script>
-  <script src="lib/matter.min.js?v=1.11.0"></script>
-  <script src="lib/peerjs.min.js?v=1.11.0"></script>
-  <script src="lib/mqtt.min.js?v=1.11.0"></script>
+  <script src="lib/decomp.min.js?v=1.12.0"></script>
+  <script src="lib/matter.min.js?v=1.12.0"></script>
+  <script src="lib/peerjs.min.js?v=1.12.0"></script>
+  <script src="lib/mqtt.min.js?v=1.12.0"></script>
   <!-- 設定ファイル -->
-  <script src="config.js?v=1.11.0"></script>
-  <script src="characters.js?v=1.11.0"></script>
-  <script src="js/chars.js?v=1.11.0"></script>
+  <script src="config.js?v=1.12.0"></script>
+  <script src="characters.js?v=1.12.0"></script>
+  <script src="js/chars.js?v=1.12.0"></script>
   <!-- ゲーム本体 -->
-  <script src="js/settings.js?v=1.11.0"></script>
-  <script src="js/save.js?v=1.11.0"></script>
-  <script src="js/audio.js?v=1.11.0"></script>
-  <script src="js/shape.js?v=1.11.0"></script>
-  <script src="js/aura.js?v=1.11.0"></script>
-  <script src="js/platform-art.js?v=1.11.0"></script>
-  <script src="js/game.js?v=1.11.0"></script>
-  <script src="js/rules.js?v=1.11.0"></script>
-  <script src="js/cpu.js?v=1.11.0"></script>
-  <script src="js/challenge.js?v=1.11.0"></script>
-  <script src="js/card.js?v=1.11.0"></script>
-  <script src="js/stamps.js?v=1.11.0"></script>
-  <script src="js/halloween-home.js?v=1.11.0"></script>
-  <script src="js/halloween.js?v=1.11.0"></script>
-  <script src="js/title-fx.js?v=1.11.0"></script>
-  <script src="js/online.js?v=1.11.0"></script>
-  <script src="js/ui.js?v=1.11.0"></script>
-  <script src="js/themes.js?v=1.11.0"></script>
-  <script src="js/frames.js?v=1.11.0"></script>
-  <script src="js/profile.js?v=1.11.0"></script>
-  <script src="js/data-file.js?v=1.11.0"></script>
-  <script src="js/news.js?v=1.11.0"></script>
-  <script src="js/events.js?v=1.11.0"></script>
-  <script src="js/ranking.js?v=1.11.0"></script>
-  <script src="js/records.js?v=1.11.0"></script>
-  <script src="js/dex.js?v=1.11.0"></script>
-  <script src="js/achievements.js?v=1.11.0"></script>
-  <script src="js/vs-intro.js?v=1.11.0"></script>
-  <script src="js/backup.js?v=1.11.0"></script>
-  <script src="js/admin.js?v=1.11.0"></script>
-  <script src="js/pwa.js?v=1.11.0"></script>
-  <script src="js/main.js?v=1.11.0"></script>
+  <script src="js/settings.js?v=1.12.0"></script>
+  <script src="js/save.js?v=1.12.0"></script>
+  <script src="js/audio.js?v=1.12.0"></script>
+  <script src="js/shape.js?v=1.12.0"></script>
+  <script src="js/aura.js?v=1.12.0"></script>
+  <script src="js/platform-art.js?v=1.12.0"></script>
+  <script src="js/game.js?v=1.12.0"></script>
+  <script src="js/rules.js?v=1.12.0"></script>
+  <script src="js/cpu.js?v=1.12.0"></script>
+  <script src="js/challenge.js?v=1.12.0"></script>
+  <script src="js/card.js?v=1.12.0"></script>
+  <script src="js/stamps.js?v=1.12.0"></script>
+  <script src="js/halloween-home.js?v=1.12.0"></script>
+  <script src="js/halloween.js?v=1.12.0"></script>
+  <script src="js/title-fx.js?v=1.12.0"></script>
+  <script src="js/online.js?v=1.12.0"></script>
+  <script src="js/ui.js?v=1.12.0"></script>
+  <script src="js/themes.js?v=1.12.0"></script>
+  <script src="js/frames.js?v=1.12.0"></script>
+  <script src="js/profile.js?v=1.12.0"></script>
+  <script src="js/data-file.js?v=1.12.0"></script>
+  <script src="js/news.js?v=1.12.0"></script>
+  <script src="js/events.js?v=1.12.0"></script>
+  <script src="js/ranking.js?v=1.12.0"></script>
+  <script src="js/records.js?v=1.12.0"></script>
+  <script src="js/dex.js?v=1.12.0"></script>
+  <script src="js/achievements.js?v=1.12.0"></script>
+  <script src="js/vs-intro.js?v=1.12.0"></script>
+  <script src="js/backup.js?v=1.12.0"></script>
+  <script src="js/admin.js?v=1.12.0"></script>
+  <script src="js/pwa.js?v=1.12.0"></script>
+  <script src="js/main.js?v=1.12.0"></script>
 </body>
 </html>

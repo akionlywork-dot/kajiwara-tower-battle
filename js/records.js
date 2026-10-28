@@ -126,7 +126,7 @@ const Records = (() => {
     const avg = s.soloPlays ? Math.round(s.soloTotalScore / s.soloPlays) : 0;
     const item = (label, value) => `<div class="stat-item"><span>${label}</span><b>${value}</b></div>`;
     $("records-content").innerHTML =
-      `<h3 class="section-title">ひとりで</h3>` +
+      `<h3 class="section-title">スコアアタック</h3>` +
       `<div class="stat-grid">` +
       item("プレイ回数", `${s.soloPlays}<small>回</small>`) +
       item("ハイスコア", s.best ? `${s.best.score}<small>点</small>` : "---") +
