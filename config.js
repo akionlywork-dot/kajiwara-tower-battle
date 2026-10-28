@@ -7,7 +7,7 @@ window.GAME_CONFIG = {
   achievementsEpoch: 2,
 
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v1.14.1",
+  version: "v1.14.2",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -85,8 +85,6 @@ window.GAME_CONFIG = {
     perMeter: 100, // 高さ 1m ごとの点数（端数も計算。1.5m なら 150点）
   },
 
-  // 1手の制限時間（秒）。設定画面で「制限時間」をONにしたときだけ使われる
-  turnTimeLimit: 10,
 
   // 背景と土台（プロフィール画面で選ぶ）
   //   id     : 名前（半角英数字。一度公開したら変えない）
@@ -177,6 +175,7 @@ window.GAME_CONFIG = {
   //   公開のメッセージ中継サーバー（MQTT）経由に切りかえる
   online: {
     directTimeout: 6, // 直接つながるのを待つ時間（秒）
+    turnTime: 15, // 1手の制限時間（秒）。時間切れになると、その場で自動で落ちる。0 なら制限なし
     // 中継サーバー（上から順に試す。ホストとゲストが同じサーバーを使う必要がある）
     relayBrokers: ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt"],
     // 試合の前の対戦カードの演出（秒）。1戦目 ＝ introSlide ＋ introTime ＋ introExit（約3秒）

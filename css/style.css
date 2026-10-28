@@ -860,6 +860,7 @@ select {
   display: flex;
   align-items: center;
   gap: var(--space-m);
+  height: 84px; /* どの人の行も同じ高さ（名前・称号・積んだ数がそれぞれ1行） */
   margin-bottom: var(--space-s);
   padding: var(--space-s) var(--space-m);
   border-radius: var(--radius-m);
@@ -893,9 +894,28 @@ select {
   text-overflow: ellipsis;
 }
 
+/* 名前・称号・積んだ数などは、それぞれ1行（長いときは「…」）。どの人の行も同じ高さになるように */
 .rank-main small {
+  display: block;
+  overflow: hidden;
   font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   opacity: 0.8;
+}
+
+.rank-main .title-badge {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 1px 0;
+}
+
+/* 称号を選んでいない人（ランキング） */
+.title-badge.title-empty {
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.12);
+  font-weight: normal;
 }
 
 .rank-score {
@@ -1971,6 +1991,12 @@ select {
 
 .settings-group.hidden {
   display: none;
+}
+
+/* 行は縮めない（行が増えて画面からはみ出したとき、縮んで中身が下の行に重ならないように。はみ出した分はスクロール） */
+.settings-list > *,
+.settings-group > * {
+  flex-shrink: 0;
 }
 
 .settings-heading {

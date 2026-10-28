@@ -63,12 +63,12 @@
     if (Game.playing && !isCpuTurn()) Game.setTurnTimeLimit(turnTimeLimit());
   }
 
+  // 1手の制限時間（秒）。オンライン対戦だけ（config.js の online.turnTime）。ほかのモードは制限なし
   function turnTimeLimit() {
-    return Settings.get("timer") ? CONFIG.turnTimeLimit : 0;
+    return mode === "online" ? Number(CONFIG.online.turnTime) || 0 : 0;
   }
 
   // 設定画面のスイッチ（data-setting="bgm" などの名前で、どの設定か分かる）
-  $("timer-desc").textContent = `1手 ${CONFIG.turnTimeLimit}秒・時間切れで自動で落ちる`;
   const toggles = document.querySelectorAll(".toggle[data-setting]");
   function updateToggles() {
     for (const t of toggles) t.setAttribute("aria-checked", String(Settings.get(t.dataset.setting)));
@@ -204,8 +204,8 @@
         onFall: () => playSe("fall"),
         onGameOver: showResult,
       },
-      // オンライン対戦では制限時間を使わない
-      { turnTimeLimit: mode === "online" ? 0 : turnTimeLimit(), rule: Rules.get(ruleId), seed }
+      // 制限時間はオンライン対戦だけ（ホストが数えて、時間切れなら相手の手番でもホストが落とす）
+      { turnTimeLimit: turnTimeLimit(), rule: Rules.get(ruleId), seed }
     );
     applySettings();
     Sound.startBgm();

@@ -158,18 +158,24 @@ const Ranking = (() => {
     const sub = [];
     if (r.count !== undefined && r.count !== "" && isFinite(Number(r.count))) sub.push(`${Number(r.count)}体`);
     if (r.height !== undefined && r.height !== "" && !isNaN(height)) sub.push(`${height.toFixed(2)}m`);
-    if (r.date) sub.push(UI.escape(String(r.date)));
+    if (r.date) sub.push(UI.escape(shortDate(String(r.date))));
     return `
       <button class="rank-row ${medal ? "rank-" + medal : ""} ${r.me ? "rank-me" : ""}" data-index="${i}" aria-label="${UI.escape(name)}のプロフィール">
         <span class="rank-num">${Number(r.rank)}</span>
         ${avatar}
         <span class="rank-main">
           <b>${UI.escape(name)}${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
-          ${r.title ? Frames.titleHTML(String(r.title), frame) : ""}
+          ${r.title ? Frames.titleHTML(String(r.title), frame) : `<span class="title-badge title-empty">称号なし</span>`}
           <small>${sub.join("・")}</small>
         </span>
         <span class="rank-score">${Number(r.score)}<small>点</small></span>
       </button>`;
+  }
+
+  // 行に出す日付は短く（"2026-10-28" → "10/28"。それ以外の書き方なら、そのまま）
+  function shortDate(d) {
+    const m = /^\d{4}-(\d{1,2})-(\d{1,2})/.exec(d);
+    return m ? `${Number(m[1])}/${Number(m[2])}` : d;
   }
 
   // ---------- ランキングの人のプロフィール ----------
@@ -191,7 +197,7 @@ const Ranking = (() => {
         ${avatarHTML(r, "rp-avatar")}
         <span class="rp-who">
           <b>${UI.escape(name)}${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
-          ${title ? Frames.titleHTML(title, frame) : ""}
+          ${title ? Frames.titleHTML(title, frame) : `<span class="title-badge title-empty">称号なし</span>`}
         </span>
       </div>` +
       (items.length ? `<div class="rp-stats">${items.map(([label, value, cls]) => `<div class="rp-stat ${cls || ""}"><span>${label}</span><b>${value}</b></div>`).join("")}</div>` : "") +

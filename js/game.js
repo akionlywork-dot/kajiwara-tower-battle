@@ -66,6 +66,8 @@ const Game = (() => {
   let fellAt = 0; // 土台から落ちた時刻
   let aimStartAt = 0; // 今の手番が始まった時刻
   let turnLimit = 0; // 1手の制限時間（ミリ秒）。0 なら制限なし
+  // オンライン対戦のゲスト：ホストから届いた制限時間 { left: 残り（ミリ秒）, limit: 全部（ミリ秒）, at: 届いた時刻 }。無ければ null
+  let remoteTime = null;
 
   let lastTime = 0;
   let frameDt = 0; // 前のフレームからの秒数（オーラの粒を出す量に使う。ポーズ中は 0）
@@ -561,6 +563,8 @@ const Game = (() => {
 
   // 制限時間の残り（ミリ秒）。制限なしのときは null
   function timeLeft() {
+    // ゲスト：ホストから届いた残り時間から、届いてからたった時間を引く
+    if (remote) return remoteTime && held ? Math.max(0, remoteTime.left - (performance.now() - remoteTime.at)) : null;
     if (!turnLimit || state !== "aim") return null;
     return Math.max(0, turnLimit - (simTime - aimStartAt));
   }
@@ -597,6 +601,7 @@ const Game = (() => {
     rule = null;
     createWorld(PLATFORM_FROM_BOTTOM);
     setTurnTimeLimit(0);
+    remoteTime = null;
     remote = true;
     remoteBodies = new Map();
     awaitingDrop = false;
@@ -612,12 +617,16 @@ const Game = (() => {
     return {
       b: pieces().map((b) => [b.id, b.shape.id, round(b.position.x, 10), round(b.position.y - platformTop, 10), round(b.angle, 1000)]),
       h: held && state === "aim" ? [held.shape.id, round(held.x, 10), round(held.angle, 1000)] : null,
+      t: turnLimit && state === "aim" ? [Math.round(timeLeft()), turnLimit] : null, // 制限時間 [残り, 全部]（ミリ秒）
     };
   }
 
   // ゲスト：受け取った状態を反映する。myTurn: 自分（ゲスト）の手番か
   function applySnapshot(snap, myTurn) {
     if (!remote) return;
+    // 制限時間（古いバージョンのホストからは届かない。おかしな値は使わない）
+    const t = Array.isArray(snap.t) && snap.t[0] >= 0 && snap.t[1] > 0 && snap.t[1] <= 600000 ? snap.t : null;
+    remoteTime = t ? { left: Math.min(t[0], t[1]), limit: t[1], at: performance.now() } : null;
     const seen = new Set();
     let top = platformTop;
     for (const [id, charId, x, yRel, a] of snap.b) {
@@ -917,8 +926,9 @@ const Game = (() => {
   }
 
   // 制限時間を過ぎたら、その場で自動的に落とす
+  // （ゲストは数えない。時間切れで落とすのはホスト）
   function checkTurnTimer() {
-    if (timeLeft() === 0) drop();
+    if (!remote && timeLeft() === 0) drop();
   }
 
   // 全部のキャラが止まったら、次のキャラへ
@@ -1573,7 +1583,7 @@ const Game = (() => {
   function drawTimer(x, y) {
     const left = timeLeft();
     if (left === null) return;
-    const ratio = left / turnLimit;
+    const ratio = left / (remote ? remoteTime.limit : turnLimit);
     // キャラと重ならないよう、画面の空いている側に描く
     const tx = x < WORLD_W / 2 ? Math.min(x + 95, WORLD_W - 30) : Math.max(x - 95, 30);
     const color = left < 3000 ? "#ff4d4d" : "#ffffff"; // 残り3秒で赤くする

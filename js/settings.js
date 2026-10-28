@@ -11,7 +11,6 @@ const Settings = (() => {
   const DEFAULTS = {
     bgm: true, // BGM
     se: true, // 効果音
-    timer: false, // 1手ごとの制限時間
     release: false, // 指を離したら落とす
     debug: false, // 当たり判定を表示（確認用）
     cardSize: "landscape", // リザルトカードの形（"landscape"=横長 / "portrait"=縦長）

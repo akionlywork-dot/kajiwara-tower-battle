@@ -36,7 +36,7 @@
   <!-- アプリとしてインストールするための設定（PWA） -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="css/style.css?v=1.14.1">
+  <link rel="stylesheet" href="css/style.css?v=1.14.2">
 </head>
 <body>
   <div id="app">
@@ -307,10 +307,6 @@
           </div>
 
           <h3 class="settings-heading">あそびかた</h3>
-          <div class="setting-row">
-            <span>制限時間<small id="timer-desc"></small></span>
-            <button class="toggle" data-setting="timer" role="switch" aria-label="制限時間"></button>
-          </div>
           <div class="setting-row">
             <span>指を離したら落とす<small>ドラッグして指を離すと落下</small></span>
             <button class="toggle" data-setting="release" role="switch" aria-label="指を離したら落とす"></button>
@@ -776,48 +772,48 @@
 
   <!-- ?v= のあとの番号：更新したら config.js の version と一緒に上げる（スマホに古いファイルが残らないように） -->
   <!-- ライブラリ（lib/ に同梱） -->
-  <script src="lib/decomp.min.js?v=1.14.1"></script>
-  <script src="lib/matter.min.js?v=1.14.1"></script>
-  <script src="lib/peerjs.min.js?v=1.14.1"></script>
-  <script src="lib/mqtt.min.js?v=1.14.1"></script>
+  <script src="lib/decomp.min.js?v=1.14.2"></script>
+  <script src="lib/matter.min.js?v=1.14.2"></script>
+  <script src="lib/peerjs.min.js?v=1.14.2"></script>
+  <script src="lib/mqtt.min.js?v=1.14.2"></script>
   <!-- 設定ファイル -->
-  <script src="config.js?v=1.14.1"></script>
+  <script src="config.js?v=1.14.2"></script>
   <!-- 読み込みの状況（開発用。devMode か ?debug=1 のときだけ表示）。ほかより先に読み込む -->
-  <script src="js/load-status.js?v=1.14.1"></script>
-  <script src="characters.js?v=1.14.1"></script>
-  <script src="js/chars.js?v=1.14.1"></script>
+  <script src="js/load-status.js?v=1.14.2"></script>
+  <script src="characters.js?v=1.14.2"></script>
+  <script src="js/chars.js?v=1.14.2"></script>
   <!-- ゲーム本体 -->
-  <script src="js/settings.js?v=1.14.1"></script>
-  <script src="js/save.js?v=1.14.1"></script>
-  <script src="js/audio.js?v=1.14.1"></script>
-  <script src="js/shape.js?v=1.14.1"></script>
-  <script src="js/aura.js?v=1.14.1"></script>
-  <script src="js/platform-art.js?v=1.14.1"></script>
-  <script src="js/game.js?v=1.14.1"></script>
-  <script src="js/rules.js?v=1.14.1"></script>
-  <script src="js/cpu.js?v=1.14.1"></script>
-  <script src="js/challenge.js?v=1.14.1"></script>
-  <script src="js/card.js?v=1.14.1"></script>
-  <script src="js/stamps.js?v=1.14.1"></script>
-  <script src="js/halloween-home.js?v=1.14.1"></script>
-  <script src="js/halloween.js?v=1.14.1"></script>
-  <script src="js/title-fx.js?v=1.14.1"></script>
-  <script src="js/online.js?v=1.14.1"></script>
-  <script src="js/ui.js?v=1.14.1"></script>
-  <script src="js/themes.js?v=1.14.1"></script>
-  <script src="js/frames.js?v=1.14.1"></script>
-  <script src="js/profile.js?v=1.14.1"></script>
-  <script src="js/data-file.js?v=1.14.1"></script>
-  <script src="js/news.js?v=1.14.1"></script>
-  <script src="js/events.js?v=1.14.1"></script>
-  <script src="js/ranking.js?v=1.14.1"></script>
-  <script src="js/records.js?v=1.14.1"></script>
-  <script src="js/dex.js?v=1.14.1"></script>
-  <script src="js/achievements.js?v=1.14.1"></script>
-  <script src="js/vs-intro.js?v=1.14.1"></script>
-  <script src="js/backup.js?v=1.14.1"></script>
-  <script src="js/admin.js?v=1.14.1"></script>
-  <script src="js/pwa.js?v=1.14.1"></script>
-  <script src="js/main.js?v=1.14.1"></script>
+  <script src="js/settings.js?v=1.14.2"></script>
+  <script src="js/save.js?v=1.14.2"></script>
+  <script src="js/audio.js?v=1.14.2"></script>
+  <script src="js/shape.js?v=1.14.2"></script>
+  <script src="js/aura.js?v=1.14.2"></script>
+  <script src="js/platform-art.js?v=1.14.2"></script>
+  <script src="js/game.js?v=1.14.2"></script>
+  <script src="js/rules.js?v=1.14.2"></script>
+  <script src="js/cpu.js?v=1.14.2"></script>
+  <script src="js/challenge.js?v=1.14.2"></script>
+  <script src="js/card.js?v=1.14.2"></script>
+  <script src="js/stamps.js?v=1.14.2"></script>
+  <script src="js/halloween-home.js?v=1.14.2"></script>
+  <script src="js/halloween.js?v=1.14.2"></script>
+  <script src="js/title-fx.js?v=1.14.2"></script>
+  <script src="js/online.js?v=1.14.2"></script>
+  <script src="js/ui.js?v=1.14.2"></script>
+  <script src="js/themes.js?v=1.14.2"></script>
+  <script src="js/frames.js?v=1.14.2"></script>
+  <script src="js/profile.js?v=1.14.2"></script>
+  <script src="js/data-file.js?v=1.14.2"></script>
+  <script src="js/news.js?v=1.14.2"></script>
+  <script src="js/events.js?v=1.14.2"></script>
+  <script src="js/ranking.js?v=1.14.2"></script>
+  <script src="js/records.js?v=1.14.2"></script>
+  <script src="js/dex.js?v=1.14.2"></script>
+  <script src="js/achievements.js?v=1.14.2"></script>
+  <script src="js/vs-intro.js?v=1.14.2"></script>
+  <script src="js/backup.js?v=1.14.2"></script>
+  <script src="js/admin.js?v=1.14.2"></script>
+  <script src="js/pwa.js?v=1.14.2"></script>
+  <script src="js/main.js?v=1.14.2"></script>
 </body>
 </html>
