@@ -4,8 +4,11 @@
 //
 // 入り口：タイトル画面右下のバージョン表示を、すばやく7回タップする（開いたあとは、ホームの右上の 🛠 から開ける）
 //
-// できること：自由配置モード（sandbox.js）・表示の切りかえ（当たり判定・FPS・キャラの数と高さ・読み込み状況）・
-//   日付を変えてテスト・イベントの確認・次に出すキャラ・解放状態の操作（元に戻せる）・出現率のテスト・データのリセット
+// できること：アップデート予告（updates.js・server/ranking.gs）・自由配置モード（sandbox.js）・
+//   表示の切りかえ（当たり判定・FPS・キャラの数と高さ・読み込み状況）・日付を変えてテスト・イベントの確認・次に出すキャラ・
+//   解放状態の操作（元に戻せる）・出現率のテスト・データのリセット
+// メニューは見出しごとに折りたためる（<details>）。開いている見出しはこの端末に覚えておき、
+//   閉じていても分かるように、見出しの横に今の状態（例「テスト日付 10/31」「マイケル」）を出す
 // 管理者モードのあいだは、ハイスコアをオンラインのランキングに送らない（ranking.js）。オンライン対戦では、
 //   次に出すキャラ・テスト日付・イベントの確認表示を使わない（game.js の fair）。相手に見せる数字も送らない（vs-intro.js）
 //
@@ -169,7 +172,10 @@ const Admin = (() => {
     });
 
     // 次に出すキャラ
-    $("admin-next").addEventListener("change", (e) => Game.setForcedShape(e.target.value || null));
+    $("admin-next").addEventListener("change", (e) => {
+      Game.setForcedShape(e.target.value || null);
+      renderSections();
+    });
 
     // ハロウィンの勝利数を変える（ごほうびの確認用。負けの数はそのまま）
     $("admin-hw-wins").addEventListener("change", (e) => {
@@ -219,6 +225,29 @@ const Admin = (() => {
     // 接続の状態を更新
     $("btn-admin-net").addEventListener("click", renderNet);
 
+    // アップデート予告
+    $("btn-admin-notice-set").addEventListener("click", setNotice);
+    $("btn-admin-notice-clear").addEventListener("click", clearNotice);
+    $("btn-admin-notice-reload").addEventListener("click", async () => {
+      $("admin-notice-state").textContent = "読みこみ中…";
+      await Updates.refresh();
+      renderNotice(true);
+    });
+    // 日時のかんたん入力：〇分後・今夜/明日の21時
+    for (const b of document.querySelectorAll("[data-notice-in], [data-notice-day]")) {
+      b.addEventListener("click", () => {
+        const d = new Date();
+        if (b.dataset.noticeIn) d.setMinutes(d.getMinutes() + Number(b.dataset.noticeIn), 0, 0);
+        else {
+          d.setDate(d.getDate() + Number(b.dataset.noticeDay));
+          d.setHours(21, 0, 0, 0);
+        }
+        $("admin-notice-at").value = localInput(d);
+      });
+    }
+
+    setupSections();
+
     // 終わる
     $("btn-admin-lock").addEventListener("click", async () => {
       if (!(await UI.confirm("管理者モードを終わりますか？\n次に開くときは、合言葉が必要です。", "終わる"))) return;
@@ -242,9 +271,18 @@ const Admin = (() => {
     // 次に出すキャラの選択肢
     const select = $("admin-next");
     const current = select.value;
+    const table = window.GAME_CONFIG.rarity || {};
+    const ids = Object.keys(table).sort((a, b) => table[a].stars - table[b].stars);
     select.innerHTML =
       `<option value="">ランダム（ふつう）</option>` +
-      window.CHARACTERS.map((c) => `<option value="${UI.escape(c.id)}">${UI.escape(c.name)}（${UI.escape(c.rarity || "N")}）</option>`).join("");
+      ids
+        .map((rid) => {
+          const list = window.CHARACTERS.filter((c) => (table[c.rarity] ? c.rarity : "N") === rid);
+          if (!list.length) return "";
+          const label = `${"★".repeat(table[rid].stars)} ${table[rid].name}`;
+          return `<optgroup label="${UI.escape(label)}">${list.map((c) => `<option value="${UI.escape(c.id)}">${UI.escape(c.name)}</option>`).join("")}</optgroup>`;
+        })
+        .join("");
     select.value = current;
     $("admin-hw-wins").value = String(Math.min(3, Records.eventWins(Halloween.EVENT_ID)));
     // 管理者メニューのスイッチを、今の設定に合わせる
@@ -253,6 +291,138 @@ const Admin = (() => {
     renderUndo();
     renderStaff();
     renderNet();
+    renderNotice(true);
+    Updates.refresh().then(() => UI.current === "admin" && renderNotice());
+    renderSections();
+  }
+
+  // ---------- 見出しの折りたたみ ----------
+  const OPEN_KEY = "stack.admin.open"; // 開いている見出し（data-sec の一覧）
+
+  function setupSections() {
+    let saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(OPEN_KEY) || "null");
+    } catch (e) {}
+    const secs = [...document.querySelectorAll("#admin-panel .admin-sec")];
+    if (Array.isArray(saved)) for (const d of secs) d.open = saved.includes(d.dataset.sec);
+    const save = () => {
+      try {
+        localStorage.setItem(OPEN_KEY, JSON.stringify(secs.filter((d) => d.open).map((d) => d.dataset.sec)));
+      } catch (e) {}
+    };
+    for (const d of secs) d.addEventListener("toggle", save);
+    $("btn-admin-open-all").addEventListener("click", () => secs.forEach((d) => (d.open = true)));
+    $("btn-admin-close-all").addEventListener("click", () => secs.forEach((d) => (d.open = false)));
+    // スイッチを押したら、見出しの状態も書きなおす（スイッチの切りかえは main.js がする）
+    $("admin-panel").addEventListener("click", (e) => {
+      if (e.target.closest(".toggle")) setTimeout(renderSections, 0);
+    });
+  }
+
+  // 見出しの横に、今の状態を出す（閉じていても分かるように）
+  function renderSections() {
+    const set = (id, text) => {
+      const el = document.querySelector(`#admin-panel .admin-sec[data-sec="${id}"] .admin-sec-state`);
+      if (el) el.textContent = text ? `　${text}` : "";
+    };
+    const n = Updates.state();
+    const nt = Updates.notice;
+    set("notice", n && n.kind === "ready" ? `新しい版 ${n.version} を公開中` : nt ? `予告 ${Updates.fmt(Date.parse(nt.at))}` : Updates.supported === false ? "サーバーが古い（予告できない）" : "予告なし");
+    const next = $("admin-next").value;
+    set("next", next ? (Chars.byId(next) || {}).name || next : "ランダム");
+    const on = [["debug", "当たり判定"], ["adminFps", "FPS"], ["adminStats", "数と高さ"], ["adminLoad", "読み込み"]].filter(([k]) => Settings.get(k)).map(([, l]) => l);
+    set("display", on.length ? `ON：${on.join("・")}` : "");
+    const t = LimitedEvents.testDate;
+    set("date", t ? `テスト日付 ${fmtDate(t)}` : "");
+    set("event", Settings.get("eventPreview") ? "期間中として表示 ON" : "");
+  }
+
+  // ---------- アップデート予告 ----------
+  // 入力欄に入れる形の日時（"2026-11-01T21:00"）
+  function localInput(d) {
+    const pad = (x) => String(x).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  // 今の版の次の番号（v3.1.0 → v3.1.1）。入力欄の初めの値に使う
+  function nextVersion() {
+    const m = String(window.GAME_CONFIG.version || "").match(/^v?(\d+)\.(\d+)\.(\d+)$/);
+    return m ? `v${m[1]}.${m[2]}.${Number(m[3]) + 1}` : "";
+  }
+
+  // 予告の状態と、入力欄。fill：入力欄も今の予告に合わせる
+  function renderNotice(fill = false) {
+    const nt = Updates.notice;
+    const lines = [`この端末の版：${window.GAME_CONFIG.version}`, `公開中の版　：${Updates.latest || "（確認中）"}`];
+    if (!(window.GAME_CONFIG.ranking || {}).url) lines.push("ランキングのサーバーを使っていないので、予告はできません（「更新する」ボタンは出ます）");
+    else if (Updates.supported === false) lines.push("サーバーの ranking.gs が古く、予告に対応していません。\nserver/ranking.gs を貼りなおして、デプロイしなおしてください");
+    else if (Updates.supported === null) lines.push("予告　　　　：（確認中）");
+    else if (!nt) lines.push("予告　　　　：なし");
+    else lines.push(`予告　　　　：${Updates.fmt(Date.parse(nt.at))}${nt.version ? ` ${nt.version}` : ""}${nt.message ? `\n　「${nt.message}」` : ""}`);
+    $("admin-notice-state").textContent = lines.join("\n");
+    if (fill) {
+      $("admin-notice-at").value = nt ? localInput(new Date(nt.at)) : $("admin-notice-at").value || "";
+      $("admin-notice-ver").value = nt ? nt.version || "" : $("admin-notice-ver").value || nextVersion();
+      $("admin-notice-msg").value = nt ? nt.message || "" : $("admin-notice-msg").value || "";
+    }
+    renderSections();
+  }
+
+  // サーバーに予告を書きこむ（notice が null なら消す）。うまくいったら true
+  async function sendNotice(notice) {
+    const link = ((window.GAME_CONFIG.ranking || {}).url || "").trim();
+    if (!link) {
+      UI.toast("ランキングのサーバーを使っていないので、予告はできません");
+      return false;
+    }
+    let key = null;
+    try {
+      key = localStorage.getItem(KEY);
+    } catch (e) {}
+    let res = null;
+    try {
+      const r = await fetch(link, {
+        method: "POST",
+        cache: "no-store",
+        // text/plain で送る（Apps Script は、事前の確認の通信（CORS のプリフライト）に答えられないため）
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "notice", key, notice }),
+      });
+      res = await r.json();
+    } catch (e) {
+      await UI.alert("サーバーと通信できませんでした。\n通信できる場所で、もう一度ためしてください。");
+      return false;
+    }
+    if (res && res.ok && res.action === "notice") {
+      Updates.setNotice(res.notice);
+      renderNotice(true);
+      return true;
+    }
+    if (res && res.error === "forbidden") await UI.alert("サーバーに断られました（鍵が合いません）。\nserver/ranking.gs の ADMIN_PASS_HASH が、config.js の admin.passHash と同じか確かめてください。");
+    else if (res && res.error === "bad time") await UI.alert("日時が正しくありません。");
+    else await UI.alert("サーバーの ranking.gs が古く、予告に対応していません。\nserver/ranking.gs を貼りなおして、デプロイしなおしてください。");
+    return false;
+  }
+
+  async function setNotice() {
+    const v = $("admin-notice-at").value;
+    const at = v ? new Date(v) : null;
+    if (!at || isNaN(at)) return UI.toast("アップデートする日時を入れてください");
+    if (at.getTime() < Date.now() && !(await UI.confirm("その日時は、もう過ぎています。\nこのまま予告しますか？（すぐに「まもなくアップデートします」が出ます）", "予告する"))) return;
+    const version = $("admin-notice-ver").value.trim();
+    const message = $("admin-notice-msg").value.trim();
+    const ok = await UI.confirm(`みんなのタイトル画面に、\n「🔧 ${Updates.fmt(at.getTime())} にアップデートします${version ? `（${version}）` : ""}」${message ? `\n「${message}」` : ""}\nと出します。よろしいですか？`, "予告する");
+    if (!ok) return;
+    $("admin-notice-state").textContent = "送信中…";
+    if (await sendNotice({ at: at.toISOString(), version, message })) UI.toast("アップデートを予告しました");
+  }
+
+  async function clearNotice() {
+    if (!Updates.notice && Updates.supported) return UI.toast("今は予告していません");
+    if (!(await UI.confirm("アップデートの予告を消しますか？\nみんなのタイトル画面から、予告が消えます。", "消す"))) return;
+    $("admin-notice-state").textContent = "送信中…";
+    if (await sendNotice(null)) UI.toast("予告を消しました");
   }
 
   // ---------- 日付を変えてテスト ----------
@@ -266,6 +436,7 @@ const Admin = (() => {
     } catch (e) {}
     refreshFlags();
     renderDate();
+    renderSections();
   }
 
   // 起動したとき：保存しておいたテスト日付に戻す（管理者モードのときだけ）

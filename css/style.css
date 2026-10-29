@@ -1475,6 +1475,34 @@ select {
   to { --legend-angle: 360deg; }
 }
 
+/* ★6（シークレット）の図鑑のカード：黒い地に、金色の枠がゆっくり光りながら回る */
+.dex-card.dex-secret {
+  position: relative;
+  border: 3px solid transparent;
+  background:
+    linear-gradient(#1a1408, #050402) padding-box,
+    conic-gradient(from var(--legend-angle, 0deg), #ffd54a, #6b4a00, #fff1a8, #e0a000, #2a1d00, #ffd54a) border-box;
+  box-shadow: 0 0 16px rgba(255, 213, 74, 0.6);
+  animation: legend-border 3s linear infinite;
+}
+
+.dex-card.dex-secret .dex-name,
+.dex-card.dex-secret .dex-no {
+  color: #ffe9a0;
+}
+
+.dex-card.dex-secret .dex-question {
+  color: #ffd54a;
+  text-shadow: 0 0 10px rgba(255, 213, 74, 0.9);
+}
+
+/* ★6 の詳細：画像の後ろを黒く、金色の光で囲む */
+.dex-detail-secret {
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 213, 74, 0.45), #0d0a03 70%);
+  box-shadow: 0 0 0 2px #ffd54a, 0 0 18px rgba(255, 213, 74, 0.6);
+}
+
 /* まだ見つけていない★5は、シルエットではなく「？」 */
 .dex-question {
   display: flex;
@@ -1543,7 +1571,8 @@ select {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dex-card.dex-legend {
+  .dex-card.dex-legend,
+  .dex-card.dex-secret {
     animation: none;
   }
 }
@@ -2382,6 +2411,34 @@ select {
   background: rgba(255, 200, 60, 0.25);
 }
 
+/* アップデートの予告・「更新する」ボタン（タイトル画面。updates.js） */
+.update-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 10px;
+  margin-top: var(--space-s);
+  padding: var(--space-s) var(--space-m);
+  border-radius: var(--radius-s);
+  font-size: var(--font-size-s);
+  font-weight: bold;
+  text-align: center;
+  color: #3a2a00;
+  background: rgba(255, 213, 74, 0.92);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.update-banner small {
+  flex-basis: 100%;
+  font-weight: normal;
+}
+
+.update-banner.update-ready {
+  color: #fff;
+  background: rgba(43, 140, 90, 0.95);
+}
+
 /* ===== 設定画面 ===== */
 /* 設定画面：上に「‹ 設定」、その下が見出しごとに分かれたリスト（リストだけスクロール） */
 .settings-list {
@@ -2694,6 +2751,71 @@ select {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-s);
+}
+
+/* 日時のかんたん入力（30分後・1時間後・今夜21時・明日21時） */
+.admin-buttons.admin-quick {
+  grid-template-columns: repeat(4, 1fr);
+  margin-bottom: var(--space-s);
+}
+
+.admin-quick .btn {
+  padding-left: 2px;
+  padding-right: 2px;
+  font-size: var(--font-size-s);
+  white-space: nowrap;
+}
+
+/* 管理者メニューの見出し：タップで開く・閉じる（<details>）。見出しの横に、今の状態を小さく出す */
+.admin-sec {
+  margin-bottom: var(--space-s);
+  padding: 0 var(--space-m);
+  border-radius: var(--radius-s);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.admin-sec > summary.section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0 calc(-1 * var(--space-m));
+  padding: var(--space-s) var(--space-m);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.admin-sec > summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-sec > summary::before {
+  content: "▶";
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 0.7em;
+  transition: transform 0.15s;
+}
+
+.admin-sec[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.admin-sec-state {
+  overflow: hidden;
+  font-size: var(--font-size-s);
+  font-weight: normal;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.75;
+}
+
+.admin-sec[open] {
+  padding-bottom: var(--space-m);
+}
+
+.admin-sec-all {
+  margin-bottom: var(--space-m);
 }
 
 .admin-net {
@@ -3540,9 +3662,155 @@ body.sandbox-on .load-status {
   animation: ultimate-shine 0.8s linear infinite;
 }
 
+/* ★6（シークレット）：まぼろしより豪華に、3段階で見せる（全部で約3.6秒）
+   1. 画面が真っ暗になる（#flash。最初の約0.7秒）
+   2. ドンッと白〜金色に光り（::after）、ゲームの画面が揺れる（#game-canvas.secret-shake）
+   3. まん中の上のほうから金色の光の筋が回りながら広がり（::before）、金色の粒が降ってくる（.secret-rain。main.js） */
+#flash.on.secret {
+  overflow: hidden;
+  background: rgba(5, 4, 1, 0.94);
+  animation: secret-dark 3.6s ease-out;
+}
+
+#flash.on.secret::before {
+  content: "";
+  position: absolute;
+  inset: -50%; /* 回しても角が欠けないように大きめ。50% 42% が、画面の 50% 34% の位置 */
+  background:
+    radial-gradient(circle at 50% 42%, #fffbe6 0, rgba(255, 213, 74, 0.95) 7%, rgba(224, 160, 0, 0.55) 18%, transparent 36%),
+    repeating-conic-gradient(from 0deg at 50% 42%, rgba(255, 213, 74, 0.42) 0 5deg, transparent 5deg 12deg);
+  transform-origin: 50% 42%;
+  opacity: 0;
+  animation: secret-burst 3.6s ease-out;
+}
+
+#flash.on.secret::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 34%, #ffffff 0, #fff4c2 35%, rgba(255, 213, 74, 0.85) 70%, rgba(224, 160, 0, 0.7));
+  opacity: 0;
+  animation: secret-impact 3.6s ease-out;
+}
+
+@keyframes secret-dark {
+  0% { opacity: 0; }
+  5% { opacity: 1; }
+  20% { opacity: 1; }
+  70% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+
+@keyframes secret-impact {
+  0%, 19% { opacity: 0; }
+  21% { opacity: 1; }
+  34% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+@keyframes secret-burst {
+  0%, 20% { opacity: 0; transform: scale(0.05) rotate(0deg); }
+  30% { opacity: 1; transform: scale(1) rotate(10deg); }
+  80% { opacity: 0.9; transform: scale(1.15) rotate(50deg); }
+  100% { opacity: 0; transform: scale(1.25) rotate(64deg); }
+}
+
+/* ゲームの画面が、ドンッと揺れる（光った瞬間に合わせて少し遅らせる） */
+#game-canvas.secret-shake {
+  animation: secret-shake 0.7s ease-out 0.7s;
+}
+
+@keyframes secret-shake {
+  0% { transform: translate(0, 0); }
+  15% { transform: translate(-9px, 6px); }
+  30% { transform: translate(8px, -7px); }
+  45% { transform: translate(-6px, -4px); }
+  60% { transform: translate(5px, 5px); }
+  80% { transform: translate(-2px, 2px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* 上から降ってくる金色の粒（main.js の showSecretFx が作って、終わったら消す） */
+.secret-rain {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.secret-rain i {
+  position: absolute;
+  top: -5%;
+  left: var(--x);
+  width: var(--s);
+  height: var(--s);
+  background: radial-gradient(circle, #fffbe6, #ffd54a 45%, #b07800);
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); /* キラッとした星の形 */
+  opacity: 0;
+  animation: secret-fall var(--d) ease-in var(--delay) forwards;
+}
+
+@keyframes secret-fall {
+  0% { top: -5%; opacity: 1; transform: rotate(0deg) scale(1); }
+  70% { opacity: 1; }
+  100% { top: 105%; opacity: 0; transform: rotate(var(--r)) scale(0.6); }
+}
+
+/* バナー：暗いあいだは出さず、光った瞬間に大きく飛び出す。まぼろしより大きく、上に★6つ */
+.rare-banner.secret {
+  z-index: 9; /* 暗くなった画面（#flash）と、降ってくる粒の手前に出す */
+  animation: secret-pop 4.4s ease-out forwards;
+}
+
+@keyframes secret-pop {
+  0%, 16% { opacity: 0; transform: scale(2.4); }
+  22% { opacity: 1; transform: scale(0.92); }
+  27% { transform: scale(1.06); }
+  32% { transform: scale(1); }
+  85% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: translateY(-20px); }
+}
+
+.rare-banner.secret span {
+  padding: 10px 26px;
+  font-size: clamp(30px, 9vw, 46px); /* スマホの幅でも1行に収まるように */
+  white-space: nowrap;
+  letter-spacing: 1px;
+  color: #1a1100;
+  text-shadow: 0 1px 0 rgba(255, 250, 220, 0.8);
+  background: linear-gradient(100deg, #6b4a00, #ffd54a 25%, #fffbe6 38%, #ffd54a 50%, #e0a000 70%, #6b4a00) 0 0 / 240% 100%;
+  box-shadow: 0 0 0 3px #0d0a03, 0 0 0 6px #ffd54a, 0 0 50px #ffd54a, 0 0 120px rgba(255, 179, 0, 0.9), 0 0 200px rgba(255, 213, 74, 0.6);
+}
+
+.rare-banner.secret span::before {
+  content: "★★★★★★";
+  display: block;
+  font-size: 15px;
+  letter-spacing: 6px;
+  line-height: 1.2;
+  color: #6b4a00;
+}
+
+.rare-banner.secret small {
+  color: #ffe9a0;
+  font-size: 16px;
+  text-shadow: 0 0 8px rgba(255, 213, 74, 0.9), 0 1px 2px #000;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  #flash.on.legendary {
+  #flash.on.legendary,
+  #flash.on.secret {
     animation: ultimate-flash 0.8s ease-out;
+  }
+
+  #flash.on.secret::before,
+  #flash.on.secret::after {
+    display: none;
+  }
+
+  .rare-banner.secret {
+    animation: rare-pop 3.6s ease-out forwards;
   }
 
   .rare-banner.legendary span {

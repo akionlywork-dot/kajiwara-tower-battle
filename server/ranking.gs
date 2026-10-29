@@ -28,6 +28,10 @@
 //            ここに値がある人は、ランキングで専用の枠と札になる。消すと、ふつうの称号の表示に戻る（次に送られたときに、また入る）
 //   achList … 持っている実績（称号）の id の一覧（カンマ区切り）。「プロフィールを公開」が ON の人だけ。
 //            ランキングには出さず、?stats=titles の「みんなの称号の取得率」を数えるのにだけ使う
+//
+// アップデート予告（ゲームの管理者モードで設定し、タイトル画面に「〇月〇日 〇時にアップデートします」と出す）：
+//   シートではなく、このスクリプトのプロパティ（notice）に1つだけ保存する。?notice=1 で読む
+//   書きこめるのは、管理者モードの鍵を持っている人だけ（ADMIN_PASS_HASH で確かめる）
 // =============================================
 
 // ランキングの種類ごとのシートの名前と、スコアの計算（config.js の score・competitive と同じにする）：
@@ -58,14 +62,20 @@ const STAFF_TITLES = { developer: "開発者", admin: "管理者", employee: "�
 const BACKGROUNDS = ["sky", "sunset", "sakura", "night", "galaxy", "halloween_night", "wonderland", "aurora"];
 const PLATFORMS = ["wood", "stone", "ice", "gold", "diamond", "pumpkin", "steel", "cardboard"];
 const MIN_INTERVAL = 5; // 同じ人が続けて送れる間隔（秒）
+// 管理者モードの確認用の番号（config.js の admin.passHash と同じにする）。アップデート予告を書きこめるのは、
+// この番号に合う鍵（管理者モードを開いた端末に保存されている）を送ってきたときだけ。"" なら、だれも書きこめない
+const ADMIN_PASS_HASH = "3c9aa8962b53664710053311a8ec7aaed3bfc7c3e3c5b14cb49665d3dbfae97e";
+const NOTICE_MESSAGE_MAX = 80; // アップデート予告のひとことの最大文字数
 const TZ = "Asia/Tokyo";
 
 // ---------- ランキングを返す（ゲームのランキング画面が読みに来る） ----------
 // ?mode=comp で競技（無ければフリー）。?me=端末の番号 を付けると、その人の順位も返す
 // ?stats=titles で、みんなの称号の取得率（titleStats_）を返す
+// ?notice=1 で、アップデート予告を返す：{ action: "notice", notice: { at, version, message, updated } か null }
 function doGet(e) {
   const p = e && e.parameter ? e.parameter : {};
   if (p.stats === "titles") return json_(titleStats_());
+  if (p.notice) return json_({ action: "notice", notice: readNotice_() });
   const mode = modeOf_(p.mode);
   const me = String(p.me || "");
   const list = ranked_(readRows_(mode));
@@ -103,6 +113,7 @@ function doPost(e) {
     return json_({ ok: false, error: "bad request" });
   }
   if (d.action === "delete") return deleteRecords_(String(d.id || ""));
+  if (d.action === "notice") return writeNotice_(d);
   const mode = modeOf_(d.mode);
   const conf = MODES[mode];
   const id = String(d.id || "");
@@ -177,6 +188,49 @@ function deleteRecords_(id) {
   } finally {
     lock.releaseLock(); // 順番待ちを終わる（Apps Script の LockService の書き方）
   }
+}
+
+// ---------- アップデート予告 ----------
+// 書きこむ（ゲームの管理者モードから）：
+//   本文（JSON）：{ action: "notice", key: 管理者モードの鍵, notice: { at: 日時（ISO の文字）, version: "v3.1.1", message: "ひとこと" } }
+//   notice を null にすると、予告を消す
+//   返す JSON：{ ok: true, action: "notice", notice: 保存した予告か null } / 鍵がちがうとき { ok: false, error: "forbidden" }
+function writeNotice_(d) {
+  if (!ADMIN_PASS_HASH || sha256Hex_("verify:" + String(d.key || "")) !== ADMIN_PASS_HASH) return json_({ ok: false, error: "forbidden" });
+  const props = PropertiesService.getScriptProperties();
+  const n = d.notice;
+  if (!n) {
+    props.deleteProperty("notice");
+    return json_({ ok: true, action: "notice", notice: null });
+  }
+  const at = new Date(String(n.at || ""));
+  if (isNaN(at.getTime())) return json_({ ok: false, error: "bad time" });
+  const notice = {
+    at: at.toISOString(),
+    version: cleanText_(n.version, 16),
+    message: cleanText_(n.message, NOTICE_MESSAGE_MAX),
+    updated: new Date().toISOString(),
+  };
+  props.setProperty("notice", JSON.stringify(notice));
+  return json_({ ok: true, action: "notice", notice: notice });
+}
+
+// 保存してある予告（無ければ null）
+function readNotice_() {
+  const v = PropertiesService.getScriptProperties().getProperty("notice");
+  if (!v) return null;
+  try {
+    return JSON.parse(v);
+  } catch (err) {
+    return null;
+  }
+}
+
+// 文字 → SHA-256 の番号（16進数の文字列。ゲームの admin.js の sha256 と同じ結果になる）
+function sha256Hex_(text) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8)
+    .map((b) => ((b + 256) % 256).toString(16).padStart(2, "0"))
+    .join("");
 }
 
 // ---------- ここから下は、上で使う部品 ----------

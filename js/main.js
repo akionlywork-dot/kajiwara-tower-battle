@@ -274,10 +274,10 @@
   }
 
   // ---------- 実績のための数（このゲームの分） ----------
-  // 反転して積んだ数・ビッグを積んでからの数・積んだときの高さ・制限時間ギリギリ（残りミリ秒）
+  // 反転して積んだ数・ビッグを積んでからの数・積んだときの高さ・制限時間ギリギリ（残りミリ秒）・積んだキャラの ID
   let achieve = null;
   function resetAchievementCounts() {
-    achieve = { flipPlaced: 0, bigAt: null, heights: [], buzzer: null, over: false, ownCount: 0 };
+    achieve = { flipPlaced: 0, bigAt: null, heights: [], buzzer: null, over: false, ownCount: 0, placedIds: [], placedCounts: {} };
   }
   resetAchievementCounts();
 
@@ -290,6 +290,8 @@
   function countForAchievements(shape, height, mine) {
     if (mine) achieve.ownCount++; // 自分が積んだ数（実績「50体積み」。対戦の相手・CPU の分は数えない）
     if (shape && shape.flip) achieve.flipPlaced++;
+    if (shape && !achieve.placedIds.includes(shape.id)) achieve.placedIds.push(shape.id); // 実績「VIVANT」など（同じタワーに積んだ組み合わせ）
+    if (shape) achieve.placedCounts[shape.id] = (achieve.placedCounts[shape.id] || 0) + 1; // 実績「量産型」（同じキャラを何体積んだか）
     if (shape && shape.variant === "big" && achieve.bigAt === null) achieve.bigAt = stacked;
     achieve.heights.push(height);
     if (achieve.heights.length > 4) achieve.heights.shift();
@@ -756,6 +758,8 @@
       ownCount: achieve.ownCount,
       afterBig: achieve.bigAt === null ? 0 : stacked - achieve.bigAt,
       heights: achieve.heights,
+      placedIds: achieve.placedIds,
+      placedCounts: achieve.placedCounts,
       buzzer: achieve.buzzer,
       over: achieve.over,
     };
@@ -821,12 +825,13 @@
   function showRareBanner(shape, info) {
     const el = $("rare-banner");
     const ultimate = info.stars >= 4;
-    const legendary = info.stars >= 5; // ★5（まぼろし）：画面が虹色に光る、いちばん豪華な演出
-    // 文字は config.js のレア度の名前 ＋「！」（★2は1つ、★3は2つ、★4は3つ）。例「めっちゃレア！！」
+    const legendary = info.stars >= 5; // ★5（まぼろし）：画面が虹色に光る、豪華な演出
+    const secret = info.stars >= 6; // ★6（シークレット）：画面が暗くなって、金色の光がはじける、いちばん豪華な演出
+    // 文字は config.js のレア度の名前 ＋「！」（★2は1つ、★3は2つ、★4以上は3つ）。例「めっちゃレア！！」
     const label = info.name + "！".repeat(Math.max(1, Math.min(3, info.stars - 1)));
     el.innerHTML = `<span>${label}</span><small>${UI.escape(shape.name)}</small>`;
     el.style.setProperty("--rare-color", info.color);
-    el.className = legendary ? "rare-banner ultimate legendary" : ultimate ? `rare-banner ultimate aura-${shape.aura || "light"}` : info.stars >= 3 ? "rare-banner super" : "rare-banner";
+    el.className = secret ? "rare-banner ultimate legendary secret" : legendary ? "rare-banner ultimate legendary" : ultimate ? `rare-banner ultimate aura-${shape.aura || "light"}` : info.stars >= 3 ? "rare-banner super" : "rare-banner";
     el.style.animation = "none"; // アニメーションを最初から
     void el.offsetWidth;
     el.style.animation = "";
@@ -834,9 +839,34 @@
       const flash = $("flash");
       flash.className = "";
       void flash.offsetWidth;
-      flash.className = legendary ? "on legendary" : "on";
+      flash.className = secret ? "on secret" : legendary ? "on legendary" : "on";
     }
-    Sound.play(legendary ? "legendary" : ultimate ? "ultimate" : "rare");
+    if (secret) showSecretFx();
+    Sound.play(secret ? "secret" : legendary ? "legendary" : ultimate ? "ultimate" : "rare");
+  }
+
+  // ★6（シークレット）だけの演出：暗くなった画面が光る瞬間に、ゲームの画面が揺れて、金色の粒が上から降ってくる
+  // （動きを控えめにする設定のときは、しない）
+  function showSecretFx() {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const canvas = $("game-canvas");
+    canvas.classList.remove("secret-shake");
+    void canvas.offsetWidth;
+    canvas.classList.add("secret-shake");
+    setTimeout(() => canvas.classList.remove("secret-shake"), 1600);
+    const rain = document.createElement("div");
+    rain.className = "secret-rain";
+    for (let i = 0; i < 46; i++) {
+      const dot = document.createElement("i");
+      dot.style.setProperty("--x", `${Math.random() * 100}%`);
+      dot.style.setProperty("--s", `${4 + Math.random() * 9}px`);
+      dot.style.setProperty("--d", `${1.6 + Math.random() * 1.6}s`);
+      dot.style.setProperty("--delay", `${0.7 + Math.random() * 1.2}s`);
+      dot.style.setProperty("--r", `${Math.random() * 720 - 360}deg`);
+      rain.appendChild(dot);
+    }
+    $("flash").after(rain);
+    setTimeout(() => rain.remove(), 4600);
   }
 
   // 塔が高くなって、新しい背景に届いた（config.js の sky）
@@ -1067,7 +1097,9 @@
     const conf = CONFIG.competitive || {};
     const count = window.CHARACTERS.filter((c) => Chars.inCompetitive(c)).length;
     const stars = (conf.rarities || []).map((id) => (CONFIG.rarity[id] || {}).stars || 0).filter(Boolean);
-    const range = stars.length ? `★${Math.min(...stars)}〜★${Math.max(...stars)}` : "";
+    // competitive: true で、レア度の範囲の外から競技に出るキャラ（★4 の別班など）は、名前を足す
+    const extra = window.CHARACTERS.filter((c) => Chars.inCompetitive(c) && !(conf.rarities || []).includes(c.rarity || "N"));
+    const range = (stars.length ? `★${Math.min(...stars)}〜★${Math.max(...stars)}` : "") + (extra.length ? `（＋${extra.map((c) => UI.escape(c.name)).join("・")}）` : "");
     $("comp-dialog-rules").innerHTML = [
       `<li>${range}の${count}体が、<b>全部同じ確率</b>で落ちてきます（サイズ違い・期間限定のキャラは出ません）</li>`,
       `<li>全キャラ<b>同じ大きさ</b>。特殊ルールのギミックはありません</li>`,
@@ -1340,6 +1372,7 @@ ${location.origin}${location.pathname}`), "image/png");
   Achievements.init();
   Backup.init();
   PWA.init(); // アプリとしてインストールできるようにする
+  Updates.init(); // アップデートの予告と「更新する」ボタン（タイトル画面）
   Share.init();
   Stamps.init();
   // ハロウィンイベント：「挑戦する」で、おばけ屋敷（CPU対戦）を始める
@@ -1408,6 +1441,7 @@ ${location.origin}${location.pathname}`), "image/png");
         shape.shared = c.shared; // 別のキャラの画像を使っているか（★4のオーラ版など）
         shape.aura = c.aura && Aura.has(c.aura) ? c.aura : null; // オーラの種類（aura.js）
         shape.event = c.event || null; // 期間限定のキャラなら、イベントの id
+        shape.competitive = c.competitive === true; // レア度に関係なく、競技にも出すキャラか（chars.js の inCompetitive）
         // レア度と出やすさ（characters.js の rarity・weight。無ければノーマル・config.js の値）
         shape.rarity = CONFIG.rarity[c.rarity] ? c.rarity : "N";
         shape.weight = Chars.chance(c); // 出やすさ（0 なら出ない。まぼろしなど）

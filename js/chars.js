@@ -51,11 +51,12 @@ const Chars = (() => {
 
   // 競技モードに出てくるキャラか（config.js の competitive）。
   // characters.js のキャラにも、ゲームの形（main.js が作る shape。variant・event・rarity を持つ）にも使える。
-  // 出てくるのは、competitive.rarities のレア度で、サイズ違い（variant）でも期間限定（event）でもないキャラ
+  // 出てくるのは、competitive.rarities のレア度（または characters.js に competitive: true と書いたキャラ）で、
+  // サイズ違い（variant）でも期間限定（event）でもないキャラ
   function inCompetitive(c) {
     const conf = window.GAME_CONFIG.competitive || {};
     const rarities = Array.isArray(conf.rarities) ? conf.rarities : ["N", "R", "SR"];
-    return !!c && !c.variant && !c.event && rarities.includes(rarityId(c));
+    return !!c && !c.variant && !c.event && (c.competitive === true || rarities.includes(rarityId(c)));
   }
 
   // ID のキャラ（無ければ null）

@@ -5,6 +5,7 @@
 // ・★2：うすい色のふち ／ ★3：ふち＋ときどきキラッ ／ ★4：キャラごとのオーラ（光・闇など。下の TYPES）
 // ・★5（まぼろし）：専用のいちばん派手なオーラ（下の MYTHIC）。後ろでゆっくり回る後光、虹色に移り変わる光、
 //   立ちのぼる虹色の粒とキラッ、ときどき広がる虹の輪。着地した瞬間は、虹色の光がはじけて輪が広がる（burst）
+// ・★6（シークレット）：★5 と同じ作りで、色を金と黒にしたオーラ（下の SECRET）。キャラのふちが黒くしまり、その外に金色の光
 // ・強さは2段階：「strong」＝持っている間・落ちている間（強め） ／「rest」＝積んだあと（控えめ）
 // ・軽くするため、キャラの形に沿った光（ぼかし）は、キャラ・色・強さごとに一度だけ別のキャンバスに作り、
 //   毎フレームはそれを貼るだけにする（shadowBlur を毎フレーム使わない）。粒の数にも上限をつける
@@ -48,8 +49,11 @@ const Aura = (() => {
   //   colors：虹の色（光・粒・輪は、この色を順に使う）
   //   rays  ：後光（キャラの後ろで回る光の筋）の数と長さ（キャラの長い方の辺に対する割合）
   //   rate  ：1秒あたりの数（strong＝持っている間・落ちている間 / rest＝積んだあと。積んだあとも目立つように多め）
+  //   inner ：キャラのすぐまわりの光の色 / tint：後光の色（r, g, b）
   const MYTHIC = {
     colors: ["#ff5d73", "#ffc21a", "#4cd964", "#3d8bff", "#b65cf0", "#7ef0ff"],
+    inner: "#ffffff",
+    tint: [255, 246, 214],
     rays: { count: 12, length: { strong: 0.95, rest: 0.7 }, alpha: { strong: 0.85, rest: 0.6 } },
     rate: {
       spark: { strong: 40, rest: 10 }, // 立ちのぼる虹色の粒
@@ -57,8 +61,23 @@ const Aura = (() => {
       ring: { strong: 1.6, rest: 0.5 }, // 広がる虹の輪
     },
   };
-  const rainbowColor = () => MYTHIC.colors[Math.floor(Math.random() * MYTHIC.colors.length)];
-  const isMythic = (info) => !!info && info.stars >= 5;
+  // ★6（シークレット）のオーラ。書き方は MYTHIC と同じ。★6 のキャラには自動で付く
+  const SECRET = {
+    colors: ["#ffd54a", "#ffb300", "#fff1a8", "#e0a000"],
+    inner: "#140c00",
+    tint: [255, 213, 74],
+    rays: { count: 16, length: { strong: 1.35, rest: 0.8 }, alpha: { strong: 0.95, rest: 0.75 } },
+    doubleRays: true, // 持っている間・落ちている間は、後光をもう1枚、逆向きに回して重ねる（★5 より豪華に。積んだあとは軽くするため1枚）
+    rate: {
+      spark: { strong: 60, rest: 16 },
+      sparkle: { strong: 12, rest: 3.5 },
+      ring: { strong: 2, rest: 0.6 },
+    },
+    burst: { more: 2.5, rings: 5 }, // 着地の瞬間：粒の数の倍率・輪の数
+  };
+  const isMythic = (info) => !!info && info.stars >= 5; // ★5 以上（★6 もふくむ）
+  const fxOf = (info) => (info.stars >= 6 ? SECRET : MYTHIC);
+  const pick = (fx) => fx.colors[Math.floor(Math.random() * fx.colors.length)];
 
   const has = (type) => !!TYPES[type];
 
@@ -122,7 +141,7 @@ const Aura = (() => {
     if (!info || info.stars < 2) return;
     const t = performance.now() / 1000;
     const calm = reducedMotion.matches; // 動きを控えめにする設定
-    if (isMythic(info)) return drawMythic(ctx, shape, level, t, calm);
+    if (isMythic(info)) return drawMythic(ctx, shape, level, t, calm, fxOf(info));
     const type = info.stars >= 4 && TYPES[shape.aura];
     if (type) {
       const sprite = glowSprite(shape, type.glow[level]);
@@ -147,20 +166,25 @@ const Aura = (() => {
     paste(ctx, shape, sprite, 1, level === "strong" && !calm ? 0.75 + 0.25 * Math.sin(t * 6) : 1);
   }
 
-  // ★5（まぼろし）：後光・虹色に移り変わる光・外へ広がる白い光
-  function drawMythic(ctx, shape, level, t, calm) {
+  // ★5（まぼろし）：後光・虹色に移り変わる光・外へ広がる白い光（★6 は fx が SECRET で、金色）
+  function drawMythic(ctx, shape, level, t, calm, fx) {
     const strong = level === "strong";
     // 後光：画像の真ん中から、光の筋がゆっくり回る（筋の絵は一度だけ作って、回して貼る）
-    const r = Math.max(shape.w, shape.h) * MYTHIC.rays.length[level];
-    const rays = raysSprite(Math.round(r));
+    const r = Math.max(shape.w, shape.h) * fx.rays.length[level];
+    const rays = raysSprite(Math.round(r), fx);
     ctx.save();
     ctx.translate(-shape.com.x + shape.w / 2, -shape.com.y + shape.h / 2);
     ctx.rotate(calm ? 0 : t * 0.4);
-    ctx.globalAlpha *= MYTHIC.rays.alpha[level] * (calm ? 1 : 0.85 + 0.15 * Math.sin(t * 3));
+    ctx.globalAlpha *= fx.rays.alpha[level] * (calm ? 1 : 0.85 + 0.15 * Math.sin(t * 3));
     ctx.drawImage(rays, -r, -r, r * 2, r * 2);
+    if (fx.doubleRays && strong) {
+      // 2枚目の後光：少し小さく、逆向きにゆっくり回す
+      ctx.rotate(calm ? Math.PI / fx.rays.count : -t * 0.9);
+      ctx.drawImage(rays, -r * 0.72, -r * 0.72, r * 1.44, r * 1.44);
+    }
     ctx.restore();
     // 虹色に移り変わる光（となりの色どうしを、少しずつ入れかえる）
-    const set = mythicSprites(shape, level);
+    const set = mythicSprites(shape, level, fx);
     const n = set.colors.length;
     const pos = calm ? 0 : (t * 0.7) % n;
     const i = Math.floor(pos);
@@ -174,28 +198,30 @@ const Aura = (() => {
     }
   }
 
-  // ★5 の光の画像（キャラ・強さごとに、虹の色の分と白を、一度だけ用意する。毎フレーム探さなくてよいように）
+  // ★5・★6 の光の画像（キャラ・強さごとに、色の分と白を、一度だけ用意する。毎フレーム探さなくてよいように）
   const mythicCache = new Map();
-  function mythicSprites(shape, level) {
-    const key = `${shape.file}|${shape.w}|${shape.h}|${level}`;
+  function mythicSprites(shape, level, fx) {
+    const key = `${shape.file}|${shape.w}|${shape.h}|${level}|${fx.inner}`;
     if (mythicCache.has(key)) return mythicCache.get(key);
     const strong = level === "strong";
     const layers = (color) =>
       strong
-        ? [{ color: "#ffffff", blur: 8, alpha: 1 }, { color, blur: 28, alpha: 0.95 }]
-        : [{ color: "#ffffff", blur: 5, alpha: 0.9 }, { color, blur: 18, alpha: 0.85 }];
+        ? [{ color: fx.inner, blur: 8, alpha: 1 }, { color, blur: 28, alpha: 0.95 }]
+        : [{ color: fx.inner, blur: 5, alpha: 0.9 }, { color, blur: 18, alpha: 0.85 }];
     const set = {
-      colors: MYTHIC.colors.map((c) => glowSprite(shape, layers(c))),
-      white: glowSprite(shape, [{ color: "#ffffff", blur: 20, alpha: 0.9 }]),
+      colors: fx.colors.map((c) => glowSprite(shape, layers(c))),
+      white: glowSprite(shape, [{ color: fx === MYTHIC ? "#ffffff" : fx.colors[2], blur: 20, alpha: 0.9 }]),
     };
     mythicCache.set(key, set);
     return set;
   }
 
-  // 後光の筋の絵（半径 r ごとに一度だけ作る）。真ん中から外へ薄くなる、太い筋と細い筋を交互に
+  // 後光の筋の絵（半径 r・色ごとに一度だけ作る）。真ん中から外へ薄くなる、太い筋と細い筋を交互に
   const raySprites = new Map();
-  function raysSprite(r) {
-    if (raySprites.has(r)) return raySprites.get(r);
+  function raysSprite(r, fx) {
+    const key = `${r}|${fx.tint}`;
+    if (raySprites.has(key)) return raySprites.get(key);
+    const [tr, tg, tb] = fx.tint;
     const size = Math.ceil(r * 2);
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = size;
@@ -203,10 +229,10 @@ const Aura = (() => {
     c.translate(size / 2, size / 2);
     const g = c.createRadialGradient(0, 0, 0, 0, 0, r);
     g.addColorStop(0, "rgba(255, 255, 255, 0.9)");
-    g.addColorStop(0.45, "rgba(255, 246, 214, 0.35)");
+    g.addColorStop(0.45, `rgba(${tr}, ${tg}, ${tb}, 0.35)`);
     g.addColorStop(1, "rgba(255, 255, 255, 0)");
     c.fillStyle = g;
-    const n = MYTHIC.rays.count;
+    const n = fx.rays.count;
     for (let i = 0; i < n; i++) {
       const a = (i * Math.PI * 2) / n;
       const w = i % 2 ? 0.07 : 0.12;
@@ -216,7 +242,7 @@ const Aura = (() => {
       c.closePath();
       c.fill();
     }
-    raySprites.set(r, canvas);
+    raySprites.set(key, canvas);
     return canvas;
   }
 
@@ -229,7 +255,7 @@ const Aura = (() => {
   function emit(shape, x, y, angle, level, dt) {
     const info = rarityOf(shape);
     if (!info || info.stars < 3 || reducedMotion.matches || dt <= 0) return;
-    if (isMythic(info)) return emitMythic(shape, x, y, level, dt);
+    if (isMythic(info)) return emitMythic(shape, x, y, level, dt, fxOf(info));
     const type = info.stars >= 4 && TYPES[shape.aura];
     // キャラのふちのあたりの、ランダムな位置（回転も合わせる。キャラの上に粒が乗って見えないように、ふちから出す）
     const spot = () => {
@@ -275,9 +301,9 @@ const Aura = (() => {
     }
   }
 
-  // ★5（まぼろし）：虹色の粒・キラッ・広がる虹の輪
-  function emitMythic(shape, x, y, level, dt) {
-    const rate = MYTHIC.rate;
+  // ★5（まぼろし）：虹色の粒・キラッ・広がる虹の輪（★6 は金色）
+  function emitMythic(shape, x, y, level, dt, fx) {
+    const rate = fx.rate;
     const size = Math.max(shape.w, shape.h);
     const edge = () => {
       const a = Math.random() * Math.PI * 2;
@@ -285,32 +311,37 @@ const Aura = (() => {
     };
     spawn(dt * rate.spark[level], () => {
       const p = edge();
-      return { kind: "spark", x: p.x, y: p.y, vx: (Math.random() - 0.5) * 16, vy: -40 - Math.random() * 50, size: 1.6 + Math.random() * 2.2, life: 1, decay: 1 / (0.8 + Math.random() * 0.8), color: rainbowColor() };
+      return { kind: "spark", x: p.x, y: p.y, vx: (Math.random() - 0.5) * 16, vy: -40 - Math.random() * 50, size: 1.6 + Math.random() * 2.2, life: 1, decay: 1 / (0.8 + Math.random() * 0.8), color: pick(fx) };
     });
     spawn(dt * rate.sparkle[level], () => {
       const a = Math.random() * Math.PI * 2;
       const r = size * (0.45 + Math.random() * 0.25);
-      return { kind: "sparkle", x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, vx: (Math.random() - 0.5) * 30, vy: -20 - Math.random() * 30, size: 4 + Math.random() * 5, life: 1, decay: 1, color: rainbowColor() };
+      return { kind: "sparkle", x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, vx: (Math.random() - 0.5) * 30, vy: -20 - Math.random() * 30, size: 4 + Math.random() * 5, life: 1, decay: 1, color: pick(fx) };
     });
-    spawn(dt * rate.ring[level], () => ({ kind: "ring", x, y, vx: 0, vy: 0, size: size * 0.35, grow: size * 0.9, life: 1, decay: 0.9, color: rainbowColor() }));
+    spawn(dt * rate.ring[level], () => ({ kind: "ring", x, y, vx: 0, vy: 0, size: size * 0.35, grow: size * 0.9, life: 1, decay: 0.9, color: pick(fx) }));
   }
 
-  // 着地した瞬間（game.js から呼ばれる）：★5 なら、虹色の光がはじけて、虹の輪が何重にも広がる
+  // 着地した瞬間（game.js から呼ばれる）：★5 なら、虹色の光がはじけて、虹の輪が何重にも広がる（★6 は金色で、多め）
   function burst(shape, x, y) {
-    if (!isMythic(rarityOf(shape)) || reducedMotion.matches) return;
+    const info = rarityOf(shape);
+    if (!isMythic(info) || reducedMotion.matches) return;
+    const fx = fxOf(info);
+    const more = (fx.burst && fx.burst.more) || 1;
+    const rings = (fx.burst && fx.burst.rings) || 3;
     const size = Math.max(shape.w, shape.h);
-    spawn(48, () => {
+    spawn(48 * more, () => {
       const a = Math.random() * Math.PI * 2;
       const speed = 90 + Math.random() * 140;
-      return { kind: "spark", x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed - 30, size: 2 + Math.random() * 2.5, life: 1, decay: 1 / (0.7 + Math.random() * 0.6), color: rainbowColor(), drag: 2.2 };
+      return { kind: "spark", x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed - 30, size: 2 + Math.random() * 2.5, life: 1, decay: 1 / (0.7 + Math.random() * 0.6), color: pick(fx), drag: 2.2 };
     });
-    spawn(14, () => {
+    spawn(14 * more, () => {
       const a = Math.random() * Math.PI * 2;
       const r = size * (0.3 + Math.random() * 0.5);
-      return { kind: "sparkle", x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, vx: Math.cos(a) * 40, vy: Math.sin(a) * 40 - 20, size: 5 + Math.random() * 6, life: 1, decay: 0.8, color: rainbowColor() };
+      return { kind: "sparkle", x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, vx: Math.cos(a) * 40, vy: Math.sin(a) * 40 - 20, size: 5 + Math.random() * 6, life: 1, decay: 0.8, color: pick(fx) };
     });
-    MYTHIC.colors.slice(0, 3).forEach((color, i) => {
-      spawn(1, () => ({ kind: "ring", x, y, vx: 0, vy: 0, size: size * (0.2 + i * 0.12), grow: size * (1.6 - i * 0.35), life: 1, decay: 1.1, color }));
+    // 輪：★5 は3つ（今までと同じ広がり方）、★6 は5つ
+    Array.from({ length: rings }, (_, i) => fx.colors[i % fx.colors.length]).forEach((color, i) => {
+      spawn(1, () => ({ kind: "ring", x, y, vx: 0, vy: 0, size: size * (0.2 + i * 0.12), grow: size * Math.max(0.5, 1.6 - i * (rings > 3 ? 0.22 : 0.35)), life: 1, decay: 1.1, color }));
     });
   }
 

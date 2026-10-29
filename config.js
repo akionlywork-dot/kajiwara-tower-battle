@@ -7,7 +7,7 @@ window.GAME_CONFIG = {
   achievementsEpoch: 2,
 
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v3.0.4",
+  version: "v3.1.0",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -149,7 +149,7 @@ window.GAME_CONFIG = {
     ],
   },
 
-  // キャラのレア度（characters.js の rarity に "N" / "R" / "SR" / "UR" / "MR" を書く）
+  // キャラのレア度（characters.js の rarity に "N" / "R" / "SR" / "UR" / "MR" / "SEC" を書く）
   //   rate   : そのレア度全体の出現率（%）。同じレア度のキャラで分け合う（初めは等分。
   //            characters.js の weight で、レア度の中の割合を変えられる。weight: 0 のキャラは出ない）。
   //            合計が 100 でなくても、合計に対する割合になる（例：全部 2 倍にしても同じ）
@@ -157,7 +157,7 @@ window.GAME_CONFIG = {
   //   stars  : 図鑑に表示する★の数
   //   ※ 管理者モードの「出現率のテスト」で、1万回抽選した実際の回数を確かめられる
   rarity: {
-    N: { name: "ふつう", rate: 76.5, color: "#b9c4d6", stars: 1 },
+    N: { name: "ふつう", rate: 76.2, color: "#b9c4d6", stars: 1 },
     R: { name: "レア", rate: 15, color: "#3d9bff", stars: 2 },
     // ★3：サイズ違いのキャラ（characters.js の variant）も、このレア度
     SR: { name: "めっちゃレア", rate: 5, color: "#ffc21a", stars: 3 },
@@ -165,6 +165,9 @@ window.GAME_CONFIG = {
     UR: { name: "みたことない", rate: 2.5, color: "#ff5ec8", stars: 4 },
     // ★5：まぼろし。出ると、画面が虹色に光る専用の演出（「まぼろし！！！」）。図鑑では専用の枠、まだのキャラは「？」
     MR: { name: "まぼろし", rate: 1, color: "#7ef0ff", stars: 5 },
+    // ★6：シークレット。まぼろしより上で、いちばん出にくい。出ると、画面が暗くなって金色の光がはじける専用の演出（「シークレット！！！」）。
+    //      図鑑では金と黒の専用の枠、まだのキャラは「？」。オーラは金色（js/aura.js の SECRET）
+    SEC: { name: "シークレット", rate: 0.3, color: "#ffd54a", stars: 6 },
   },
 
   // サイズ違いのキャラ（characters.js の variant: "big" / "small"）
@@ -333,6 +336,7 @@ window.GAME_CONFIG = {
     ultimate: "", // ★4（激レア）が出たとき
     vs: "", // オンライン対戦の、試合の前の「VS」
     legendary: "", // ★5（まぼろし）が出たとき
+    secret: "", // ★6（シークレット）が出たとき
     bgm: "", // BGM（くり返し再生される）
   },
 };

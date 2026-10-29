@@ -699,7 +699,7 @@ const Game = (() => {
   // キャラを選ぶ。出やすさ（weight）に合わせて、くじ引きのように選ぶ（同じキャラが2回続かないように）
   function randomShape() {
     // 期間限定のキャラは、イベントの期間中だけ出る（events.js）。
-    // 競技：出てくるキャラは Chars.inCompetitive のものだけ（期間限定・サイズ違い・★4・★5 は出ない）
+    // 競技：出てくるキャラは Chars.inCompetitive のものだけ（期間限定・サイズ違い・★4・★5 は出ない。competitive: true のキャラは出る）
     const open = comp ? shapes.filter((s) => Chars.inCompetitive(s)) : shapes.filter((s) => LimitedEvents.available(s, fair));
     // 競技（equalChance）：全キャラ同じ確率（レア度・weight を使わない）
     const chance = comp && comp.equalChance !== false ? () => 1 : chanceOf;

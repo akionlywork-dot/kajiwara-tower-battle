@@ -36,7 +36,7 @@
   <!-- アプリとしてインストールするための設定（PWA） -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="css/style.css?v=3.0.4">
+  <link rel="stylesheet" href="css/style.css?v=3.1.0">
 </head>
 <body>
   <div id="app">
@@ -132,6 +132,8 @@
         <div class="title-middle">
           <div id="best-score" class="best-card"></div>
           <p id="notice" class="notice hidden"></p>
+          <!-- アップデートの予告・「更新する」ボタン（updates.js） -->
+          <div id="update-banner" class="update-banner hidden" aria-live="polite"></div>
         </div>
         <!-- 下寄り：スタートボタン（親指で押しやすい位置） -->
         <div class="title-bottom">
@@ -778,115 +780,152 @@
 
           <!-- 開いたとき：管理者メニュー -->
           <div id="admin-panel" class="hidden">
-            <!-- 1. 自由配置モード（sandbox.js） -->
-            <h3 class="section-title">自由配置モード</h3>
-            <p class="page-note">好きなキャラを、タップした場所（空中でも）に置いて動きを確かめます。置いたキャラはドラッグで動かす・回す・反転する・消すことができ、物理の計算を止めて1コマずつ進めることもできます。ハイスコア・戦績・実績・図鑑には記録されません。</p>
-            <button id="btn-admin-sandbox" class="btn btn-primary">自由配置モードを始める</button>
-
-            <!-- 6. 表示の切りかえ -->
-            <h3 class="section-title">表示</h3>
-            <div class="setting-row">
-              <span>当たり判定の線</span>
-              <button class="toggle" data-setting="debug" role="switch" aria-label="当たり判定の線"></button>
+            <!-- 見出しをタップすると開く・閉じる。開いている見出しは、この端末に覚えておく（admin.js の setupSections） -->
+            <div class="admin-buttons admin-sec-all">
+              <button id="btn-admin-open-all" class="btn btn-small btn-sub">すべて開く</button>
+              <button id="btn-admin-close-all" class="btn btn-small btn-sub">すべて閉じる</button>
             </div>
-            <div class="setting-row">
-              <span>FPS<small>画面の左上に、1秒あたりの描画の回数</small></span>
-              <button class="toggle" data-setting="adminFps" role="switch" aria-label="FPS"></button>
-            </div>
-            <div class="setting-row">
-              <span>キャラの数と高さ<small>画面の左上に、積んでいるキャラの数と、塔の高さ（m）</small></span>
-              <button class="toggle" data-setting="adminStats" role="switch" aria-label="キャラの数と高さ"></button>
-            </div>
-            <div class="setting-row">
-              <span>読み込み状況<small>画面の左下に、読み込み中のファイルとエラー</small></span>
-              <button class="toggle" data-setting="adminLoad" role="switch" aria-label="読み込み状況"></button>
-            </div>
-
-            <!-- 4. 日付を変えてテスト -->
-            <h3 class="section-title">日付を変えてテスト</h3>
-            <p class="page-note">ゲームの中の日付だけを変えて、イベント（ハロウィンなど）の表示を確かめます。時計はそこから進みます。管理者モードを終わると、実際の日付に戻ります。オンライン対戦では使われません（相手に影響しないように、実際の日付で抽選します）。</p>
-            <label class="field">
-              <span>テスト日付 <small id="admin-date-now"></small></span>
-              <input id="admin-date" type="datetime-local">
-            </label>
-            <div class="admin-buttons">
-              <button id="btn-admin-date-set" class="btn btn-small btn-sub">この日付にする</button>
-              <button id="btn-admin-date-clear" class="btn btn-small btn-sub">実際の日付に戻す</button>
-            </div>
-
-            <h3 class="section-title">イベント（確認用）</h3>
-            <div class="setting-row">
-              <span>イベント期間中として表示<small>日付に関係なく、events.json のイベントを全部「期間中」にする</small></span>
-              <button class="toggle" data-setting="eventPreview" role="switch" aria-label="イベント期間中として表示"></button>
-            </div>
-            <label class="field">
-              <span>ハロウィンの勝利数</span>
-              <select id="admin-hw-wins">
-                <option value="0">0勝</option>
-                <option value="1">1勝</option>
-                <option value="2">2勝</option>
-                <option value="3">3勝</option>
-              </select>
-            </label>
-
-            <h3 class="section-title">次に出すキャラ</h3>
-            <p class="page-note">1人で遊ぶ・CPU・2人対戦で使われます（オンライン対戦では使われません）。</p>
-            <label class="field">
-              <select id="admin-next"></select>
-            </label>
-
-            <!-- スタッフの称号（開発者・管理者・社員・運営）を、1つずつ獲得・リセット（admin.js の renderStaff） -->
-            <h3 class="section-title">スタッフの称号</h3>
-            <p class="page-note">実績ではもらえない特別な称号です。獲得した称号は、管理者モードを終えても、この端末の「称号を選ぶ」画面で選べます。</p>
-            <div id="admin-staff" class="admin-staff"></div>
-
-            <!-- 3. 解放状態の操作 -->
-            <h3 class="section-title">解放状態</h3>
-            <p class="page-note">見た目の確認用に、まとめて解放・未解放にします。最初に操作する前の状態を保存しておくので、「元に戻す」で戻せます。</p>
-            <div class="admin-checks">
-              <label><input type="checkbox" data-unlock="dex" checked> 図鑑</label>
-              <label><input type="checkbox" data-unlock="ach" checked> 実績・称号</label>
-              <label><input type="checkbox" data-unlock="themes" checked> 背景・土台<small>（解放の条件の実績・イベントの勝利数もふくむ）</small></label>
-            </div>
-            <div class="admin-buttons">
-              <button id="btn-admin-unlock-all" class="btn btn-small btn-sub">すべて解放</button>
-              <button id="btn-admin-lock-all" class="btn btn-small btn-sub">すべて未解放</button>
-            </div>
-            <button id="btn-admin-undo" class="btn btn-small btn-sub admin-wide">元に戻す</button>
-            <p id="admin-undo-note" class="page-note"></p>
-
-            <!-- 5. 出現率テスト -->
-            <h3 class="section-title">出現率のテスト</h3>
-            <p class="page-note">今の設定で抽選して、レア度ごと・キャラごとに、実際に出た回数と設定の出現率をくらべます（同じキャラが続かない決まりも、本物と同じ）。「差」は 結果 − 設定 で、偶然では起きにくい大きなずれは赤くなります（同じキャラが続かない決まりのため、★1 は少し出にくくなります）。</p>
-            <div class="admin-draw-form">
+            <details class="admin-sec" data-sec="notice" open>
+              <summary class="section-title">アップデート予告<small class="admin-sec-state"></small></summary>
+              <p class="page-note">日時を決めて「予告する」と、みんなのタイトル画面に「🔧 11/1（土）21:00 にアップデートします」と出ます。その時刻を過ぎて新しいバージョンを公開すると、「更新する」ボタンに変わります（予告がなくても、新しいバージョンを公開すれば「更新する」ボタンは出ます）。予告はランキングのサーバー（server/ranking.gs）に保存します。</p>
+              <pre id="admin-notice-state" class="admin-net"></pre>
               <label class="field">
-                <span>抽選する回数</span>
-                <input id="admin-draw-n" type="number" min="100" max="1000000" step="1000" value="10000" inputmode="numeric">
+                <span>アップデートする日時</span>
+                <input id="admin-notice-at" type="datetime-local">
               </label>
-              <button id="btn-admin-draw" class="btn btn-small btn-sub">抽選する</button>
-            </div>
-            <label class="admin-check-backup"><input id="admin-draw-comp" type="checkbox"> 競技のルールで抽選する（全キャラ同じ確率）</label>
-            <div id="admin-draw" class="admin-draw"></div>
-
-            <!-- 2. スコアのリセット -->
-            <h3 class="section-title">データのリセット</h3>
-            <p class="page-note">選んだ項目だけを、初めの状態に戻します。</p>
-            <div class="admin-checks">
-              <label><input type="checkbox" data-reset="best" checked> ハイスコア</label>
-              <label><input type="checkbox" data-reset="stats" checked> 戦績（1人・対戦）</label>
-              <label><input type="checkbox" data-reset="dex" checked> 図鑑</label>
-              <label><input type="checkbox" data-reset="ach" checked> 実績・称号</label>
-              <label><input type="checkbox" data-reset="stamps" checked> スタンプ設定</label>
-              <label><input type="checkbox" data-reset="themes" checked> 解放した背景・土台</label>
-              <label><input type="checkbox" data-reset="profile"> プロフィール（名前・写真）</label>
-              <label><input type="checkbox" data-reset="settings"> 設定</label>
-            </div>
-            <label class="admin-check-backup"><input id="admin-reset-backup" type="checkbox" checked> リセットの前に、バックアップのファイルを書き出す</label>
-            <button id="btn-admin-reset" class="btn btn-small btn-danger admin-wide">選んだ項目をリセット</button>
-
-            <h3 class="section-title">オンライン対戦の接続</h3>
-            <pre id="admin-net" class="admin-net"></pre>
-            <button id="btn-admin-net" class="btn btn-small btn-sub">更新</button>
+              <div class="admin-buttons admin-quick">
+                <button class="btn btn-small btn-sub" data-notice-in="30">30分後</button>
+                <button class="btn btn-small btn-sub" data-notice-in="60">1時間後</button>
+                <button class="btn btn-small btn-sub" data-notice-day="0">今夜21時</button>
+                <button class="btn btn-small btn-sub" data-notice-day="1">明日21時</button>
+              </div>
+              <label class="field">
+                <span>新しいバージョン<small>例 v3.1.1。省略できる。この版になった人には、予告を出さない</small></span>
+                <input id="admin-notice-ver" type="text" maxlength="16" autocomplete="off">
+              </label>
+              <label class="field">
+                <span>ひとこと<small>省略できる（80文字まで）。例「新キャラが登場します」</small></span>
+                <input id="admin-notice-msg" type="text" maxlength="80" autocomplete="off">
+              </label>
+              <div class="admin-buttons">
+                <button id="btn-admin-notice-set" class="btn btn-small btn-primary">予告する</button>
+                <button id="btn-admin-notice-clear" class="btn btn-small btn-sub">予告を消す</button>
+              </div>
+              <button id="btn-admin-notice-reload" class="btn btn-small btn-sub admin-wide">状態を読みなおす</button>
+            </details>
+            <details class="admin-sec" data-sec="next" open>
+              <summary class="section-title">次に出すキャラ<small class="admin-sec-state"></small></summary>
+              <p class="page-note">1人で遊ぶ・CPU・2人対戦で使われます（オンライン対戦では使われません）。</p>
+              <label class="field">
+                <select id="admin-next"></select>
+              </label>
+            </details>
+            <details class="admin-sec" data-sec="display">
+              <summary class="section-title">表示<small class="admin-sec-state"></small></summary>
+              <div class="setting-row">
+                <span>当たり判定の線</span>
+                <button class="toggle" data-setting="debug" role="switch" aria-label="当たり判定の線"></button>
+              </div>
+              <div class="setting-row">
+                <span>FPS<small>画面の左上に、1秒あたりの描画の回数</small></span>
+                <button class="toggle" data-setting="adminFps" role="switch" aria-label="FPS"></button>
+              </div>
+              <div class="setting-row">
+                <span>キャラの数と高さ<small>画面の左上に、積んでいるキャラの数と、塔の高さ（m）</small></span>
+                <button class="toggle" data-setting="adminStats" role="switch" aria-label="キャラの数と高さ"></button>
+              </div>
+              <div class="setting-row">
+                <span>読み込み状況<small>画面の左下に、読み込み中のファイルとエラー</small></span>
+                <button class="toggle" data-setting="adminLoad" role="switch" aria-label="読み込み状況"></button>
+              </div>
+            </details>
+            <details class="admin-sec" data-sec="sandbox">
+              <summary class="section-title">自由配置モード<small class="admin-sec-state"></small></summary>
+              <p class="page-note">好きなキャラを、タップした場所（空中でも）に置いて動きを確かめます。置いたキャラはドラッグで動かす・回す・反転する・消すことができ、物理の計算を止めて1コマずつ進めることもできます。ハイスコア・戦績・実績・図鑑には記録されません。</p>
+              <button id="btn-admin-sandbox" class="btn btn-primary">自由配置モードを始める</button>
+            </details>
+            <details class="admin-sec" data-sec="date">
+              <summary class="section-title">日付を変えてテスト<small class="admin-sec-state"></small></summary>
+              <p class="page-note">ゲームの中の日付だけを変えて、イベント（ハロウィンなど）の表示を確かめます。時計はそこから進みます。管理者モードを終わると、実際の日付に戻ります。オンライン対戦では使われません（相手に影響しないように、実際の日付で抽選します）。</p>
+              <label class="field">
+                <span>テスト日付 <small id="admin-date-now"></small></span>
+                <input id="admin-date" type="datetime-local">
+              </label>
+              <div class="admin-buttons">
+                <button id="btn-admin-date-set" class="btn btn-small btn-sub">この日付にする</button>
+                <button id="btn-admin-date-clear" class="btn btn-small btn-sub">実際の日付に戻す</button>
+              </div>
+            </details>
+            <details class="admin-sec" data-sec="event">
+              <summary class="section-title">イベント（確認用）<small class="admin-sec-state"></small></summary>
+              <div class="setting-row">
+                <span>イベント期間中として表示<small>日付に関係なく、events.json のイベントを全部「期間中」にする</small></span>
+                <button class="toggle" data-setting="eventPreview" role="switch" aria-label="イベント期間中として表示"></button>
+              </div>
+              <label class="field">
+                <span>ハロウィンの勝利数</span>
+                <select id="admin-hw-wins">
+                  <option value="0">0勝</option>
+                  <option value="1">1勝</option>
+                  <option value="2">2勝</option>
+                  <option value="3">3勝</option>
+                </select>
+              </label>
+            </details>
+            <details class="admin-sec" data-sec="staff">
+              <summary class="section-title">スタッフの称号<small class="admin-sec-state"></small></summary>
+              <p class="page-note">実績ではもらえない特別な称号です。獲得した称号は、管理者モードを終えても、この端末の「称号を選ぶ」画面で選べます。</p>
+              <div id="admin-staff" class="admin-staff"></div>
+            </details>
+            <details class="admin-sec" data-sec="unlock">
+              <summary class="section-title">解放状態<small class="admin-sec-state"></small></summary>
+              <p class="page-note">見た目の確認用に、まとめて解放・未解放にします。最初に操作する前の状態を保存しておくので、「元に戻す」で戻せます。</p>
+              <div class="admin-checks">
+                <label><input type="checkbox" data-unlock="dex" checked> 図鑑</label>
+                <label><input type="checkbox" data-unlock="ach" checked> 実績・称号</label>
+                <label><input type="checkbox" data-unlock="themes" checked> 背景・土台<small>（解放の条件の実績・イベントの勝利数もふくむ）</small></label>
+              </div>
+              <div class="admin-buttons">
+                <button id="btn-admin-unlock-all" class="btn btn-small btn-sub">すべて解放</button>
+                <button id="btn-admin-lock-all" class="btn btn-small btn-sub">すべて未解放</button>
+              </div>
+              <button id="btn-admin-undo" class="btn btn-small btn-sub admin-wide">元に戻す</button>
+              <p id="admin-undo-note" class="page-note"></p>
+            </details>
+            <details class="admin-sec" data-sec="draw">
+              <summary class="section-title">出現率のテスト<small class="admin-sec-state"></small></summary>
+              <p class="page-note">今の設定で抽選して、レア度ごと・キャラごとに、実際に出た回数と設定の出現率をくらべます（同じキャラが続かない決まりも、本物と同じ）。「差」は 結果 − 設定 で、偶然では起きにくい大きなずれは赤くなります（同じキャラが続かない決まりのため、★1 は少し出にくくなります）。</p>
+              <div class="admin-draw-form">
+                <label class="field">
+                  <span>抽選する回数</span>
+                  <input id="admin-draw-n" type="number" min="100" max="1000000" step="1000" value="10000" inputmode="numeric">
+                </label>
+                <button id="btn-admin-draw" class="btn btn-small btn-sub">抽選する</button>
+              </div>
+              <label class="admin-check-backup"><input id="admin-draw-comp" type="checkbox"> 競技のルールで抽選する（全キャラ同じ確率）</label>
+              <div id="admin-draw" class="admin-draw"></div>
+            </details>
+            <details class="admin-sec" data-sec="net">
+              <summary class="section-title">オンライン対戦の接続<small class="admin-sec-state"></small></summary>
+              <pre id="admin-net" class="admin-net"></pre>
+              <button id="btn-admin-net" class="btn btn-small btn-sub">更新</button>
+            </details>
+            <details class="admin-sec" data-sec="reset">
+              <summary class="section-title">データのリセット<small class="admin-sec-state"></small></summary>
+              <p class="page-note">選んだ項目だけを、初めの状態に戻します。</p>
+              <div class="admin-checks">
+                <label><input type="checkbox" data-reset="best" checked> ハイスコア</label>
+                <label><input type="checkbox" data-reset="stats" checked> 戦績（1人・対戦）</label>
+                <label><input type="checkbox" data-reset="dex" checked> 図鑑</label>
+                <label><input type="checkbox" data-reset="ach" checked> 実績・称号</label>
+                <label><input type="checkbox" data-reset="stamps" checked> スタンプ設定</label>
+                <label><input type="checkbox" data-reset="themes" checked> 解放した背景・土台</label>
+                <label><input type="checkbox" data-reset="profile"> プロフィール（名前・写真）</label>
+                <label><input type="checkbox" data-reset="settings"> 設定</label>
+              </div>
+              <label class="admin-check-backup"><input id="admin-reset-backup" type="checkbox" checked> リセットの前に、バックアップのファイルを書き出す</label>
+              <button id="btn-admin-reset" class="btn btn-small btn-danger admin-wide">選んだ項目をリセット</button>
+            </details>
             <p class="page-note">称号「開発者」は、プロフィールの「称号」から開く、称号を選ぶ画面で選べます（管理者モードの端末だけ）。<br>管理者モードのあいだは、ハイスコアをオンラインのランキングに送りません。オンライン対戦の相手に見せるプロフィールにも、ハイスコア・順位・実績の数・対戦成績は載せません。</p>
             <button id="btn-admin-lock" class="btn btn-small btn-danger">管理者モードを終わる</button>
           </div>
@@ -964,50 +1003,51 @@
 
   <!-- ?v= のあとの番号：更新したら config.js の version と一緒に上げる（スマホに古いファイルが残らないように） -->
   <!-- ライブラリ（lib/ に同梱） -->
-  <script src="lib/decomp.min.js?v=3.0.4"></script>
-  <script src="lib/matter.min.js?v=3.0.4"></script>
-  <script src="lib/peerjs.min.js?v=3.0.4"></script>
-  <script src="lib/mqtt.min.js?v=3.0.4"></script>
+  <script src="lib/decomp.min.js?v=3.1.0"></script>
+  <script src="lib/matter.min.js?v=3.1.0"></script>
+  <script src="lib/peerjs.min.js?v=3.1.0"></script>
+  <script src="lib/mqtt.min.js?v=3.1.0"></script>
   <!-- 設定ファイル -->
-  <script src="config.js?v=3.0.4"></script>
+  <script src="config.js?v=3.1.0"></script>
   <!-- 読み込みの状況（開発用。devMode か ?debug=1 のときだけ表示）。ほかより先に読み込む -->
-  <script src="js/load-status.js?v=3.0.4"></script>
-  <script src="characters.js?v=3.0.4"></script>
-  <script src="js/chars.js?v=3.0.4"></script>
+  <script src="js/load-status.js?v=3.1.0"></script>
+  <script src="characters.js?v=3.1.0"></script>
+  <script src="js/chars.js?v=3.1.0"></script>
   <!-- ゲーム本体 -->
-  <script src="js/settings.js?v=3.0.4"></script>
-  <script src="js/save.js?v=3.0.4"></script>
-  <script src="js/audio.js?v=3.0.4"></script>
-  <script src="js/shape.js?v=3.0.4"></script>
-  <script src="js/aura.js?v=3.0.4"></script>
-  <script src="js/platform-art.js?v=3.0.4"></script>
-  <script src="js/game.js?v=3.0.4"></script>
-  <script src="js/rules.js?v=3.0.4"></script>
-  <script src="js/cpu.js?v=3.0.4"></script>
-  <script src="js/challenge.js?v=3.0.4"></script>
-  <script src="js/card.js?v=3.0.4"></script>
-  <script src="js/stamps.js?v=3.0.4"></script>
-  <script src="js/halloween-home.js?v=3.0.4"></script>
-  <script src="js/halloween.js?v=3.0.4"></script>
-  <script src="js/title-fx.js?v=3.0.4"></script>
-  <script src="js/online.js?v=3.0.4"></script>
-  <script src="js/ui.js?v=3.0.4"></script>
-  <script src="js/themes.js?v=3.0.4"></script>
-  <script src="js/frames.js?v=3.0.4"></script>
-  <script src="js/profile.js?v=3.0.4"></script>
-  <script src="js/data-file.js?v=3.0.4"></script>
-  <script src="js/news.js?v=3.0.4"></script>
-  <script src="js/events.js?v=3.0.4"></script>
-  <script src="js/ranking.js?v=3.0.4"></script>
-  <script src="js/records.js?v=3.0.4"></script>
-  <script src="js/dex.js?v=3.0.4"></script>
-  <script src="js/achievements.js?v=3.0.4"></script>
-  <script src="js/vs-intro.js?v=3.0.4"></script>
-  <script src="js/backup.js?v=3.0.4"></script>
-  <script src="js/controls.js?v=3.0.4"></script>
-  <script src="js/admin.js?v=3.0.4"></script>
-  <script src="js/sandbox.js?v=3.0.4"></script>
-  <script src="js/pwa.js?v=3.0.4"></script>
-  <script src="js/main.js?v=3.0.4"></script>
+  <script src="js/settings.js?v=3.1.0"></script>
+  <script src="js/save.js?v=3.1.0"></script>
+  <script src="js/audio.js?v=3.1.0"></script>
+  <script src="js/shape.js?v=3.1.0"></script>
+  <script src="js/aura.js?v=3.1.0"></script>
+  <script src="js/platform-art.js?v=3.1.0"></script>
+  <script src="js/game.js?v=3.1.0"></script>
+  <script src="js/rules.js?v=3.1.0"></script>
+  <script src="js/cpu.js?v=3.1.0"></script>
+  <script src="js/challenge.js?v=3.1.0"></script>
+  <script src="js/card.js?v=3.1.0"></script>
+  <script src="js/stamps.js?v=3.1.0"></script>
+  <script src="js/halloween-home.js?v=3.1.0"></script>
+  <script src="js/halloween.js?v=3.1.0"></script>
+  <script src="js/title-fx.js?v=3.1.0"></script>
+  <script src="js/online.js?v=3.1.0"></script>
+  <script src="js/ui.js?v=3.1.0"></script>
+  <script src="js/themes.js?v=3.1.0"></script>
+  <script src="js/frames.js?v=3.1.0"></script>
+  <script src="js/profile.js?v=3.1.0"></script>
+  <script src="js/data-file.js?v=3.1.0"></script>
+  <script src="js/news.js?v=3.1.0"></script>
+  <script src="js/events.js?v=3.1.0"></script>
+  <script src="js/ranking.js?v=3.1.0"></script>
+  <script src="js/records.js?v=3.1.0"></script>
+  <script src="js/dex.js?v=3.1.0"></script>
+  <script src="js/achievements.js?v=3.1.0"></script>
+  <script src="js/vs-intro.js?v=3.1.0"></script>
+  <script src="js/backup.js?v=3.1.0"></script>
+  <script src="js/controls.js?v=3.1.0"></script>
+  <script src="js/admin.js?v=3.1.0"></script>
+  <script src="js/sandbox.js?v=3.1.0"></script>
+  <script src="js/pwa.js?v=3.1.0"></script>
+  <script src="js/updates.js?v=3.1.0"></script>
+  <script src="js/main.js?v=3.1.0"></script>
 </body>
 </html>

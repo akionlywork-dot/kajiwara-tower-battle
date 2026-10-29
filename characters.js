@@ -4,8 +4,9 @@
 // file : 画像ファイルの場所（images/ フォルダに背景透過の画像を置く。PNG でも WebP でもよい）
 // name : キャラの名前（画面に表示されます）
 // description : （省略可）図鑑に表示する説明文
-// rarity : （省略可）レア度。"N"（ノーマル）/ "R"（レア）/ "SR"（めっちゃレア）/ "UR"（激レア）/ "MR"（まぼろし）。省略すると "N"
+// rarity : （省略可）レア度。"N"（ノーマル）/ "R"（レア）/ "SR"（めっちゃレア）/ "UR"（激レア）/ "MR"（まぼろし）/ "SEC"（シークレット）。省略すると "N"
 //          レア度ごとの出現率は config.js の rarity の rate（%）。同じレア度のキャラで分け合う
+// competitive : （省略可）true にすると、レア度に関係なく競技モードにも出る（ふだんは config.js の competitive.rarities のレア度だけ）
 // weight : （省略可）同じレア度の中での出やすさの割合。省略すると 1（等分）。2 にすると、ほかの2倍出る。0 にすると出ない
 // size : （省略可）画面上での大きさ。画像の長い方の辺の長さ。省略すると 130
 // tolerance : （省略可）当たり判定の細かさ。小さいほど画像の形に忠実。省略すると 0.8
@@ -56,4 +57,17 @@ window.CHARACTERS = [
   { file: "images/chara13.webp", name: "スマホ自慢", rarity: "MR", description: "しゃがんで、スマホを見せびらかす。" },
   { file: "images/chara14.webp", name: "白シャツの伊達男", rarity: "MR", description: "腰に手を当てて、さっそうと歩く。" },
   { file: "images/chara15.webp", name: "キャプテン", rarity: "MR", description: "ドクロの帽子にサングラス。海の男。" },
+  // v3.1.0 で追加（_source/images/新俺のゲーム〇.png。名前・説明文は仮）
+  // ★6（シークレット）：いちばん出にくい（config.js の rarity の SEC）
+  { file: "images/chara16.webp", name: "マイケル", rarity: "SEC", description: "上着をひるがえし、帽子に手をそえる。正体はだれも知らない。" },
+  { file: "images/chara17.webp", name: "卍", rarity: "R", description: "学ランで両手を広げ、木の棒を2本かかげる。" },
+  { file: "images/chara18.webp", name: "公安", rarity: "UR", competitive: true, description: "腰を落として、両手で水鉄砲をかまえる。" },
+  { file: "images/chara19.webp", name: "別班", rarity: "UR", competitive: true, description: "片手をポケットに、もう片手で水鉄砲をまっすぐ向ける。" },
+  { file: "images/chara20.webp", name: "ハンガーファイター", rarity: "SR", description: "ドクロの帽子で、両手にハンガー。キャプテンの子分？" },
+  { file: "images/chara21.webp", name: "友達", rarity: "SR", description: "手をつないだ2人組。横に広いので、土台にぴったり。" },
+  { file: "images/chara22.webp", name: "読書家", rarity: "R", description: "本を読みながら、片手で本を高く積み上げる。とても細長い。" },
+  { file: "images/chara23.webp", name: "若相撲", rarity: "N", description: "両手を広げて、見えないイスに座る。" },
+  { file: "images/chara24.webp", name: "て", rarity: "N", size: 60, description: "ピンと立った人差し指。てっぺんに積むのはむずかしい。" },
+  { file: "images/chara25.webp", name: "ヨガ", rarity: "N", description: "四つんばいで、片足と片手をのばす。" },
+  { file: "images/chara26.webp", name: "土下座", rarity: "N", description: "深々と頭を下げる。平らな背中は、積むのにちょうどいい。" },
 ];

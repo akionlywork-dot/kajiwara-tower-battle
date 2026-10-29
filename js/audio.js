@@ -116,6 +116,13 @@ const Sound = (() => {
       [523, 659, 784, 988, 1175, 1319, 1568, 1976, 2349].forEach((f, i) => tone("sine", f, f, t + 0.12 + i * 0.06, 0.18, 0.18, seGain));
       [659, 831, 988, 1319].forEach((f, i) => tone("triangle", f, f, t + 0.2 + i * 0.09, 0.2, 0.12, seGain));
       [1047, 1319, 1568, 2093, 2637].forEach((f) => tone("sine", f, f * 1.005, t + 0.8, 1.6, 0.1, seGain));
+    } else if (name === "secret") {
+      // ★6：ズン…（暗く低い音が2回）→ 静かになって → 金色のきらめきが一気に降る → 長く響く和音
+      tone("sawtooth", 82, 41, t, 0.6, 0.3, seGain);
+      tone("sine", 65, 33, t + 0.35, 0.8, 0.35, seGain);
+      [2637, 2349, 2093, 1760, 1568, 1319, 1175, 1047].forEach((f, i) => tone("sine", f, f, t + 0.85 + i * 0.045, 0.22, 0.14, seGain));
+      [523, 659, 784, 1047, 1319, 1568, 2093].forEach((f, i) => tone("triangle", f, f, t + 1.1 + i * 0.05, 0.16, 0.16, seGain));
+      [262, 392, 523, 659, 784, 1047].forEach((f) => tone("sine", f, f * 1.004, t + 1.45, 2.2, 0.09, seGain));
     } else if (name === "record") {
       // ハイスコア更新のファンファーレ
       [523, 659, 784, 1047].forEach((f, i) => tone("triangle", f, f, t + i * 0.12, i === 3 ? 0.6 : 0.14, 0.25, seGain));

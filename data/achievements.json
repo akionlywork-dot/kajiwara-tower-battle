@@ -415,6 +415,281 @@
       }
     },
     {
+      "id": "sec_first",
+      "hidden": true,
+      "name": "シークレットとの遭遇",
+      "title": "秘密を知る者",
+      "rank": "mythic",
+      "description": "★6（シークレット）のキャラが出た（積めなくてもよい）",
+      "category": "レア",
+      "condition": {
+        "type": "rarityDrawn",
+        "rarity": "SEC",
+        "value": 1
+      }
+    },
+    {
+      "id": "vivant",
+      "hideCondition": true,
+      "name": "国防",
+      "title": "VIVANT",
+      "rank": "legend",
+      "description": "「公安」と「別班」を、同じタワーに積んだ",
+      "category": "組み合わせ",
+      "condition": {
+        "type": "together",
+        "ids": [
+          "chara18",
+          "chara19"
+        ]
+      }
+    },
+    {
+      "id": "water_squad",
+      "hideCondition": true,
+      "hidden": true,
+      "name": "水鉄砲部隊",
+      "title": "ウォーターガンナー",
+      "rank": "legend",
+      "description": "「ヤンチャ坊主」「公安」「別班」の水鉄砲の3人を、同じタワーに積んだ",
+      "category": "組み合わせ",
+      "condition": {
+        "type": "together",
+        "ids": [
+          "chara04",
+          "chara18",
+          "chara19"
+        ]
+      }
+    },
+    {
+      "id": "pirates",
+      "hideCondition": true,
+      "name": "海賊団結成",
+      "title": "船長の右腕",
+      "rank": "legend",
+      "description": "「キャプテン」と「ハンガーファイター」を、同じタワーに積んだ",
+      "category": "組み合わせ",
+      "condition": {
+        "type": "together",
+        "ids": [
+          "chara15",
+          "chara20"
+        ]
+      }
+    },
+    {
+      "id": "shinobue",
+      "hideCondition": true,
+      "name": "篠笛アンサンブル",
+      "title": "篠笛の師弟",
+      "rank": "silver",
+      "description": "「篠笛教師」と「篠笛マスター」を、同じタワーに積んだ",
+      "category": "組み合わせ",
+      "condition": {
+        "type": "together",
+        "ids": [
+          "chara07",
+          "chara08"
+        ]
+      }
+    },
+    {
+      "id": "alien_invasion",
+      "hideCondition": true,
+      "name": "エイリアン襲来",
+      "title": "宇宙人の親玉",
+      "rank": "gold",
+      "description": "「エイリアン」と「ビッグエイリアン」を、同じタワーに積んだ",
+      "category": "組み合わせ",
+      "condition": {
+        "type": "together",
+        "ids": [
+          "chara06",
+          "chara06_big"
+        ]
+      }
+    },
+    {
+      "id": "group_tour",
+      "hideCondition": true,
+      "name": "団体ツアー",
+      "title": "添乗員",
+      "rank": "gold",
+      "description": "「台湾案内人」と「ビッグ案内人」を、同じタワーに積んだ",
+      "category": "組み合わせ",
+      "condition": {
+        "type": "together",
+        "ids": [
+          "chara05",
+          "chara05_big"
+        ]
+      }
+    },
+    {
+      "id": "floor_family",
+      "hideCondition": true,
+      "name": "床アレルギー一家",
+      "title": "床恐怖症",
+      "rank": "gold",
+      "description": "「床アレルギー」と「ミニ床アレルギー」を、同じタワーに積んだ",
+      "category": "組み合わせ",
+      "condition": {
+        "type": "together",
+        "ids": [
+          "chara10",
+          "chara10_small"
+        ]
+      }
+    },
+    {
+      "id": "sword_duel",
+      "hideCondition": true,
+      "name": "剣豪対決",
+      "title": "二刀流",
+      "rank": "silver",
+      "description": "剣を持った「悪の帝王」と「虫嫌い」を、同じタワーに積んだ",
+      "category": "組み合わせ",
+      "condition": {
+        "type": "together",
+        "ids": [
+          "chara02",
+          "chara11"
+        ]
+      }
+    },
+    {
+      "id": "yankee",
+      "hideCondition": true,
+      "name": "ヤンキー連合",
+      "title": "総長",
+      "rank": "silver",
+      "description": "「卍」と「ヤンチャ坊主」を、同じタワーに積んだ",
+      "category": "組み合わせ",
+      "condition": {
+        "type": "together",
+        "ids": [
+          "chara17",
+          "chara04"
+        ]
+      }
+    },
+    {
+      "id": "stretch",
+      "hideCondition": true,
+      "name": "柔軟体操",
+      "title": "ストレッチ部長",
+      "rank": "gold",
+      "description": "「片足バランス」「横ガニ90度」「ヨガ」を、同じタワーに積んだ",
+      "category": "組み合わせ",
+      "condition": {
+        "type": "together",
+        "ids": [
+          "chara09",
+          "chara12",
+          "chara25"
+        ]
+      }
+    },
+    {
+      "id": "kneel",
+      "hideCondition": true,
+      "hidden": true,
+      "name": "ひれ伏せ",
+      "title": "忠実なしもべ",
+      "rank": "secret",
+      "description": "「悪の帝王」と「土下座」を、同じタワーに積んだ",
+      "category": "組み合わせ",
+      "condition": {
+        "type": "together",
+        "ids": [
+          "chara02",
+          "chara26"
+        ]
+      }
+    },
+    {
+      "id": "same5",
+      "name": "量産型",
+      "title": "量産型",
+      "rank": "silver",
+      "description": "1回のゲームで、同じキャラを5体積んだ",
+      "category": "積む",
+      "condition": {
+        "type": "sameChar",
+        "value": 5
+      }
+    },
+    {
+      "id": "variety12",
+      "name": "顔が広い",
+      "title": "人脈の達人",
+      "rank": "gold",
+      "description": "1回のゲームで、ちがうキャラを12種類積んだ（競技はのぞく）",
+      "category": "積む",
+      "condition": {
+        "type": "variety",
+        "value": 12
+      }
+    },
+    {
+      "id": "rainbow_tower",
+      "name": "レインボータワー",
+      "title": "虹の建築家",
+      "rank": "legend",
+      "description": "1回のゲームで、★1〜★5 のキャラを1体ずつ以上積んだ（競技はのぞく）",
+      "category": "積む",
+      "condition": {
+        "type": "rarityMix",
+        "rarities": [
+          "N",
+          "R",
+          "SR",
+          "UR",
+          "MR"
+        ]
+      }
+    },
+    {
+      "id": "sec_placed",
+      "hidden": true,
+      "name": "シークレットを積む",
+      "title": "キング・オブ・タワー",
+      "rank": "mythic",
+      "description": "★6（シークレット）のキャラを積んだ",
+      "category": "レア",
+      "condition": {
+        "type": "rarityPlaced",
+        "rarity": "SEC",
+        "value": 1
+      }
+    },
+    {
+      "id": "new_faces",
+      "hidden": true,
+      "name": "新顔コンプリート",
+      "title": "新時代の目撃者",
+      "rank": "mythic",
+      "description": "v3.1.0 で増えた11体を、全部図鑑に登録した",
+      "category": "図鑑",
+      "condition": {
+        "type": "dexAll",
+        "ids": [
+          "chara16",
+          "chara17",
+          "chara18",
+          "chara19",
+          "chara20",
+          "chara21",
+          "chara22",
+          "chara23",
+          "chara24",
+          "chara25",
+          "chara26"
+        ]
+      }
+    },
+    {
       "id": "dex_half",
       "name": "図鑑 半分",
       "title": "図鑑コレクター",

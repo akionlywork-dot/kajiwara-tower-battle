@@ -29,16 +29,24 @@
 //   challengeWins… 挑戦状で、相手のスコアを上回った回数が value 回
 //   stampsSent   … オンライン対戦のリザルトで、スタンプを value 回送った
 //   rarityDrawn  … レア度 rarity のキャラが、自分の番に value 回出た（積めなくてもよい）
-//   dexAll       … 条件に合うキャラを、全部図鑑に登録した   例 { "type": "dexAll", "rarity": "MR" } / { "type": "dexAll", "variant": true }
+//   dexAll       … 条件に合うキャラを、全部図鑑に登録した   例 { "type": "dexAll", "rarity": "MR" } / { "type": "dexAll", "variant": true } / { "type": "dexAll", "ids": ["chara16", "chara17"] }
 //   fallFirst    … ひとりモードで、1体目で落とした
 //   dejaVu       … 1回のゲームで、同じキャラが1体おきに3回出た（A→？→A→？→A）
 //   flipStreak   … 1体を落とす前に、反転を value 回続けて押した
 //   exactHeight  … タワーの高さが、ちょうど value m（画面の表示の数字。小数2けた）のときに積めた
+//   together     … ids に書いたキャラを全部、1回のゲームで同じタワーに積んだ（だれが積んでもよい。1体でも落ちるとゲームが終わるので、全員タワーに乗っている）。
+//                  競技では数えない（★4 の公安・別班も同じ確率で出て、すぐそろってしまうため）
+//   sameChar     … 1回のゲームで、同じキャラを value 体積んだ
+//   variety      … 1回のゲームで、ちがうキャラを value 種類積んだ（競技では数えない）
+//   rarityMix    … rarities に書いたレア度のキャラを、1回のゲームで全部（1体ずつ以上）積んだ（競技では数えない）
+//                  例 { "type": "rarityMix", "rarities": ["N", "R", "SR", "UR", "MR"] }
+//                  例 { "type": "together", "ids": ["chara18", "chara19"] }
 //   ※ 管理者モードの自由配置モードでは、実績の判定をしない（記録の処理を通らないため）
 //
 // そのほかの項目：
 //   category … 実績画面の分類（見出し）。同じ分類の実績をまとめて表示する
 //   hidden   … true にすると、達成するまで名前・説明・称号を「？？？」で表示する（隠し実績）
+//   hideCondition … true にすると、達成するまで説明（条件）だけを「？？？（条件はひみつ）」にする。名前は見せる（組み合わせの実績）
 //   rank     … 称号の枠の種類："bronze" / "silver" / "gold" / "legend" / "mythic"（まぼろし・星5つ）/ "event" / "secret"（隠し）（frames.js）
 //   decoration … （省略可）アイコンのふちに並べる飾り："star"（星。省略したとき）/ "pumpkin"（カボチャ）（frames.js の DECORATIONS）
 //   reward   … （省略可）ごほうびの背景・土台。{ "background": "背景の id" } か { "platform": "土台の id" }。
@@ -100,6 +108,19 @@ const Achievements = (() => {
         return !!game && (game.flipStreak || 0) >= v;
       case "exactHeight":
         return !!game && (game.heights || []).some((h) => h.toFixed(2) === v.toFixed(2));
+      case "together": {
+        const ids = cond.ids || [];
+        return !!game && !game.comp && ids.length > 0 && ids.every((id) => (game.placedIds || []).includes(id));
+      }
+      case "sameChar":
+        return !!game && Math.max(0, ...Object.values(game.placedCounts || {})) >= v;
+      case "variety":
+        return !!game && !game.comp && (game.placedIds || []).length >= v;
+      case "rarityMix": {
+        const rarities = cond.rarities || [];
+        const placed = new Set((game && game.placedIds || []).map((id) => (Chars.byId(id) || {}).rarity || "N"));
+        return !!game && !game.comp && rarities.length > 0 && rarities.every((r) => placed.has(r));
+      }
       default: {
         // 累計の条件（今の数と、目標の数）
         const p = progress(cond);
@@ -116,9 +137,9 @@ const Achievements = (() => {
     return false;
   }
 
-  // dexAll の条件に合うキャラ（rarity：レア度、variant：サイズ違い。期間限定のキャラはのぞく）
+  // dexAll の条件に合うキャラ（rarity：レア度、variant：サイズ違い、ids：キャラの ID。期間限定のキャラはのぞく）
   function dexTargets(cond) {
-    return (window.CHARACTERS || []).filter((c) => !c.event && (!cond.rarity || c.rarity === cond.rarity) && (!cond.variant || !!c.variant));
+    return (window.CHARACTERS || []).filter((c) => !c.event && (!cond.rarity || c.rarity === cond.rarity) && (!cond.variant || !!c.variant) && (!cond.ids || cond.ids.includes(c.id)));
   }
 
   // 1手ごとの時間の並びの中で、limit ミリ秒以内が一番長く続いた数
@@ -257,7 +278,7 @@ const Achievements = (() => {
         event: a.event || null,
         decoration: a.decoration || "star",
         hidden: !!a.hidden,
-        description: a.description || "",
+        description: descriptionOf(a),
         got: !!unlocked()[a.id],
         closed: closed(a),
       }));
@@ -310,6 +331,11 @@ const Achievements = (() => {
     return !!a.event && !unlocked()[a.id] && !LimitedEvents.isActive(a.event);
   }
 
+  // 説明文（条件を伏せる実績は、達成するまで「？？？（条件はひみつ）」）
+  function descriptionOf(a) {
+    return a.hideCondition && !unlocked()[a.id] ? "？？？（条件はひみつ）" : a.description || "";
+  }
+
   // 1つ分の行
   function rowHTML(a) {
     const at = unlocked()[a.id];
@@ -337,7 +363,7 @@ const Achievements = (() => {
         <span class="ach-icon">${at ? "🏆" : secret ? "❓" : "🔒"}</span>
         <span class="ach-main">
           <b>${secret ? "？？？" : UI.escape(a.name)}${a.event ? ` <span class="limited-tag">期間限定</span>` : ""}</b>
-          <small>${secret ? "？？？（隠し実績）" : UI.escape(a.description || "")}</small>
+          <small>${secret ? "？？？（隠し実績）" : UI.escape(descriptionOf(a))}</small>
           <span class="ach-title">称号「${UI.escape(at ? a.title : "？？？")}」${a.reward ? `<span class="ach-reward">＋ ${secret ? "？？？" : UI.escape(rewardText(a))}</span>` : ""}</span>
           ${bar}
         </span>
