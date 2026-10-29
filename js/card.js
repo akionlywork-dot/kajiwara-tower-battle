@@ -279,6 +279,7 @@ const Card = (() => {
   // アイコンのまわりの枠（枠なしなら、前と同じ白い輪）。太さ・星の大きさは、画面の CSS と同じ割合
   function drawFrameRing(ctx, cx, cy, r, frame) {
     if (frame && frame.rank === "dev") return drawDevRing(ctx, cx, cy, r);
+    if (frame && STAFF_COLORS[frame.rank]) return drawStaffRing(ctx, cx, cy, r, frame);
     const f = frame && FRAME_COLORS[frame.rank];
     if (!f) {
       ring(ctx, cx, cy, r, "#fff", 4);
@@ -324,6 +325,39 @@ const Card = (() => {
       star(ctx, sx, syy, sr + edge, f.dark);
       star(ctx, sx, syy, sr, fill);
     }
+  }
+
+  // スタッフの称号（管理者・社員・運営）の枠と札の色（画面の style.css の .frame-staff-〇〇・.rank-staff-〇〇 と同じ）
+  //   ring：輪、edge：輪の外側のふち、tag：枠の下の札の地 / 文字、badge：称号の札の地 / 文字 / ふち
+  const STAFF_COLORS = {
+    "staff-admin": { ring: "#141414", edge: "#e8c25a", tag: ["#e8c25a", "#141414"], badge: ["#141414", "#f3d27a", "#e8c25a"] },
+    "staff-employee": { ring: "#1d3a6e", edge: "#ffffff", tag: ["#ffffff", "#1d3a6e"], badge: ["#1d3a6e", "#ffffff", "#ffffff"] },
+    "staff-operator": { ring: "#d62f3a", edge: "#ffffff", tag: ["#ffffff", "#d62f3a"], badge: ["#d62f3a", "#ffffff", "#ffffff"] },
+  };
+
+  // スタッフの枠：色の輪に、外側のふち。星の代わりに、枠の下に札（ADMIN・STAFF・運営）
+  function drawStaffRing(ctx, cx, cy, r, frame) {
+    const c = STAFF_COLORS[frame.rank];
+    const d = r * 2;
+    const w = Math.max(3, d * 0.08);
+    ring(ctx, cx, cy, r + w / 2 + 1.5, c.edge, w + 3);
+    ring(ctx, cx, cy, r + w / 2, c.ring, w);
+    const label = frame.label || "";
+    if (!label) return;
+    const size = Math.max(9, d * 0.16);
+    ctx.save();
+    ctx.font = `bold ${size}px ${FONT}`;
+    const tw = ctx.measureText(label).width + size;
+    const th = size * 1.35;
+    const ty = cy + r + w - th / 2;
+    ctx.fillStyle = c.tag[0];
+    roundRect(ctx, cx - tw / 2, ty, tw, th, th / 2);
+    ctx.fill();
+    ctx.fillStyle = c.tag[1];
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, cx, ty + th / 2 + 1);
+    ctx.restore();
   }
 
   // 開発者の枠：黒っぽい輪に、緑に光るふち。ふちの外側に </> と 0・1 を並べる（画面の .frame-dev と同じ）
@@ -386,6 +420,19 @@ const Card = (() => {
   function titlePill(ctx, text, x, y, fontSize, frame) {
     const f = frame && FRAME_COLORS[frame.rank];
     if (frame && frame.rank === "dev") return devPill(ctx, text, x, y, fontSize);
+    if (frame && STAFF_COLORS[frame.rank]) {
+      // スタッフの称号の札：専用の色の地に、ふち
+      const [bgColor, fg, line] = STAFF_COLORS[frame.rank].badge;
+      ctx.font = `bold ${fontSize}px ${FONT}`;
+      const h = fontSize + 16;
+      const pw = ctx.measureText(text).width + 32;
+      pill(ctx, text, x, y, fontSize, bgColor, fg);
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 2;
+      roundRect(ctx, x + 1, y + 1, pw - 2, h - 2, (h - 2) / 2);
+      ctx.stroke();
+      return;
+    }
     if (!f) return pill(ctx, text, x, y, fontSize, COLOR.gold, "#2b3a55"); // 枠なしなら、前と同じ金色
     const label = text;
     ctx.font = `bold ${fontSize}px ${FONT}`;

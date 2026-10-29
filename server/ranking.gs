@@ -24,6 +24,8 @@
 //   bg / platform        … 選んでいる背景・土台の id（config.js の themes にあるものだけ）
 //   plays / pieces       … プレイ回数・これまでに積んだ数の合計
 //   onlineWins / onlineLosses … オンライン対戦の勝ち・負け
+//   staff  … スタッフの称号の id（developer・admin・employee・operator のどれか。ゲームの管理者モードで獲得し、つけている人だけ）。
+//            ここに値がある人は、ランキングで専用の枠と札になる。消すと、ふつうの称号の表示に戻る（次に送られたときに、また入る）
 // =============================================
 
 // ランキングの種類ごとのシートの名前と、スコアの計算（config.js の score・competitive と同じにする）：
@@ -41,9 +43,12 @@ const NAME_MAX = 10; // 名前の最大文字数（ゲームのプロフィー�
 const TITLE_MAX = 20; // 称号の最大文字数
 const ICON_MAX = 12000; // 写真アイコンの最大の長さ（文字数。1つのセルに入る量より十分小さく）
 const HEADERS = ["id", "name", "score", "count", "height", "date", "hidden", "title", "icon",
-  "ach", "achTotal", "dex", "dexTotal", "bg", "platform", "plays", "pieces", "onlineWins", "onlineLosses"];
+  "ach", "achTotal", "dex", "dexTotal", "bg", "platform", "plays", "pieces", "onlineWins", "onlineLosses", "staff"];
 const PROFILE_COL = 10; // プロフィールの列が始まる場所（ach の列。1から数える）
-const PROFILE_KEYS = HEADERS.slice(PROFILE_COL - 1); // ["ach", …, "onlineLosses"]
+const STAFF_COL = HEADERS.indexOf("staff") + 1; // スタッフの称号の列（1から数える）
+const PROFILE_KEYS = HEADERS.slice(PROFILE_COL - 1, STAFF_COL - 1); // ["ach", …, "onlineLosses"]
+// スタッフの称号の id と称号の文字（ゲームの js/frames.js の STAFF と同じにする。ここに無い id は保存しない）
+const STAFF_TITLES = { developer: "開発者", admin: "管理者", employee: "社員", operator: "運営" };
 // 背景・土台の id（config.js の themes の backgrounds・platforms と同じにする。ここに無い id は保存しない）
 const BACKGROUNDS = ["sky", "sunset", "sakura", "night", "galaxy", "halloween_night", "wonderland", "aurora"];
 const PLATFORMS = ["wood", "stone", "ice", "gold", "diamond", "pumpkin", "steel", "cardboard"];
@@ -66,6 +71,7 @@ function doGet(e) {
       const row = { rank: r.rank, name: r.name, title: r.title, score: r.score, count: r.count, height: r.height, date: r.date };
       if (r.icon) row.icon = r.icon;
       if (r.profile) row.profile = r.profile; // プロフィールを公開している人だけ
+      if (r.staff) row.staff = r.staff; // スタッフの称号の人だけ
       if (mine && r.id === me) row.me = true;
       return row;
     }),
@@ -77,7 +83,8 @@ function doGet(e) {
 // 記録を消す（ゲームの設定画面で「ランキングへの参加の同意を取り消す」を押したとき）：
 //   本文（JSON）：{ action: "delete", id }。その端末の番号の行を、フリー・競技の両方のシートから消す
 //   返す JSON：{ ok: true, action: "delete", deleted: 消した行の数 }
-// 本文（JSON）：{ mode, id, name, title, icon, score, count, height, profile }
+// 本文（JSON）：{ mode, id, name, title, staff, icon, score, count, height, profile }
+//   staff … スタッフの称号の id（つけている人だけ。STAFF_TITLES にある id だけ保存し、称号の文字もそれにそろえる）
 //   mode … "comp" なら競技のシート、それ以外（"free"・無い）ならフリーのシートに書く
 //   profile … 「ランキングでプロフィールを公開」が ON の人だけ。OFF の人・古いバージョンからは届かない（そのときは消す）
 //     { ach: [達成数, 全部], dex: [登録数, 全部], bg, platform, plays, pieces, online: [勝ち, 負け] }
@@ -94,7 +101,9 @@ function doPost(e) {
   const id = String(d.id || "");
   if (!/^[0-9a-zA-Z-]{16,64}$/.test(id)) return json_({ ok: false, error: "bad id" });
   const name = cleanName_(d.name);
-  const title = cleanText_(d.title, TITLE_MAX);
+  // スタッフの称号：決まった id だけ。そのときは称号の文字も、その称号にそろえる
+  const staff = Object.prototype.hasOwnProperty.call(STAFF_TITLES, String(d.staff || "")) ? String(d.staff) : "";
+  const title = staff ? STAFF_TITLES[staff] : cleanText_(d.title, TITLE_MAX);
   const icon = cleanIcon_(d.icon);
   const profile = profileCells_(d.profile); // シートに書く値（公開していなければ、全部 ""）
   const count = Number(d.count);
@@ -122,12 +131,13 @@ function doPost(e) {
     const today = Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd");
     const found = rows.find((r) => r.id === id);
     if (!found) {
-      sh.appendRow([text_(id), text_(name), score, count, height, text_(today), "", title ? text_(title) : "", icon].concat(profile));
+      sh.appendRow([text_(id), text_(name), score, count, height, text_(today), "", title ? text_(title) : "", icon].concat(profile, [staff]));
     } else {
       // 名前・称号・アイコンはいつも新しいものに。スコアは前より高いときだけ書きかえる（hidden はそのまま）
       sh.getRange(found.row, 2).setValue(text_(name));
       sh.getRange(found.row, 8, 1, 2).setValues([[title ? text_(title) : "", icon]]);
       sh.getRange(found.row, PROFILE_COL, 1, PROFILE_KEYS.length).setValues([profile]); // 公開をやめた人は、ここで消える
+      sh.getRange(found.row, STAFF_COL).setValue(staff); // スタッフの称号をはずした人は、ここで消える
       if (score > found.score) sh.getRange(found.row, 3, 1, 4).setValues([[score, count, height, text_(today)]]);
     }
     SpreadsheetApp.flush();
@@ -198,7 +208,8 @@ function readRows_(mode) {
     hidden: String(v[6]).trim() !== "",
     title: String(v[7] || ""),
     icon: String(v[8] || ""),
-    profile: readProfile_(v.slice(PROFILE_COL - 1)),
+    profile: readProfile_(v.slice(PROFILE_COL - 1, STAFF_COL - 1)),
+    staff: Object.prototype.hasOwnProperty.call(STAFF_TITLES, String(v[STAFF_COL - 1] || "")) ? String(v[STAFF_COL - 1]) : "",
   }));
 }
 

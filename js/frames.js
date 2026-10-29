@@ -42,15 +42,37 @@ const Frames = (() => {
     return a ? clean(a.rank, a.event, a.decoration) : null;
   }
 
-  // 開発者の枠（管理者モードの端末の称号「開発者」と、手で書く ranking.json の "title": "developer" の人だけ）
-  function developer() {
-    return { rank: "dev", event: null, decoration: "developer" };
+  // ---------- スタッフの称号（開発者・管理者・社員・運営） ----------
+  // 実績ではもらえない特別な称号。管理者モードの「スタッフの称号」で、1つずつ獲得・リセットする
+  // （獲得したものは Save.data.staffTitles に入り、管理者モードを終えても、その端末で選べる）。
+  //   rank：枠の種類（style.css の .frame-dev・.frame-staff、card.js の FRAME_COLORS）、label：枠の下の札の文字
+  // ほかの人（オンライン対戦の相手・ランキング）から「開発者」などの文字が届いても、専用の枠にはしない（だれでも名乗れてしまうため）。
+  // 手で書く ranking.json だけは、"title": "developer" / "admin" / "employee" / "operator" と書くと、専用の札になる
+  const STAFF = {
+    developer: { title: "開発者", rank: "dev" }, // コード風（</> と 0・1）
+    admin: { title: "管理者", rank: "staff-admin", label: "ADMIN" }, // 黒×金
+    employee: { title: "社員", rank: "staff-employee", label: "STAFF" }, // 紺×白（名札ふう）
+    operator: { title: "運営", rank: "staff-operator", label: "運営" }, // 赤×白（腕章ふう）
+  };
+  const isStaff = (id) => Object.prototype.hasOwnProperty.call(STAFF, id || "");
+  // この端末で、スタッフの称号 id を獲得しているか
+  const staffGranted = (id) => isStaff(id) && typeof Save !== "undefined" && !!(Save.data.staffTitles || {})[id];
+
+  // スタッフの称号 id の枠
+  function staff(id) {
+    const s = STAFF[id];
+    return s ? { rank: s.rank, event: null, decoration: id, label: s.label || "" } : null;
   }
 
-  // 称号（実績の id）の枠。称号を選んでいなければ null
+  // 開発者の枠（獲得した端末の称号「開発者」と、手で書く ranking.json の "title": "developer" の人だけ）
+  function developer() {
+    return staff("developer");
+  }
+
+  // 称号（実績の id か、スタッフの称号の id）の枠。称号を選んでいなければ null
   function ofTitleId(id) {
     if (!id) return null;
-    if (id === "developer") return typeof Admin !== "undefined" && Admin.unlocked ? developer() : null; // 管理者モードの端末だけ
+    if (isStaff(id)) return staffGranted(id) ? staff(id) : null; // スタッフの称号は、獲得した端末だけ
     return ofAchievement(typeof Achievements !== "undefined" ? Achievements.find(id) : null);
   }
 
@@ -65,6 +87,7 @@ const Frames = (() => {
   function avatarClass(f) {
     if (!f) return "";
     if (f.rank === "dev") return "frame frame-dev";
+    if (String(f.rank).startsWith("staff-")) return `frame frame-staff frame-${f.rank}`; // 管理者・社員・運営（星の代わりに、枠の下に札）
     const deco = f.decoration && f.decoration !== "star" ? ` deco-${f.decoration}` : "";
     return `frame frame-${f.rank} stars-${STARS[f.rank] || 1}${deco}${f.event ? ` frame-ev-${f.event}` : ""}`;
   }
@@ -114,8 +137,9 @@ const Frames = (() => {
   function titleHTML(text, f) {
     if (!text) return "";
     if (f && f.rank === "dev") return `<span class="title-badge dev-title"><span class="dev-code">&lt;/&gt;</span>${UI.escape(text)}<span class="dev-caret"></span></span>`;
+    if (f && String(f.rank).startsWith("staff-")) return `<span class="title-badge staff-title rank-${f.rank}">${UI.escape(text)}</span>`;
     return `<span class="title-badge${f ? ` ranked rank-${f.rank}${f.event ? ` rank-ev-${f.event}` : ""}` : ""}">${UI.escape(text)}</span>`;
   }
 
-  return { clean, ofAchievement, developer, ofTitleId, ofTitleText, avatarClass, starsClass, decoClass, decorationImage, starCount, starLayout, applyAvatar, titleHTML };
+  return { clean, ofAchievement, developer, STAFF, isStaff, staffGranted, staff, ofTitleId, ofTitleText, avatarClass, starsClass, decoClass, decorationImage, starCount, starLayout, applyAvatar, titleHTML };
 })();

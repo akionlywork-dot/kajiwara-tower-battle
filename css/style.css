@@ -3963,6 +3963,81 @@ body.sandbox-on .load-status {
 }
 
 /* =============================================
+   スタッフの称号の枠（.frame-staff）と札（.staff-title）：管理者・社員・運営（frames.js の STAFF）
+   色の輪に外側のふち。星の代わりに、枠の下に小さな札（ADMIN・STAFF・運営）。card.js の STAFF_COLORS と同じ色
+   ============================================= */
+.frame-staff-admin { --staff-ring: #141414; --staff-edge: #e8c25a; --staff-tag-bg: #e8c25a; --staff-tag: #141414; --staff-label: "ADMIN"; }
+.frame-staff-employee { --staff-ring: #1d3a6e; --staff-edge: #ffffff; --staff-tag-bg: #ffffff; --staff-tag: #1d3a6e; --staff-label: "STAFF"; }
+.frame-staff-operator { --staff-ring: #d62f3a; --staff-edge: #ffffff; --staff-tag-bg: #ffffff; --staff-tag: #d62f3a; --staff-label: "運営"; }
+
+.avatar.frame.frame-staff {
+  border-color: var(--staff-ring);
+  border-width: max(3px, calc(var(--av) * 0.08));
+  box-shadow: 0 0 0 max(1.5px, calc(var(--av) * 0.035)) var(--staff-edge), 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* 枠の下の札（星の並びの代わり） */
+.avatar.frame.frame-staff::after {
+  content: var(--staff-label);
+  inset: auto;
+  left: 50%;
+  bottom: calc(var(--av) * -0.2);
+  padding: 0 calc(var(--av) * 0.08);
+  border-radius: 999px;
+  color: var(--staff-tag);
+  background: var(--staff-tag-bg);
+  -webkit-mask: none;
+  mask: none;
+  font-size: max(7px, calc(var(--av) * 0.16));
+  font-weight: bold;
+  line-height: 1.35;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* 称号の札 */
+.title-badge.staff-title {
+  color: #ffffff;
+  background: var(--staff-badge, #333);
+  box-shadow: inset 0 0 0 1px var(--staff-badge-line, #fff);
+}
+
+.title-badge.rank-staff-admin { --staff-badge: linear-gradient(#2a2a2a, #0d0d0d); --staff-badge-line: #e8c25a; color: #f3d27a; }
+.title-badge.rank-staff-employee { --staff-badge: linear-gradient(#2b4f8f, #1d3a6e); --staff-badge-line: #ffffff; }
+.title-badge.rank-staff-operator { --staff-badge: linear-gradient(#e8434e, #c22731); --staff-badge-line: #ffffff; }
+
+/* 管理者メニュー：スタッフの称号の一覧 */
+.admin-staff-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-m);
+  margin-bottom: var(--space-s);
+  padding: var(--space-s) var(--space-m) calc(var(--space-s) + 6px);
+  border-radius: var(--radius-m);
+  background: var(--color-panel);
+}
+
+.admin-staff-avatar {
+  --av: 40px;
+  flex-shrink: 0;
+}
+
+.admin-staff-main {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.admin-staff-main small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* =============================================
    開発者の枠（.frame-dev）と札（.dev-title）：ほかの称号とちがう「コード風」
    黒っぽい輪に、緑に光るふち。ふちに沿って </> と 0・1 が並び、ゆっくり回りながら、ときどき点滅する。
    ふちの光が、輪に沿ってゆっくり流れる。「視差効果を減らす」では動かない

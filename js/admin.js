@@ -47,7 +47,10 @@ const Admin = (() => {
     try {
       if (await isValidKey(localStorage.getItem(KEY))) unlocked = true;
     } catch (e) {}
-    if (unlocked) restoreTestDate();
+    if (unlocked) {
+      restoreTestDate();
+      migrateDeveloper();
+    }
     applyDisplay();
   }
 
@@ -72,10 +75,49 @@ const Admin = (() => {
     Game.setForcedShape(null);
     setTestDate(null); // 実際の日付に戻す
     applyDisplay(); // FPS などの表示を消す
-    if (Save.data.profile.titleId === "developer") {
-      Save.data.profile.titleId = null;
-      Save.write();
+    // スタッフの称号（開発者など）は、獲得したものを残す（管理者モードを終えても、この端末で選べる）
+  }
+
+  // ---------- スタッフの称号（開発者・管理者・社員・運営。frames.js の STAFF） ----------
+  // 前は、管理者モードの端末ならいつでも「開発者」を選べた。そのような端末では、1回だけ「開発者」を獲得ずみにする
+  // （つけていた称号が外れないように。そのあとは、ほかの称号と同じく、獲得・リセットで決める）
+  function migrateDeveloper() {
+    const meta = Save.data.meta;
+    if (meta.staffMigrated) return;
+    meta.staffMigrated = true;
+    Save.data.staffTitles = Save.data.staffTitles || {};
+    if (!Save.data.staffTitles.developer) Save.data.staffTitles.developer = new Date().toISOString();
+    Save.write();
+  }
+
+  // 1つずつ、獲得・リセット
+  function setStaff(id, on) {
+    const all = (Save.data.staffTitles = Save.data.staffTitles || {});
+    if (on) all[id] = new Date().toISOString();
+    else {
+      delete all[id];
+      if (Save.data.profile.titleId === id) Save.data.profile.titleId = null; // つけていた称号なら外す
     }
+    Save.write();
+    Profile.refresh();
+    renderStaff();
+    UI.toast(`称号「${Frames.STAFF[id].title}」を${on ? "獲得しました" : "リセットしました"}`);
+  }
+
+  function renderStaff() {
+    const all = Save.data.staffTitles || {};
+    $("admin-staff").innerHTML = Object.entries(Frames.STAFF)
+      .map(([id, s]) => {
+        const got = !!all[id];
+        const frame = Frames.staff(id);
+        return `
+          <div class="admin-staff-row">
+            <span class="avatar avatar-empty admin-staff-avatar ${Frames.avatarClass(frame)}">${UI.escape([...s.title][0])}</span>
+            <span class="admin-staff-main">${Frames.titleHTML(s.title, frame)}<small>${got ? "獲得ずみ" : "まだ獲得していない"}</small></span>
+            <button class="btn btn-small ${got ? "btn-sub" : "btn-primary"}" data-staff="${id}" data-on="${got ? "0" : "1"}">${got ? "リセット" : "獲得"}</button>
+          </div>`;
+      })
+      .join("");
   }
 
   // ---------- 画面 ----------
@@ -138,6 +180,12 @@ const Admin = (() => {
       Achievements.check(null); // 3勝なら実績「かぼちゃの王」
       Themes.apply(); // 使えなくなった背景・土台は元に戻す
       UI.toast(`ハロウィンの勝利数を ${r.wins} にしました`);
+    });
+
+    // スタッフの称号：獲得・リセット
+    $("admin-staff").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-staff]");
+      if (b) setStaff(b.dataset.staff, b.dataset.on === "1");
     });
 
     // 自由配置モード（sandbox.js。始める前の後かたづけは main.js）
@@ -203,6 +251,7 @@ const Admin = (() => {
     for (const t of document.querySelectorAll("#admin-panel .toggle[data-setting]")) t.setAttribute("aria-checked", String(Settings.get(t.dataset.setting)));
     renderDate();
     renderUndo();
+    renderStaff();
     renderNet();
   }
 
@@ -346,7 +395,7 @@ const Admin = (() => {
     if (pick.includes("dex")) Dex.setAll(on);
     if (pick.includes("ach")) {
       Achievements.setAll(on);
-      if (!on && d.profile.titleId !== "developer") d.profile.titleId = null;
+      if (!on && !Frames.isStaff(d.profile.titleId)) d.profile.titleId = null; // スタッフの称号は外さない
     }
     if (pick.includes("themes")) {
       const { achIds, wins } = themeConditions();
@@ -426,7 +475,7 @@ const Admin = (() => {
       detail: "達成した実績と、つけている称号",
       run(d) {
         d.achievements = {};
-        if (d.profile.titleId !== "developer") d.profile.titleId = null;
+        if (!Frames.isStaff(d.profile.titleId)) d.profile.titleId = null; // スタッフの称号は外さない
       },
     },
     stamps: { label: "スタンプ設定", detail: "オンライン対戦のスタンプ4つ", run: (d, fresh) => (d.stamps = fresh.stamps) },

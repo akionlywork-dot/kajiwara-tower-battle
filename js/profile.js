@@ -109,9 +109,9 @@ const Profile = (() => {
   // 達成した実績の一覧（実績の機能がまだ読み込まれていなければ空）
   function unlockedTitles() {
     const list = typeof Achievements !== "undefined" ? Achievements.unlockedList() : [];
-    // 管理者モードの端末だけ、特別な称号「開発者」を選べる
-    if (typeof Admin !== "undefined" && Admin.unlocked) list.unshift({ id: "developer", title: "開発者" });
-    return list;
+    // スタッフの称号（開発者・管理者・社員・運営）は、管理者モードで獲得した端末だけ選べる（frames.js の STAFF）
+    const staff = Object.entries(Frames.STAFF).filter(([id]) => Frames.staffGranted(id)).map(([id, s]) => ({ id, title: s.title }));
+    return staff.concat(list);
   }
 
   // 称号の id → 称号の文字（無ければ ""）
@@ -126,7 +126,7 @@ const Profile = (() => {
   let pickId = null;
   // 格の見出し（上から、むずかしい順）
   const RANK_GROUPS = [
-    ["dev", "開発者"],
+    ["staff", "スタッフ"],
     ["mythic", "まぼろし"],
     ["legend", "レジェンド"],
     ["gold", "ゴールド"],
@@ -161,9 +161,11 @@ const Profile = (() => {
 
     // 一覧：いちばん上に「称号なし」、その下に格ごと
     const all = typeof Achievements !== "undefined" ? Achievements.titleList() : [];
-    if (typeof Admin !== "undefined" && Admin.unlocked) {
-      all.unshift({ id: "developer", title: "開発者", rank: "dev", got: true, description: "管理者モードの端末だけの称号" });
-    }
+    // スタッフの称号：獲得したものだけ、いちばん上の「スタッフ」の見出しに並べる
+    const staff = Object.entries(Frames.STAFF)
+      .filter(([id]) => Frames.staffGranted(id))
+      .map(([id, s]) => ({ id, title: s.title, rank: "staff", got: true, description: "スタッフの称号" }));
+    all.unshift(...staff);
     let html = rowHTML({ id: "", none: true });
     for (const [rank, label] of RANK_GROUPS) {
       const list = all.filter((a) => a.rank === rank);
@@ -187,7 +189,7 @@ const Profile = (() => {
       const note = a.closed ? `<span class="limited-tag">期間限定（終了）</span>` : a.event ? `<span class="limited-tag">期間限定</span>` : "";
       return `<div class="title-row locked">${myAvatarHTML(`frame frame-locked ${Frames.starsClass(a.rank)} ${Frames.decoClass(a.decoration)}`)}<span class="title-row-main"><span class="title-badge ranked rank-locked">？？？</span><small>${how} ${note}</small></span></div>`;
     }
-    const frame = a.id === "developer" ? Frames.developer() : Frames.ofAchievement(a);
+    const frame = Frames.isStaff(a.id) ? Frames.staff(a.id) : Frames.ofAchievement(a);
     return `<button class="title-row ${selected ? "selected" : ""}" data-title="${UI.escape(a.id)}">${myAvatarHTML(Frames.avatarClass(frame))}<span class="title-row-main">${Frames.titleHTML(a.title, frame)}</span>${mark}</button>`;
   }
 

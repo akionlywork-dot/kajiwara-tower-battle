@@ -187,8 +187,10 @@ const Ranking = (() => {
   // 届いたランキングを、部門ごとの並び [{ name, rows }] にする。おかしければ null
   //   ・ふつうは json.ranking が1つの部門。手で書く ranking.json に divisions: [{ name, ranking }] があれば、部門ごと
   //   ・順位（rank）は、書いてあればそのまま使い、書いていなければ並び順から決める（手で入れなくてよい）
-  //   ・manual（手で書く ranking.json）のときだけ、"title": "developer" の人に開発者の印（dev）を付ける。
-  //     オンラインのランキング（ゲームから送られてくる称号）には付けない（だれかが「開発者」を名乗れないように）
+  //   ・スタッフの称号（frames.js の STAFF）の専用の札と枠を付ける人（staffId）：
+  //     オンラインのランキングでは、ranking.gs が返す staff（スタッフの称号を獲得してつけている端末が送ってくる id）がある人。
+  //     手で書く ranking.json では、"title": "developer" / "admin" / "employee" / "operator" の人。
+  //     称号の文字（「管理者」など）だけでは付けない（だれでも名乗れてしまうため）
   function divisionsOf(json, manual) {
     const raw = Array.isArray(json.divisions) && json.divisions.length
       ? json.divisions.filter((d) => d && Array.isArray(d.ranking)).map((d) => ({ name: String(d.name || ""), rows: d.ranking }))
@@ -200,8 +202,8 @@ const Ranking = (() => {
       if (hasRank) rows.sort((a, b) => a.rank - b.rank);
       else rows.forEach((r, i) => (r.rank = i + 1)); // 並び順で順位を付ける
       for (const r of rows) {
-        r.dev = manual && r.title === "developer";
-        if (r.dev) r.title = ""; // 開発者は、称号の札の代わりに専用の印を出す
+        r.staffId = manual ? (Frames.isStaff(r.title) ? r.title : null) : Frames.isStaff(r.staff) ? r.staff : null;
+        if (r.staffId) r.title = ""; // スタッフは、称号の札の代わりに専用の札を出す
       }
       return { name: d.name, rows };
     });
@@ -215,15 +217,15 @@ const Ranking = (() => {
     return `<span class="rank-crown" aria-label="${rank}位の王冠"><svg viewBox="0 0 24 16"><defs><linearGradient id="cg${rank}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c[0]}"/><stop offset="1" stop-color="${c[1]}"/></linearGradient></defs><path d="M2 14 1 3l6 5 5-7 5 7 6-5-1 11z" fill="url(#cg${rank})" stroke="rgba(0,0,0,.35)" stroke-width="1"/><circle cx="12" cy="1.8" r="1.3" fill="${c[0]}"/></svg></span>`;
   }
 
-  // 開発者の印（手で書く ranking.json の "title": "developer" の人だけ。コード風の専用の札）
-  const DEV_BADGE = Frames.titleHTML("開発者", Frames.developer());
+  // スタッフの称号の札（手で書く ranking.json の人だけ。開発者はコード風、管理者・社員・運営は専用の色）
+  const staffBadge = (id) => Frames.titleHTML(Frames.STAFF[id].title, Frames.staff(id));
 
   // アイコン（写真か、名前の1文字目）に称号の枠を付けた HTML。cls：大きさのクラス
   function avatarHTML(r, cls) {
     const name = String(r.name || "");
     const icon = ICON_PATTERN.test(String(r.icon || "")) ? r.icon : null;
     // 称号の枠：サーバーには称号の文字しか無いので、その文字から実績を探して決める（見つからなければ枠なし）
-    const fc = Frames.avatarClass(r.dev ? Frames.developer() : Frames.ofTitleText(String(r.title || "")));
+    const fc = Frames.avatarClass(r.staffId ? Frames.staff(r.staffId) : Frames.ofTitleText(String(r.title || "")));
     return icon
       ? `<span class="avatar ${cls} ${fc}" style="background-image:url(${icon})"></span>`
       : `<span class="avatar avatar-empty ${cls} ${fc}">${UI.escape([...name][0] || "?")}</span>`;
@@ -249,7 +251,7 @@ const Ranking = (() => {
         ${avatar}
         <span class="rank-main">
           <b class="rank-name"><span class="rank-name-text">${UI.escape(name)}</span>${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
-          ${r.dev ? `<span class="rank-dev">${DEV_BADGE}</span>` : r.title ? Frames.titleHTML(String(r.title), frame) : `<span class="title-badge title-empty">称号なし</span>`}
+          ${r.staffId ? `<span class="rank-dev">${staffBadge(r.staffId)}</span>` : r.title ? Frames.titleHTML(String(r.title), frame) : `<span class="title-badge title-empty">称号なし</span>`}
           <small>${sub.join("・")}</small>
         </span>
         <span class="rank-score">${Number(r.score)}<small>点</small></span>
@@ -283,8 +285,8 @@ const Ranking = (() => {
       `<div class="rp-head">
         ${avatarHTML(r, "rp-avatar")}
         <span class="rp-who">
-          <b>${UI.escape(name)}${r.dev ? DEV_BADGE : ""}${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
-          ${r.dev ? "" : title ? Frames.titleHTML(title, frame) : `<span class="title-badge title-empty">称号なし</span>`}
+          <b>${UI.escape(name)}${r.staffId ? staffBadge(r.staffId) : ""}${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
+          ${r.staffId ? "" : title ? Frames.titleHTML(title, frame) : `<span class="title-badge title-empty">称号なし</span>`}
         </span>
       </div>` +
       (items.length ? `<div class="rp-stats">${items.map(([label, value, cls]) => `<div class="rp-stat ${cls || ""}"><span>${label}</span><b>${value}</b></div>`).join("")}</div>` : "") +
@@ -517,7 +519,9 @@ const Ranking = (() => {
     const title = Profile.titleText(p.titleId);
     const icon = Settings.get("rankingIcon") && p.icon ? await Profile.smallIcon(p.icon) : "";
     const profile = Settings.get("rankingProfile") ? publicProfile() : null;
-    const profileKey = `${name}\n${title}\n${digest(icon)}\n${JSON.stringify(profile)}`;
+    // スタッフの称号（開発者・管理者・社員・運営）を獲得してつけている人は、称号の id も送る（ランキングで専用の枠と札を出すため）
+    const staff = Frames.isStaff(p.titleId) && Frames.staffGranted(p.titleId) ? p.titleId : "";
+    const profileKey = `${name}\n${title}\n${staff}\n${digest(icon)}\n${JSON.stringify(profile)}`;
     if (best.score <= (mem()[k.sent] || 0) && profileKey === mem()[k.sentProfile]) return;
     if (kind === "comp" && !(await compSupported())) return; // 古い ranking.gs には、競技のスコアを送らない
     try {
@@ -525,7 +529,7 @@ const Ranking = (() => {
         method: "POST",
         // text/plain で送る（Apps Script は、事前の確認の通信（CORS のプリフライト）に答えられないため）
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ mode: kind, id: playerId(), name, title, icon, score: best.score, count: best.count, height: best.height, profile }),
+        body: JSON.stringify({ mode: kind, id: playerId(), name, title, staff, icon, score: best.score, count: best.count, height: best.height, profile }),
       });
       if (!res || !res.ok) throw new Error((res && res.error) || "error");
       const improved = best.score > (mem()[k.sent] || 0);
