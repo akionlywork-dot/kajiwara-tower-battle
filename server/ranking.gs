@@ -135,7 +135,7 @@ function doPost(e) {
     const mine = list.find((r) => r.id === id);
     return json_({ ok: true, mode: mode, rank: mine ? mine.rank : null, total: list.length });
   } finally {
-    lock.release();
+    lock.releaseLock(); // 順番待ちを終わる（Apps Script の LockService の書き方）
   }
 }
 
@@ -157,7 +157,7 @@ function deleteRecords_(id) {
     SpreadsheetApp.flush();
     return json_({ ok: true, action: "delete", deleted: deleted });
   } finally {
-    lock.release();
+    lock.releaseLock(); // 順番待ちを終わる（Apps Script の LockService の書き方）
   }
 }
 

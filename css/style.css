@@ -976,6 +976,12 @@ select {
   font-weight: normal;
 }
 
+/* パソコンの横長の画面だけで使う、表の列（積んだ数・高さ・日付）と見出しの行。スマホでは出さない */
+.rank-col,
+.rank-head {
+  display: none;
+}
+
 .rank-score {
   flex-shrink: 0;
   font-size: 22px;
@@ -1048,6 +1054,22 @@ select {
 
 .my-record .player-badge {
   margin: 0;
+  min-width: 0;
+}
+
+/* 名前は1行で（長ければ「…」）。右のスコアと注意書きは、名前を押しつぶさないよう縮めて折り返す */
+.my-record .player-badge b {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.my-record .player-badge > :last-child {
+  min-width: 0;
+}
+
+.my-record .rank-score {
+  flex-shrink: 1;
   min-width: 0;
 }
 
@@ -5201,7 +5223,6 @@ kbd {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
-  #ranking-list,
   #achievements-list,
   #title-list {
     display: grid;
@@ -5210,16 +5231,74 @@ kbd {
     align-content: start;
   }
 
-  #ranking-list > :not(.rank-row),
   #achievements-list > :not(.ach-row),
   #title-list > :not(.title-row) {
     grid-column: 1 / -1;
   }
 
+  /* フリー・競技のタブは、一覧と同じ幅 */
   .ranking-tabs {
     width: 100%;
-    max-width: 480px;
-    margin-left: auto;
-    margin-right: auto;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  /* ランキング：1列で、1人分の行を表のように横に並べる（見出しの行と、列の幅をそろえる）
+     順位 | アイコン | 名前・称号 | スコア | 積んだ数 | 高さ | 記録した日 */
+  .rank-row,
+  .rank-head {
+    display: grid;
+    grid-template-columns: 44px 52px minmax(0, 1fr) 130px 84px 90px 92px;
+    align-items: center;
+    column-gap: var(--space-m);
+    width: 100%;
+  }
+
+  .rank-row {
+    padding-left: var(--space-l);
+    padding-right: var(--space-l);
+    text-align: left;
+  }
+
+  .rank-head {
+    padding: 0 var(--space-l) 6px;
+    font-size: 12px;
+    font-weight: bold;
+    opacity: 0.75;
+  }
+
+  /* 数字の列（スコア・積んだ数・高さ・記録した日）は右にそろえる */
+  .rank-head span:nth-child(n + 4),
+  .rank-col {
+    text-align: right;
+  }
+
+  .rank-col {
+    display: block;
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .rank-col-date {
+    font-size: 14px;
+    opacity: 0.8;
+  }
+
+  .rank-score {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 名前の下の「積んだ数・高さ・日付」の1行は、列に出すので隠す。名前・称号は長ければ「…」で省略 */
+  .rank-main small {
+    display: none;
+  }
+
+  .rank-main .title-badge {
+    max-width: 100%;
+  }
+
+  .rank-num {
+    justify-self: center;
   }
 }

@@ -167,8 +167,10 @@ const Ranking = (() => {
     // 部門ごとに並べる（部門が1つで名前が無ければ、見出しは出さない）。タップで出すプロフィールのため、全部の行を shown に入れる
     shown = [].concat(...divisions.map((d) => d.rows));
     let index = 0;
+    // 見出しの行（パソコンの横長の画面だけ出す。列の位置は行と同じ）
+    const head = `<div class="rank-head" aria-hidden="true"><span>順位</span><span></span><span>名前・称号</span><span>スコア</span><span>積んだ数</span><span>高さ</span><span>記録した日</span></div>`;
     const html = divisions
-      .map((d) => (d.name ? `<h3 class="section-title ranking-division">${UI.escape(d.name)}</h3>` : "") + d.rows.map((r) => rowHTML(r, index++)).join(""))
+      .map((d) => (d.name ? `<h3 class="section-title ranking-division">${UI.escape(d.name)}</h3>` : "") + (d.rows.length ? head : "") + d.rows.map((r) => rowHTML(r, index++)).join(""))
       .join("");
     const updated = json.updated ? `<p class="ranking-updated">${UI.escape(json.updated)} 更新</p>` : "";
     box.innerHTML =
@@ -235,10 +237,12 @@ const Ranking = (() => {
     const frame = Frames.ofTitleText(String(r.title || ""));
     const avatar = `<span class="rank-avatar-wrap">${crownHTML(Number(r.rank))}${avatarHTML(r, "rank-avatar")}</span>`;
     // 積んだ数・高さ・日付（手で書く ranking.json で書いていない項目は出さない）
-    const sub = [];
-    if (r.count !== undefined && r.count !== "" && isFinite(Number(r.count))) sub.push(`${Number(r.count)}体`);
-    if (r.height !== undefined && r.height !== "" && !isNaN(height)) sub.push(`${height.toFixed(2)}m`);
-    if (r.date) sub.push(UI.escape(shortDate(String(r.date))));
+    const count = r.count !== undefined && r.count !== "" && isFinite(Number(r.count)) ? `${Number(r.count)}体` : "";
+    const ht = r.height !== undefined && r.height !== "" && !isNaN(height) ? `${height.toFixed(2)}m` : "";
+    const date = r.date ? UI.escape(shortDate(String(r.date))) : "";
+    const sub = [count, ht, date].filter(Boolean);
+    // 行の最後の rank-col（積んだ数・高さ・日付）は、パソコンの横長の画面だけで、表のように別の列に並べる（style.css の「パソコン」）。
+    // スマホでは rank-col は出さず、名前の下の small に1行で出す
     return `
       <button class="rank-row ${medal ? "rank-" + medal : ""} ${r.me ? "rank-me" : ""}" data-index="${i}" aria-label="${UI.escape(name)}のプロフィール">
         <span class="rank-num">${Number(r.rank)}</span>
@@ -249,6 +253,9 @@ const Ranking = (() => {
           <small>${sub.join("・")}</small>
         </span>
         <span class="rank-score">${Number(r.score)}<small>点</small></span>
+        <span class="rank-col rank-col-count">${count}</span>
+        <span class="rank-col rank-col-height">${ht}</span>
+        <span class="rank-col rank-col-date">${date}</span>
       </button>`;
   }
 
@@ -322,7 +329,7 @@ const Ranking = (() => {
     const best = KINDS[tab].best();
     let note = "";
     if (isOnline() && best) {
-      if (!Settings.get("ranking")) note = `<small class="my-rank">ランキングに参加していません（設定で変えられます）</small>`;
+      if (!Settings.get("ranking")) note = `<small class="my-rank">ランキングに未参加</small>`;
       else if (me) note = `<small class="my-rank">あなたは <b>${Number(me.rank)}位</b></small>`;
     }
     $("ranking-mine").innerHTML =
