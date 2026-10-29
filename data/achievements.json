@@ -442,6 +442,9 @@
           "chara18",
           "chara19"
         ]
+      },
+      "reward": {
+        "background": "desert"
       }
     },
     {
@@ -476,6 +479,9 @@
           "chara15",
           "chara20"
         ]
+      },
+      "reward": {
+        "platform": "ship"
       }
     },
     {
@@ -492,6 +498,9 @@
           "chara07",
           "chara08"
         ]
+      },
+      "reward": {
+        "platform": "wa"
       }
     },
     {
@@ -589,6 +598,9 @@
           "chara12",
           "chara25"
         ]
+      },
+      "reward": {
+        "platform": "yoga"
       }
     },
     {
@@ -618,6 +630,9 @@
       "condition": {
         "type": "sameChar",
         "value": 5
+      },
+      "reward": {
+        "platform": "block"
       }
     },
     {
@@ -648,6 +663,9 @@
           "UR",
           "MR"
         ]
+      },
+      "reward": {
+        "background": "rainbow"
       }
     },
     {
@@ -665,6 +683,9 @@
           "SEC"
         ],
         "value": 2
+      },
+      "reward": {
+        "background": "golden_night"
       }
     },
     {
@@ -689,6 +710,9 @@
           "chara25",
           "chara26"
         ]
+      },
+      "reward": {
+        "background": "dawn"
       }
     },
     {

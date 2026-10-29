@@ -250,7 +250,7 @@ const Ranking = (() => {
         <span class="rank-num">${Number(r.rank)}</span>
         ${avatar}
         <span class="rank-main">
-          <b class="rank-name"><span class="rank-name-text">${UI.escape(name)}</span>${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
+          <b class="rank-name"><span class="rank-name-text">${Custom.nameHTML(name, r.nameColor)}</span>${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
           ${r.staffId ? `<span class="rank-dev">${staffBadge(r.staffId)}</span>` : r.title ? Frames.titleHTML(String(r.title), frame) : `<span class="title-badge title-empty">称号なし</span>`}
           <small>${sub.join("・")}</small>
         </span>
@@ -285,7 +285,7 @@ const Ranking = (() => {
       `<div class="rp-head">
         ${avatarHTML(r, "rp-avatar")}
         <span class="rp-who">
-          <b>${UI.escape(name)}${r.staffId ? staffBadge(r.staffId) : ""}${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
+          <b>${Custom.nameHTML(name, r.nameColor)}${r.staffId ? staffBadge(r.staffId) : ""}${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
           ${r.staffId ? "" : title ? Frames.titleHTML(title, frame) : `<span class="title-badge title-empty">称号なし</span>`}
         </span>
       </div>` +
@@ -314,9 +314,13 @@ const Ranking = (() => {
       .filter(Boolean)
       .map((t, i) => `<span class="rp-theme"><img src="${t.src}" alt=""><small>${i === 0 && bg ? "背景" : "土台"}：${UI.escape(t.name)}</small></span>`)
       .join("");
-    if (!items.length && !tiles) return "";
+    // お気に入りのキャラ（custom.js。このゲームにいるキャラだけ）
+    const fav = Custom.cleanFavorite(p.fav) ? Chars.byId(p.fav) : null;
+    const favHTML = fav ? `<div class="rp-fav"><img src="${UI.escape(fav.file)}" alt=""><span><small>お気に入りのキャラ</small><b>${UI.escape(fav.name)}</b></span></div>` : "";
+    if (!items.length && !tiles && !favHTML) return "";
     return (
       `<p class="rp-section">プロフィール</p>` +
+      favHTML +
       (items.length ? `<div class="rp-stats">${items.map(([label, value]) => `<div class="rp-stat"><span>${label}</span><b>${value}</b></div>`).join("")}</div>` : "") +
       (tiles ? `<div class="rp-themes">${tiles}</div>` : "")
     );
@@ -482,6 +486,8 @@ const Ranking = (() => {
       plays: s.soloPlays + (s.rulePlays || 0) + (s.compPlays || 0) + s.versusPlays + cpu + (online.plays || 0),
       pieces: s.totalPieces,
     };
+    const fav = Custom.myFavorite();
+    if (fav) p.fav = fav.id; // お気に入りのキャラ
     if (c) p.ach = [c.got, c.total];
     if (online.plays > 0) p.online = [online.wins, online.plays - online.wins];
     // 持っている実績（称号）の id の一覧。ranking.gs が「みんなの取得率」を数えるのに使う（ランキングには出さない）
@@ -549,7 +555,8 @@ const Ranking = (() => {
     const profile = Settings.get("rankingProfile") ? publicProfile() : null;
     // スタッフの称号（開発者・管理者・社員・運営）を獲得してつけている人は、称号の id も送る（ランキングで専用の枠と札を出すため）
     const staff = Frames.isStaff(p.titleId) && Frames.staffGranted(p.titleId) ? p.titleId : "";
-    const profileKey = `${name}\n${title}\n${staff}\n${digest(icon)}\n${JSON.stringify(profile)}`;
+    const nameColor = Custom.myColor() || ""; // 名前の色（custom.js）
+    const profileKey = `${name}\n${title}\n${staff}\n${nameColor}\n${digest(icon)}\n${JSON.stringify(profile)}`;
     if (best.score <= (mem()[k.sent] || 0) && profileKey === mem()[k.sentProfile]) return;
     if (kind === "comp" && !(await compSupported())) return; // 古い ranking.gs には、競技のスコアを送らない
     try {
@@ -557,7 +564,7 @@ const Ranking = (() => {
         method: "POST",
         // text/plain で送る（Apps Script は、事前の確認の通信（CORS のプリフライト）に答えられないため）
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ mode: kind, id: playerId(), name, title, staff, icon, score: best.score, count: best.count, height: best.height, profile }),
+        body: JSON.stringify({ mode: kind, id: playerId(), name, title, staff, nameColor, icon, score: best.score, count: best.count, height: best.height, profile }),
       });
       if (!res || !res.ok) throw new Error((res && res.error) || "error");
       const improved = best.score > (mem()[k.sent] || 0);

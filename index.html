@@ -36,7 +36,7 @@
   <!-- アプリとしてインストールするための設定（PWA） -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="css/style.css?v=3.1.1">
+  <link rel="stylesheet" href="css/style.css?v=3.2.0">
 </head>
 <body>
   <div id="app">
@@ -535,7 +535,9 @@
                 写真を選ぶ
                 <input type="file" id="icon-file" accept="image/*" hidden>
               </label>
-              <button id="btn-icon-remove" class="btn btn-sub btn-small">写真を外す</button>
+              <!-- 図鑑に登録したキャラの絵を、アイコンにする（custom.js） -->
+              <button id="btn-icon-char" class="btn btn-sub btn-small">キャラにする</button>
+              <button id="btn-icon-remove" class="btn btn-sub btn-small">アイコンを外す</button>
             </div>
           </div>
           <label class="field">
@@ -546,6 +548,15 @@
           <div class="field">
             <span>称号<small>実績を達成すると選べる</small></span>
             <button id="btn-title-pick" class="title-pick" aria-label="称号を選ぶ"></button>
+          </div>
+          <!-- 名前の色・お気に入りのキャラ（custom.js。色の種類と解放条件は config.js の nameColors） -->
+          <h3 class="section-title">名前の色<small>実績を達成すると、色が増える</small></h3>
+          <div id="name-colors" class="name-colors"></div>
+          <h3 class="section-title">お気に入りのキャラ<small>図鑑に登録したキャラから選ぶ。対戦カードと、ランキングのプロフィールに出る</small></h3>
+          <div class="fav-row">
+            <button id="btn-fav" class="stamp-slot fav-slot" aria-label="お気に入りのキャラを選ぶ"></button>
+            <span id="fav-name" class="fav-name"></span>
+            <button id="btn-fav-clear" class="btn btn-small btn-sub hidden">はずす</button>
           </div>
           <!-- 背景と土台（中身は themes.js が作る。種類と解放条件は config.js の themes） -->
           <h3 class="section-title">背景</h3>
@@ -559,10 +570,22 @@
           <!-- スタンプ（中身は stamps.js が作る） -->
           <h3 class="section-title">スタンプ<small>オンライン対戦のリザルトで送れる。枠をタップして変える</small></h3>
           <div id="stamp-slots" class="stamp-slots"></div>
-          <p class="page-note">写真と名前はこの端末の中に保存されます。名前はオンライン対戦の相手に伝わります。スコアアタック・競技の記録は、ランキングに載ります（遊ぶ前に同意したとき。名前・称号・スコア・積んだ数・高さ）。<b>ランキングでの名前は、ここで変えられます。</b>写真は、設定の「ランキング」→「写真アイコンを載せる」をオンにしたときだけ載ります。「プロフィールを公開」をオンにすると、実績の数・図鑑の数・背景と土台・プレイ回数・積んだ数の合計・オンライン対戦の勝敗も、ランキングを見た人に見えます。同意は、設定画面でいつでも取り消せます（取り消すと、ランキングから記録を消します）。</p>
+          <p class="page-note">写真と名前はこの端末の中に保存されます。名前（名前の色・お気に入りのキャラも）はオンライン対戦の相手に伝わります。スコアアタック・競技の記録は、ランキングに載ります（遊ぶ前に同意したとき。名前・称号・スコア・積んだ数・高さ）。<b>ランキングでの名前は、ここで変えられます。</b>写真は、設定の「ランキング」→「写真アイコンを載せる」をオンにしたときだけ載ります。「プロフィールを公開」をオンにすると、実績の数・図鑑の数・背景と土台・プレイ回数・積んだ数の合計・オンライン対戦の勝敗も、ランキングを見た人に見えます。同意は、設定画面でいつでも取り消せます（取り消すと、ランキングから記録を消します）。</p>
         </div>
       </div>
     </section>
+
+    <!-- ===== キャラを選ぶ画面（お気に入りのキャラ・キャラのアイコン。custom.js） ===== -->
+    <div id="char-picker" class="dialog">
+      <div class="dialog-box stamp-picker-box">
+        <p id="char-picker-title"></p>
+        <div id="char-picker-grid" class="stamp-picker-grid"></div>
+        <p class="stamp-picker-note">図鑑に登録したキャラを選べます</p>
+        <div class="dialog-buttons">
+          <button id="char-picker-close" class="btn btn-primary">閉じる</button>
+        </div>
+      </div>
+    </div>
 
     <!-- ===== アイコンの調整画面（写真を丸く切り抜く） ===== -->
     <section id="screen-crop" class="screen screen-dim page">
@@ -1003,51 +1026,52 @@
 
   <!-- ?v= のあとの番号：更新したら config.js の version と一緒に上げる（スマホに古いファイルが残らないように） -->
   <!-- ライブラリ（lib/ に同梱） -->
-  <script src="lib/decomp.min.js?v=3.1.1"></script>
-  <script src="lib/matter.min.js?v=3.1.1"></script>
-  <script src="lib/peerjs.min.js?v=3.1.1"></script>
-  <script src="lib/mqtt.min.js?v=3.1.1"></script>
+  <script src="lib/decomp.min.js?v=3.2.0"></script>
+  <script src="lib/matter.min.js?v=3.2.0"></script>
+  <script src="lib/peerjs.min.js?v=3.2.0"></script>
+  <script src="lib/mqtt.min.js?v=3.2.0"></script>
   <!-- 設定ファイル -->
-  <script src="config.js?v=3.1.1"></script>
+  <script src="config.js?v=3.2.0"></script>
   <!-- 読み込みの状況（開発用。devMode か ?debug=1 のときだけ表示）。ほかより先に読み込む -->
-  <script src="js/load-status.js?v=3.1.1"></script>
-  <script src="characters.js?v=3.1.1"></script>
-  <script src="js/chars.js?v=3.1.1"></script>
+  <script src="js/load-status.js?v=3.2.0"></script>
+  <script src="characters.js?v=3.2.0"></script>
+  <script src="js/chars.js?v=3.2.0"></script>
   <!-- ゲーム本体 -->
-  <script src="js/settings.js?v=3.1.1"></script>
-  <script src="js/save.js?v=3.1.1"></script>
-  <script src="js/audio.js?v=3.1.1"></script>
-  <script src="js/shape.js?v=3.1.1"></script>
-  <script src="js/aura.js?v=3.1.1"></script>
-  <script src="js/platform-art.js?v=3.1.1"></script>
-  <script src="js/game.js?v=3.1.1"></script>
-  <script src="js/rules.js?v=3.1.1"></script>
-  <script src="js/cpu.js?v=3.1.1"></script>
-  <script src="js/challenge.js?v=3.1.1"></script>
-  <script src="js/card.js?v=3.1.1"></script>
-  <script src="js/stamps.js?v=3.1.1"></script>
-  <script src="js/halloween-home.js?v=3.1.1"></script>
-  <script src="js/halloween.js?v=3.1.1"></script>
-  <script src="js/title-fx.js?v=3.1.1"></script>
-  <script src="js/online.js?v=3.1.1"></script>
-  <script src="js/ui.js?v=3.1.1"></script>
-  <script src="js/themes.js?v=3.1.1"></script>
-  <script src="js/frames.js?v=3.1.1"></script>
-  <script src="js/profile.js?v=3.1.1"></script>
-  <script src="js/data-file.js?v=3.1.1"></script>
-  <script src="js/news.js?v=3.1.1"></script>
-  <script src="js/events.js?v=3.1.1"></script>
-  <script src="js/ranking.js?v=3.1.1"></script>
-  <script src="js/records.js?v=3.1.1"></script>
-  <script src="js/dex.js?v=3.1.1"></script>
-  <script src="js/achievements.js?v=3.1.1"></script>
-  <script src="js/vs-intro.js?v=3.1.1"></script>
-  <script src="js/backup.js?v=3.1.1"></script>
-  <script src="js/controls.js?v=3.1.1"></script>
-  <script src="js/admin.js?v=3.1.1"></script>
-  <script src="js/sandbox.js?v=3.1.1"></script>
-  <script src="js/pwa.js?v=3.1.1"></script>
-  <script src="js/updates.js?v=3.1.1"></script>
-  <script src="js/main.js?v=3.1.1"></script>
+  <script src="js/settings.js?v=3.2.0"></script>
+  <script src="js/save.js?v=3.2.0"></script>
+  <script src="js/audio.js?v=3.2.0"></script>
+  <script src="js/shape.js?v=3.2.0"></script>
+  <script src="js/aura.js?v=3.2.0"></script>
+  <script src="js/platform-art.js?v=3.2.0"></script>
+  <script src="js/game.js?v=3.2.0"></script>
+  <script src="js/rules.js?v=3.2.0"></script>
+  <script src="js/cpu.js?v=3.2.0"></script>
+  <script src="js/challenge.js?v=3.2.0"></script>
+  <script src="js/card.js?v=3.2.0"></script>
+  <script src="js/stamps.js?v=3.2.0"></script>
+  <script src="js/halloween-home.js?v=3.2.0"></script>
+  <script src="js/halloween.js?v=3.2.0"></script>
+  <script src="js/title-fx.js?v=3.2.0"></script>
+  <script src="js/online.js?v=3.2.0"></script>
+  <script src="js/ui.js?v=3.2.0"></script>
+  <script src="js/themes.js?v=3.2.0"></script>
+  <script src="js/frames.js?v=3.2.0"></script>
+  <script src="js/profile.js?v=3.2.0"></script>
+  <script src="js/custom.js?v=3.2.0"></script>
+  <script src="js/data-file.js?v=3.2.0"></script>
+  <script src="js/news.js?v=3.2.0"></script>
+  <script src="js/events.js?v=3.2.0"></script>
+  <script src="js/ranking.js?v=3.2.0"></script>
+  <script src="js/records.js?v=3.2.0"></script>
+  <script src="js/dex.js?v=3.2.0"></script>
+  <script src="js/achievements.js?v=3.2.0"></script>
+  <script src="js/vs-intro.js?v=3.2.0"></script>
+  <script src="js/backup.js?v=3.2.0"></script>
+  <script src="js/controls.js?v=3.2.0"></script>
+  <script src="js/admin.js?v=3.2.0"></script>
+  <script src="js/sandbox.js?v=3.2.0"></script>
+  <script src="js/pwa.js?v=3.2.0"></script>
+  <script src="js/updates.js?v=3.2.0"></script>
+  <script src="js/main.js?v=3.2.0"></script>
 </body>
 </html>

@@ -124,6 +124,7 @@ const VsIntro = (() => {
   // p.card（背景の id）があれば、その背景の絵をカードの下地にする（自分か相手かは、枠と札の色で分かる）
   function cardHTML(p, side) {
     const name = p.name || "プレイヤー";
+    const fav = p.fav ? Chars.byId(p.fav) : null; // お気に入りのキャラ（custom.js）
     const cls = Frames.avatarClass(p.frame);
     const avatar = p.icon
       ? `<span class="avatar vs-avatar ${cls}" style="background-image:url(${p.icon})"></span>`
@@ -141,7 +142,8 @@ const VsIntro = (() => {
         <span class="vs-side">${side === "me" ? "あなた" : "相手"}</span>
         <div class="vs-head">
           ${avatar}
-          <span class="vs-who"><b>${UI.escape(name)}</b>${Frames.titleHTML(p.title || "", p.frame)}</span>
+          <span class="vs-who"><b>${Custom.nameHTML(name, p.nc)}</b>${Frames.titleHTML(p.title || "", p.frame)}</span>
+          ${fav ? `<img class="vs-fav" src="${UI.escape(fav.file)}" alt="お気に入り：${UI.escape(fav.name)}" title="お気に入り：${UI.escape(fav.name)}">` : ""}
         </div>
         ${
           rows.length
@@ -154,7 +156,8 @@ const VsIntro = (() => {
   }
 
   // ---------- 相手に送るプロフィール ----------
-  // { title, rank, ev, best, rankNo, ach: [達成数, 全体], online: [勝, 敗], id, icon, card }
+  // { title, rank, ev, best, rankNo, ach: [達成数, 全体], online: [勝, 敗], id, icon, card, nc, fav }
+  //   nc：名前の色の id ／ fav：お気に入りのキャラの ID（custom.js。届いた側は、config.js・characters.js にあるものだけ使う）
   //   card：対戦カードの色にする背景の id（プロフィールで選んだもの。いつもの色なら null）
   //   rankNo：ランキングの順位（参加している人だけ。最後にランキングを開いた・送ったときの値。試合前に取りにはいかない）
   //   id：相手を見分けるための番号（ランキングの番号から作った別の値。ランキングの番号そのものは送らない）
@@ -179,6 +182,8 @@ const VsIntro = (() => {
       id: await Ranking.opponentKey(),
       icon: Settings.get("onlineIcon") && p.icon ? await Profile.smallIcon(p.icon) : "",
       card: cardBgId(),
+      nc: Custom.myColor(),
+      fav: (Custom.myFavorite() || {}).id || null,
     };
   }
 
@@ -207,6 +212,8 @@ const VsIntro = (() => {
         online: [online.wins, online.plays - online.wins],
         icon: Settings.get("onlineIcon") && p.icon ? p.icon : null,
         card: cardBgId(),
+        nc: Custom.myColor(),
+        fav: (Custom.myFavorite() || {}).id || null,
       },
       "me"
     );
@@ -215,7 +222,7 @@ const VsIntro = (() => {
   // 相手から届いたプロフィールを確かめる（おかしな値は使わない）。
   // 古いバージョンの相手からは届かないので、そのときは名前だけ（{ name }）
   function cleanProfile(name, p) {
-    const out = { name, title: "", frame: null, best: null, rankNo: null, ach: null, online: null, id: null, icon: null, card: null };
+    const out = { name, title: "", frame: null, best: null, rankNo: null, ach: null, online: null, id: null, icon: null, card: null, nc: null, fav: null };
     if (!p || typeof p !== "object") return out;
     const int = (v, max) => (Number.isInteger(v) && v >= 0 && v <= max ? v : null);
     out.title = typeof p.title === "string" ? p.title.slice(0, 20) : "";
@@ -229,6 +236,8 @@ const VsIntro = (() => {
     if (typeof p.icon === "string" && p.icon.length <= ICON_MAX && ICON_PATTERN.test(p.icon)) out.icon = p.icon;
     // 対戦カードの色：config.js にある背景の id だけ使う
     if (typeof p.card === "string" && Themes.previewOf("backgrounds", p.card)) out.card = p.card;
+    out.nc = Custom.cleanColor(p.nc); // 名前の色：config.js にある色だけ
+    out.fav = Custom.cleanFavorite(p.fav); // お気に入り：このゲームにいるキャラだけ
     return out;
   }
 

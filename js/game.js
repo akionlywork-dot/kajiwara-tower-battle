@@ -1262,6 +1262,7 @@ const Game = (() => {
     ctx.setTransform(scale, 0, 0, scale, -v.left * scale, -v.top * scale);
     syncTheme();
     drawBackground();
+    drawHorizon(); // 地平線の太陽・砂丘（背景の sun・dunes）
     if (homeActive() && homeScene.drawBack) homeScene.drawBack(ctx, groundY()); // ホーム画面の飾り（丘・屋敷・かぼちゃ・霧・おばけ）
 
     ctx.save();
@@ -1537,6 +1538,8 @@ const Game = (() => {
     }
     if (bgTheme.moon || bgTheme.bats) drawHalloweenSky(k);
     if (bgTheme.aurora) drawAurora(k);
+    if (bgTheme.rainbow) drawRainbow(k);
+    if (bgTheme.goldDust) drawGoldDust(k);
     if (sky.clouds > 0) {
       ctx.globalAlpha = Math.min(1, sky.clouds);
       drawClouds(k, sky.cloud);
@@ -1764,6 +1767,90 @@ const Game = (() => {
       ctx.fill();
     }
     ctx.restore();
+  }
+
+  // 虹（背景 rainbow）：空に大きな虹の弧。上に登るほど薄くなる
+  const RAINBOW = ["255, 93, 115", "255, 159, 64", "255, 214, 74", "86, 214, 110", "61, 139, 255", "160, 92, 240"];
+  function drawRainbow(k) {
+    const fade = Math.max(0, 1 - skyHeight / 3);
+    if (fade <= 0) return;
+    const cx = view.left + view.w * 0.5, cy = view.top + view.h * 0.7;
+    const r = view.w * 0.62, band = 7 * k;
+    ctx.save();
+    ctx.lineWidth = band;
+    RAINBOW.forEach((c, i) => {
+      ctx.strokeStyle = `rgba(${c}, ${0.42 * fade})`;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r - i * band, Math.PI * 1.08, Math.PI * 1.92);
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  // 昇る金の粒（背景 goldDust）：金色の粒が、ゆっくり下から上へ。上に登るほど薄くなる
+  const goldDots = Array.from({ length: 36 }, () => ({ x: Math.random(), y: Math.random(), r: 0.8 + Math.random() * 1.6, sp: 0.015 + Math.random() * 0.03, ph: Math.random() * 6 }));
+  function drawGoldDust(k) {
+    const fade = Math.max(0, 1 - skyHeight / 4);
+    if (fade <= 0) return;
+    const t = reducedMotion.matches ? 0 : performance.now() / 1000;
+    ctx.save();
+    ctx.fillStyle = "#ffd54a";
+    for (const d of goldDots) {
+      const y = (((d.y - t * d.sp) % 1) + 1) % 1;
+      ctx.globalAlpha = fade * (0.35 + 0.45 * (0.5 + 0.5 * Math.sin(t * 2 + d.ph)));
+      ctx.beginPath();
+      ctx.arc(view.left + (d.x + Math.sin(t * 0.5 + d.ph) * 0.01) * view.w, view.top + y * view.h, d.r * k, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // 地平線の太陽（背景 sun。sunRays で光の筋）と砂丘（背景 dunes）。ゲーム内の座標で、地面のすぐ上に描く
+  function drawHorizon() {
+    if (!bgTheme.sun && !bgTheme.dunes) return;
+    const top = groundY();
+    const left = Math.min(-10, view.left - 10);
+    const right = Math.max(WORLD_W + 10, view.left + view.w + 10);
+    if (bgTheme.sun) {
+      const x = WORLD_W * 0.74, y = top - 40, r = 44;
+      const glow = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 3);
+      glow.addColorStop(0, "rgba(255, 236, 180, 0.55)");
+      glow.addColorStop(1, "rgba(255, 236, 180, 0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(x - r * 3, y - r * 3, r * 6, r * 6);
+      if (bgTheme.sunRays) {
+        const t = reducedMotion.matches ? 0 : performance.now() / 1000;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(t * 0.05);
+        ctx.fillStyle = "rgba(255, 240, 200, 0.22)";
+        for (let i = 0; i < 12; i++) {
+          ctx.rotate(Math.PI / 6);
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(r * 3.4, -r * 0.18);
+          ctx.lineTo(r * 3.4, r * 0.18);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+      ctx.fillStyle = bgTheme.sun;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (bgTheme.dunes) {
+      // 奥と手前の2つの砂丘（手前ほど濃い）
+      for (const [h, phase, dark] of [[46, 0, -0.08], [26, 2.2, 0]]) {
+        ctx.fillStyle = dark ? mix(bgTheme.dunes, "#000000", -dark) : bgTheme.dunes;
+        ctx.beginPath();
+        ctx.moveTo(left, top + 20);
+        for (let x = left; x <= right; x += 10) ctx.lineTo(x, top - h * (0.55 + 0.45 * Math.sin(x / 70 + phase)));
+        ctx.lineTo(right, top + 20);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
   }
 
   // 満月とこうもり。上に登るほど薄くなる（高さで変わる背景に入れかわっていく）

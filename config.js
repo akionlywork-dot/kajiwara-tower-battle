@@ -7,7 +7,7 @@ window.GAME_CONFIG = {
   achievementsEpoch: 2,
 
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v3.1.1",
+  version: "v3.2.0",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -108,10 +108,16 @@ window.GAME_CONFIG = {
       //   aurora: true … 空に、ゆらめくオーロラの光の帯
       { id: "wonderland", name: "ふしぎの国", unlock: "achievement", top: "#b98aff", bottom: "#ffd3ec", cloud: "#fff2fb", ground: "#8fd4a8", groundDark: "#6fb88c" },
       { id: "aurora", name: "オーロラ", unlock: "achievement", top: "#020b1f", bottom: "#123d52", cloud: "#26485c", ground: "#1e3b3a", groundDark: "#132826", stars: true, aurora: true },
+      // v3.2.0 で追加（実績のごほうび）：砂漠 … 国防 ／ 虹の空 … レインボータワー ／ 黄金の夜 … まぼろしの共演 ／ 夜明け … 新顔コンプリート
+      //   sun: 地平線の大きな太陽の色（sunRays: true で光の筋が回る） ／ dunes: 砂丘の色 ／ rainbow: true で空に虹 ／ goldDust: true で金の粒が昇る
+      { id: "desert", name: "砂漠", unlock: "achievement", top: "#f08a4b", bottom: "#ffdca0", cloud: "#ffe9cf", ground: "#e0b26b", groundDark: "#c4924c", sun: "#ff6a2b", dunes: "#d9a25c" },
+      { id: "rainbow", name: "虹の空", unlock: "achievement", top: "#5fb8f5", bottom: "#e8f7ff", cloud: "#ffffff", ground: "#7fcb5d", groundDark: "#62ad47", rainbow: true },
+      { id: "golden_night", name: "黄金の夜", unlock: "achievement", top: "#0a0702", bottom: "#3d2b06", cloud: "#2a1f09", ground: "#2b2110", groundDark: "#1a1408", stars: true, goldDust: true },
+      { id: "dawn", name: "夜明け", unlock: "achievement", top: "#2b3c78", bottom: "#ffb88a", cloud: "#ffd7c0", ground: "#5d8c55", groundDark: "#466d40", sun: "#ffe08a", sunRays: true },
     ],
     // 土台：body（正面）・top（上の面）・pillar（柱）の色と、style（描き方。js/platform-art.js）
     //   style："wood"（木）/ "stone"（石積み）/ "ice"（氷・つらら）/ "gold"（金・彫り模様・光が走る）/ "crystal"（宝石）/ "pumpkin"（かぼちゃ）
-    //          / "steel"（鉄骨・リベット）/ "cardboard"（ダンボール・ガムテープ）
+    //          / "steel"（鉄骨・リベット）/ "cardboard"（ダンボール・ガムテープ）/ "ship"（海賊船）/ "wa"（朱塗り）/ "block"（おもちゃのブロック）/ "yoga"（ヨガマット）
     //   style を書かないと、色だけの四角になる。当たり判定は、どの style でも同じ四角
     platforms: [
       { id: "wood", name: "木の台", unlock: null, style: "wood", body: "#8a5a3b", top: "#6fbf4a", pillar: "#9a6b45" },
@@ -125,6 +131,11 @@ window.GAME_CONFIG = {
       // 実績のごほうび（data/achievements.json の reward）：鉄骨の台 … 実績「縁の下の力持ち」 ／ ダンボールの台 … 隠し実績
       { id: "steel", name: "鉄骨の台", unlock: "achievement", style: "steel", body: "#56606b", top: "#9aa4ae", pillar: "#c0392b" },
       { id: "cardboard", name: "ダンボールの台", unlock: "achievement", style: "cardboard", body: "#c79a5e", top: "#dcb47c", pillar: "#b88a50" },
+      // v3.2.0 で追加（実績のごほうび）：海賊船の台 … 海賊団結成 ／ 和の台 … 篠笛アンサンブル ／ ブロックの台 … 量産型 ／ ヨガマットの台 … 柔軟体操
+      { id: "ship", name: "海賊船の台", unlock: "achievement", style: "ship", body: "#5a3a22", top: "#a07a4e", pillar: "#7a5232" },
+      { id: "wa", name: "和の台", unlock: "achievement", style: "wa", body: "#c8321e", top: "#1c1412", pillar: "#c8321e" },
+      { id: "block", name: "ブロックの台", unlock: "achievement", style: "block", body: "#e8443a", top: "#ff8fb1", pillar: "#e8443a" },
+      { id: "yoga", name: "ヨガマットの台", unlock: "achievement", style: "yoga", body: "#8e7bd8", top: "#b9acf0", pillar: "#7fc8b8" },
     ],
   },
 
@@ -307,6 +318,21 @@ window.GAME_CONFIG = {
       },
     },
   },
+
+  // 名前の色（プロフィールで選ぶ。js/custom.js）。タイトル画面・プロフィール・対戦カード・ランキングの名前に付く
+  //   unlock : null なら最初から使える。実績の id を書くと、その実績を達成したら使える（背景・土台の unlock と同じ）
+  //   color  : 文字の色 ／ style : "gold"（金色に光る）・"rainbow"（虹色が流れる）。どちらも書かないと、いつもの色
+  //   ※ 色を足したら、server/ranking.gs の NAME_COLORS にも id を足して、デプロイしなおす（ランキングに出すため）
+  nameColors: [
+    { id: "default", name: "いつもの色", unlock: null },
+    { id: "sky", name: "空色", unlock: "first_stack", color: "#7ec8ff" },
+    { id: "pink", name: "ピンク", unlock: "plays10", color: "#ff9ccf" },
+    { id: "orange", name: "オレンジ", unlock: "stack10", color: "#ffb35c" },
+    { id: "green", name: "みどり", unlock: "height5", color: "#7ee08a" },
+    { id: "purple", name: "むらさき", unlock: "versus_win1", color: "#c9a2ff" },
+    { id: "gold", name: "金", unlock: "dex_complete", style: "gold" },
+    { id: "rainbow", name: "虹色", unlock: "rainbow_tower", style: "rainbow" },
+  ],
 
   // スタンプ（オンライン対戦のリザルト画面で、相手に送る）
   //   defaults : 何も選んでいない枠に入る、最初から使える初期スタンプ（キャラの ID ＝ 画像のファイル名から拡張子を除いたもの）。

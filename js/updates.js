@@ -23,6 +23,16 @@ const Updates = (() => {
   const url = () => ((window.GAME_CONFIG.ranking || {}).url || "").trim();
   const current = () => String(window.GAME_CONFIG.version || "");
   const same = (a, b) => String(a || "").replace(/^v/i, "") === String(b || "").replace(/^v/i, "");
+  // a の版が b と同じか、b より新しいか（"v3.2.0" と "v3.1.1" のように、数字を左から比べる。数字でなければ同じときだけ）
+  const atLeast = (a, b) => {
+    const pa = String(a || "").replace(/^v/i, "").split(".").map(Number);
+    const pb = String(b || "").replace(/^v/i, "").split(".").map(Number);
+    if (pa.some(isNaN) || pb.some(isNaN)) return same(a, b);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+    }
+    return true;
+  };
 
   let notice = null; // サーバーの予告 { at, version, message, updated } か null
   let supported = null; // サーバーが予告に対応しているか（古い ranking.gs なら false。まだ分からなければ null）
@@ -68,7 +78,7 @@ const Updates = (() => {
   //   { kind: "waiting", message }（予告の時刻を過ぎて、公開を待っている）/ null（何も出さない）
   function state(now = Date.now()) {
     if (latest && !same(latest, current())) return { kind: "ready", version: latest };
-    if (!notice || (notice.version && same(notice.version, current()))) return null; // 予告の版にもう上がっている
+    if (!notice || (notice.version && atLeast(current(), notice.version))) return null; // 予告の版（か、それより新しい版）にもう上がっている
     const at = Date.parse(notice.at);
     if (!at) return null;
     if (now < at) return { kind: "soon", at, message: notice.message || "", version: notice.version || "" };

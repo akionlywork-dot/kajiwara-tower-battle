@@ -127,6 +127,27 @@ const Themes = (() => {
       ctx.fillStyle = "rgba(255,255,255,0.85)";
       for (const [x, y] of [[14, 10], [40, 22], [70, 8], [104, 18], [130, 30], [150, 9], [24, 36]]) ctx.fillRect(x, y, 1.6, 1.6);
     }
+    if (bg.rainbow) {
+      ctx.lineWidth = 3;
+      ["#ff5d73", "#ff9f40", "#ffd64a", "#56d66e", "#3d8bff", "#a05cf0"].forEach((c, i) => {
+        ctx.strokeStyle = c;
+        ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        ctx.arc(W / 2, H * 0.78, W * 0.42 - i * 3, Math.PI * 1.08, Math.PI * 1.92);
+        ctx.stroke();
+      });
+      ctx.globalAlpha = 1;
+    }
+    if (bg.goldDust) {
+      ctx.fillStyle = "#ffd54a";
+      for (const [x, y] of [[20, 44], [52, 30], [78, 50], [112, 36], [140, 46], [96, 14], [60, 12]]) circle(ctx, x, y, 1.4);
+    }
+    if (bg.sun) {
+      ctx.fillStyle = "rgba(255, 236, 180, 0.35)";
+      circle(ctx, W * 0.74, H * (full ? 0.66 : 0.8), 22);
+      ctx.fillStyle = bg.sun;
+      circle(ctx, W * 0.74, H * (full ? 0.66 : 0.8), 14);
+    }
     if (bg.moon) {
       ctx.fillStyle = "rgba(255, 240, 190, 0.35)";
       circle(ctx, 124, 24, 15);
@@ -141,6 +162,15 @@ const Themes = (() => {
     }
     // 地面（なだらかな丘）
     const top = full ? H * 0.72 : H * 0.86;
+    if (bg.dunes) {
+      ctx.fillStyle = bg.dunes;
+      ctx.beginPath();
+      ctx.moveTo(0, top + 4);
+      for (let x = 0; x <= W; x += 6) ctx.lineTo(x, top - 8 * (0.55 + 0.45 * Math.sin(x / 18)));
+      ctx.lineTo(W, top + 4);
+      ctx.closePath();
+      ctx.fill();
+    }
     ctx.fillStyle = bg.ground;
     ctx.beginPath();
     ctx.moveTo(0, top + 3);

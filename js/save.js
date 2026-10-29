@@ -20,6 +20,9 @@ const Save = (() => {
       // プロフィール
       profile: {
         name: "", // 名前（空欄なら「プレイヤー」と表示）
+        nameColor: null, // 名前の色（config.js の nameColors の id。null ならいつもの色。custom.js）
+        favorite: null, // お気に入りのキャラの ID（図鑑に登録したキャラ。custom.js）
+        iconChar: null, // アイコンをキャラの絵から作ったときの、そのキャラの ID（写真なら null。custom.js）
         icon: null, // アイコン画像（256px の JPEG を文字列にしたもの）
         titleId: null, // 名前の横に表示する称号（実績の id）
       },

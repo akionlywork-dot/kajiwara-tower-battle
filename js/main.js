@@ -1365,6 +1365,7 @@ ${location.origin}${location.pathname}`), "image/png");
   Admin.init().then(applyAdmin);
   applySettings();
   Profile.init();
+  Custom.init(); // 名前の色・お気に入りのキャラ・キャラのアイコン（プロフィール画面）
   News.init();
   Ranking.init();
   Records.init();

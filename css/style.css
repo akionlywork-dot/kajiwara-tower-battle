@@ -1599,6 +1599,138 @@ select {
   gap: 6px;
 }
 
+/* ===== 名前の色・お気に入りのキャラ（プロフィール。custom.js） ===== */
+/* 色つきの名前：金（光が流れる）・虹色（色が流れる）。ほかの色は style の color */
+.pname-gold,
+.pname-rainbow {
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: pname-flow 3s linear infinite;
+}
+
+.pname-gold {
+  background-image: linear-gradient(100deg, #c99a1e, #ffe58a 30%, #fff8d6 45%, #ffd54a 60%, #c99a1e);
+}
+
+.pname-rainbow {
+  background-image: linear-gradient(90deg, #ff5d73, #ffb347, #ffe066, #6ee07a, #5ab8ff, #b07cff, #ff5d73);
+}
+
+@keyframes pname-flow {
+  to { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pname-gold,
+  .pname-rainbow {
+    animation: none;
+  }
+}
+
+.name-colors {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: var(--space-s);
+}
+
+.name-color {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 4px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-s);
+  color: #fff;
+  background: rgba(10, 16, 34, 0.55);
+  font: inherit;
+  cursor: pointer;
+}
+
+.name-color b {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--font-size-s);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.name-color small {
+  font-size: 10px;
+  line-height: 1.3;
+  opacity: 0.8;
+}
+
+.name-color.selected {
+  border-color: var(--color-gold, #ffd54a);
+}
+
+.name-color.locked {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.fav-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-m);
+  margin-bottom: var(--space-s);
+}
+
+.fav-slot {
+  flex: none;
+  width: 72px;
+}
+
+.fav-slot small {
+  font-size: var(--font-size-s);
+  opacity: 0.8;
+}
+
+.fav-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: bold;
+}
+
+/* 対戦カードの、お気に入りのキャラ（名前の右） */
+.vs-fav {
+  flex: none;
+  width: 40px;
+  height: 52px;
+  margin-left: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
+}
+
+/* ランキングのプロフィールの、お気に入りのキャラ */
+.rp-fav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: var(--space-s);
+}
+
+.rp-fav img {
+  width: 48px;
+  height: 56px;
+  object-fit: contain;
+}
+
+.rp-fav span {
+  display: flex;
+  flex-direction: column;
+}
+
+.rp-fav small {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
 .theme-tile {
   display: flex;
   flex-direction: column;

@@ -236,6 +236,7 @@ const Achievements = (() => {
     Sound.play("record");
     // 実績の達成で、新しい背景・土台が解放されたら知らせる
     if (typeof Themes !== "undefined") Themes.notifyUnlocked(newly);
+    if (typeof Custom !== "undefined") Custom.notifyUnlocked(newly); // 名前の色
     return newly;
   }
 

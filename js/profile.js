@@ -49,6 +49,7 @@ const Profile = (() => {
     });
     $("btn-icon-remove").addEventListener("click", () => {
       Save.data.profile.icon = null;
+      Save.data.profile.iconChar = null;
       Save.write();
       refresh();
     });
@@ -92,6 +93,7 @@ const Profile = (() => {
     renderThemes();
     renderCard();
     Stamps.renderSlots();
+    Custom.render();
     refresh();
   }
 
@@ -217,7 +219,8 @@ const Profile = (() => {
     const p = Save.data.profile;
     applyAvatar($("profile-avatar"), p.icon, Save.playerName(1));
     applyAvatar($("chip-avatar"), p.icon, Save.playerName(1));
-    $("chip-name").textContent = Save.playerName(1);
+    $("chip-name").innerHTML = Custom.nameHTML(Save.playerName(1), Custom.myColor()); // 名前の色（custom.js）
+    if (UI.current === "profile") Custom.render(); // 名前の色の見本も、今の名前で書きなおす
     // 称号の枠（アイコンのまわりと、称号の札。frames.js）
     const frame = Frames.ofTitleId(p.titleId);
     Frames.applyAvatar($("profile-avatar"), frame);
@@ -394,9 +397,12 @@ const Profile = (() => {
     drawPhoto(ctx, ICON_SIZE);
     // 丸く見せるのは CSS（border-radius）で行う。JPEG にすると容量が小さくなる
     const before = Save.data.profile.icon;
+    const beforeChar = Save.data.profile.iconChar;
     Save.data.profile.icon = out.toDataURL("image/jpeg", 0.85);
+    Save.data.profile.iconChar = null; // 写真のアイコン（キャラの絵ではない）
     if (!Save.write()) {
       Save.data.profile.icon = before;
+      Save.data.profile.iconChar = beforeChar;
       UI.toast("保存できませんでした（端末の保存容量が足りません）");
     }
     crop = null;

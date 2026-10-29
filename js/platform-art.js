@@ -14,6 +14,10 @@
 //     pumpkin … かぼちゃのすじ・顔の模様・つるとはっぱ。柱はつるが巻いた木の柱
 //     steel   … 鉄の板にリベット、ふちに黄色と黒の注意のしま。柱は赤い鉄骨（ななめの筋交い）
 //     cardboard … ダンボールの箱（波の断面・ガムテープ・「天地無用」の印）。柱もダンボールを積んだもの
+//     ship    … 海賊船の甲板（こげ茶の板・船べりの金具・丸い窓・ロープ・ドクロの旗の印）。柱はマスト（ロープの巻いた太い柱）
+//     wa      … 朱塗りの台（金の縁どり・波の模様・金具）。柱は朱色の柱に黒い台座
+//     block   … おもちゃのブロック（色ちがいのブロックを並べ、上にぽっちが並ぶ）。柱もブロックを積んだもの
+//     yoga    … ヨガマット（やわらかい色・すべり止めの模様・はしが丸まる）。柱は丸めたマットを積んだもの
 //   style を書いていない土台は、色だけの四角（前の描き方）になる。
 //   使う色は、その土台の body（正面）・top（上の面）・pillar（柱）
 // =============================================
@@ -202,6 +206,229 @@ const PlatformArt = (() => {
           ctx.fillRect(0, y + 13, w, 7);
           ctx.fillStyle = shade(d.pillar, -0.3);
           ctx.fillRect(0, y + 33, w, 1);
+        }
+        pillarShade(ctx, w, h);
+      },
+    },
+
+    // 海賊船の台：こげ茶の甲板、船べりの金具・丸い窓・ロープ・ドクロの旗の印。柱はロープの巻いたマスト
+    ship: {
+      platform(ctx, w, h, d) {
+        // 船体の板（横に重なった板）
+        for (let y = 0, i = 0; y < h; y += 8, i++) {
+          ctx.fillStyle = shade(d.body, (i % 2 ? -0.06 : 0.04));
+          ctx.fillRect(0, y, w, 8);
+          ctx.fillStyle = shade(d.body, -0.35);
+          ctx.fillRect(0, y + 7.2, w, 0.8);
+        }
+        // 丸い窓（真ちゅうのふち）
+        for (const x of [w * 0.2, w * 0.4, w * 0.6, w * 0.8]) {
+          ctx.fillStyle = "#c9a227";
+          dot(ctx, x, h * 0.6, 5.2);
+          ctx.fillStyle = "#26384a";
+          dot(ctx, x, h * 0.6, 3.6);
+          ctx.fillStyle = "rgba(255,255,255,0.45)";
+          dot(ctx, x - 1.2, h * 0.6 - 1.2, 1);
+        }
+        // ドクロの旗の印（まん中）
+        ctx.fillStyle = "#1a1a1a";
+        ctx.fillRect(w / 2 - 11, 12, 22, 15);
+        ctx.fillStyle = "#f2efe6";
+        dot(ctx, w / 2, 18, 4);
+        ctx.fillRect(w / 2 - 2.5, 20, 5, 3);
+        ctx.fillStyle = "#1a1a1a";
+        dot(ctx, w / 2 - 1.5, 17.5, 1);
+        dot(ctx, w / 2 + 1.5, 17.5, 1);
+        ctx.strokeStyle = "#f2efe6";
+        ctx.lineWidth = 1.2;
+        line(ctx, w / 2 - 6, 21, w / 2 + 6, 26);
+        line(ctx, w / 2 + 6, 21, w / 2 - 6, 26);
+        bottomShade(ctx, w, h);
+        // 上の面：船べり（明るい板）と、ロープ
+        ctx.fillStyle = d.top;
+        ctx.fillRect(0, 0, w, 6);
+        ctx.fillStyle = shade(d.top, -0.3);
+        for (let x = 0; x < w; x += 20) ctx.fillRect(x, 0, 1, 6);
+        ctx.strokeStyle = "#d8c49a";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        for (let x = 0; x <= w; x += 35) {
+          ctx.moveTo(x, 7);
+          ctx.quadraticCurveTo(x + 17.5, 13, x + 35, 7);
+        }
+        ctx.stroke();
+        ctx.fillStyle = "#c9a227"; // ロープを留める金具
+        for (let x = 0; x <= w; x += 35) dot(ctx, x, 7, 1.8);
+      },
+      // マスト：太い木の柱に、ロープが巻いている
+      pillar(ctx, w, h, d) {
+        const g = ctx.createLinearGradient(0, 0, w, 0);
+        g.addColorStop(0, shade(d.pillar, 0.15));
+        g.addColorStop(1, shade(d.pillar, -0.25));
+        ctx.fillStyle = g;
+        ctx.fillRect(w * 0.18, 0, w * 0.64, h);
+        ctx.strokeStyle = shade(d.pillar, -0.35);
+        ctx.lineWidth = 1;
+        for (const x of [w * 0.32, w * 0.5, w * 0.66]) line(ctx, x, 0, x, h);
+        ctx.strokeStyle = "#d8c49a";
+        ctx.lineWidth = 2;
+        for (let y = 18; y < h; y += 46) for (let k = 0; k < 4; k++) line(ctx, w * 0.18, y + k * 4, w * 0.82, y + k * 4 + 3);
+        pillarShade(ctx, w, h);
+      },
+    },
+
+    // 和の台：朱塗りに金の縁どり、青海波（波）の模様と金具。柱は朱色の柱に黒い台座
+    wa: {
+      platform(ctx, w, h, d) {
+        const g = ctx.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0, shade(d.body, 0.12));
+        g.addColorStop(1, shade(d.body, -0.18));
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, w, h);
+        // 青海波（重なった半円の波）を、うすい金で
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(4, 10, w - 8, h - 16);
+        ctx.clip();
+        ctx.strokeStyle = "rgba(255, 214, 120, 0.35)";
+        ctx.lineWidth = 1;
+        for (let y = 10, row = 0; y < h + 8; y += 6, row++) {
+          for (let x = (row % 2) * 7; x < w + 14; x += 14) {
+            for (const r of [6, 4, 2]) {
+              ctx.beginPath();
+              ctx.arc(x, y + 6, r, Math.PI, 0);
+              ctx.stroke();
+            }
+          }
+        }
+        ctx.restore();
+        // 金の縁どりと、角の金具
+        ctx.strokeStyle = "#e6b84a";
+        ctx.lineWidth = 1.6;
+        ctx.strokeRect(3, 9, w - 6, h - 14);
+        ctx.fillStyle = "#e6b84a";
+        for (const x of [3, w - 3]) for (const y of [9, h - 5]) dot(ctx, x, y, 3);
+        bottomShade(ctx, w, h);
+        // 上の面：黒い漆の天板
+        ctx.fillStyle = "#1c1412";
+        ctx.fillRect(0, 0, w, 7);
+        ctx.fillStyle = "rgba(255,255,255,0.18)";
+        ctx.fillRect(0, 1, w, 1.2);
+        ctx.fillStyle = "#e6b84a";
+        ctx.fillRect(0, 7, w, 1.4);
+      },
+      pillar(ctx, w, h, d) {
+        const g = ctx.createLinearGradient(0, 0, w, 0);
+        g.addColorStop(0, shade(d.pillar, 0.18));
+        g.addColorStop(1, shade(d.pillar, -0.22));
+        ctx.fillStyle = g;
+        ctx.fillRect(w * 0.15, 0, w * 0.7, h);
+        // 金の帯と、黒い台座
+        ctx.fillStyle = "#e6b84a";
+        ctx.fillRect(w * 0.15, 10, w * 0.7, 3);
+        ctx.fillRect(w * 0.15, 18, w * 0.7, 1.5);
+        ctx.fillStyle = "#1c1412";
+        ctx.fillRect(w * 0.08, h - 40, w * 0.84, 40);
+        ctx.fillStyle = "#e6b84a";
+        ctx.fillRect(w * 0.08, h - 40, w * 0.84, 2);
+        pillarShade(ctx, w, h);
+      },
+    },
+
+    // ブロックの台：色ちがいのおもちゃのブロックを並べ、上にぽっちが並ぶ。柱もブロックを積んだもの
+    block: {
+      platform(ctx, w, h, d) {
+        const colors = [d.body, "#3d8bff", "#ffc21a", "#4cd964", d.top];
+        const bw = w / 5;
+        for (let i = 0; i < 5; i++) {
+          const c = colors[i % colors.length];
+          const g = ctx.createLinearGradient(0, 0, 0, h);
+          g.addColorStop(0, shade(c, 0.15));
+          g.addColorStop(1, shade(c, -0.18));
+          ctx.fillStyle = g;
+          ctx.fillRect(i * bw, 0, bw, h);
+          ctx.fillStyle = shade(c, -0.35);
+          ctx.fillRect(i * bw + bw - 1, 0, 1, h);
+          ctx.fillStyle = "rgba(255,255,255,0.3)";
+          ctx.fillRect(i * bw + 2, 3, bw - 5, 2);
+        }
+        bottomShade(ctx, w, h);
+        // 上の面：ぽっち（ブロックの上の丸い出っぱり）。四角の上にはみ出して描く
+        for (let i = 0; i < 5; i++) {
+          const c = colors[i % colors.length];
+          for (let k = 0; k < 4; k++) {
+            const x = i * bw + bw * (k + 0.5) / 4;
+            ctx.fillStyle = shade(c, -0.25);
+            ctx.fillRect(x - 4.5, -3, 9, 4);
+            ctx.fillStyle = shade(c, 0.18);
+            ellipse(ctx, x, -3, 4.5, 1.8);
+          }
+        }
+      },
+      pillar(ctx, w, h, d) {
+        const colors = [d.pillar, "#3d8bff", "#ffc21a", "#4cd964"];
+        for (let y = 0, i = 0; y < h; y += 24, i++) {
+          const c = colors[i % colors.length];
+          ctx.fillStyle = shade(c, 0.05);
+          ctx.fillRect(w * 0.12, y, w * 0.76, 23);
+          ctx.fillStyle = shade(c, -0.35);
+          ctx.fillRect(w * 0.12, y + 23, w * 0.76, 1);
+          ctx.fillStyle = "rgba(255,255,255,0.25)";
+          ctx.fillRect(w * 0.12 + 2, y + 2, w * 0.76 - 4, 2);
+        }
+        pillarShade(ctx, w, h);
+      },
+    },
+
+    // ヨガマットの台：やわらかい色の厚いマット、すべり止めの模様、両はしが少し丸まる。柱は丸めたマットを積んだもの
+    yoga: {
+      platform(ctx, w, h, d) {
+        // マットの側面（ふっくらした厚み）
+        const g = ctx.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0, shade(d.body, 0.1));
+        g.addColorStop(1, shade(d.body, -0.22));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.roundRect(0, 0, w, h, 6);
+        ctx.fill();
+        // すべり止めの小さな凸凹（ドットの並び）
+        ctx.fillStyle = shade(d.body, -0.12);
+        for (let y = 14; y < h - 6; y += 6) for (let x = 6 + ((y / 6) % 2) * 3; x < w - 4; x += 6) dot(ctx, x, y, 1);
+        // 真ん中のロゴ（はすの花の形）
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        for (const a of [-0.9, -0.45, 0, 0.45, 0.9]) leaf(ctx, w / 2 + Math.sin(a) * 6, 24 - Math.cos(a) * 4, 4.5, a);
+        bottomShade(ctx, w, h);
+        // 上の面と、両はしの丸まり
+        ctx.fillStyle = d.top;
+        ctx.fillRect(0, 0, w, 6);
+        ctx.fillStyle = "rgba(255,255,255,0.35)";
+        ctx.fillRect(4, 1.5, w - 8, 1.2);
+        for (const x of [0, w]) {
+          ctx.fillStyle = shade(d.body, -0.1);
+          ellipse(ctx, x, h / 2, 6, h / 2);
+          ctx.strokeStyle = shade(d.body, -0.4);
+          ctx.lineWidth = 1;
+          for (const r of [4, 2]) {
+            ctx.beginPath();
+            ctx.ellipse(x, h / 2, r, (h / 2) * (r / 6), 0, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+      },
+      // 丸めたマットを、色を変えて積んだ柱
+      pillar(ctx, w, h, d) {
+        const colors = [d.pillar, d.top, d.body];
+        for (let y = 0, i = 0; y < h; y += 22, i++) {
+          const c = colors[i % colors.length];
+          ctx.fillStyle = shade(c, 0.05);
+          ctx.beginPath();
+          ctx.roundRect(w * 0.1, y, w * 0.8, 20, 10);
+          ctx.fill();
+          ctx.strokeStyle = shade(c, -0.3);
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.ellipse(w * 0.1 + 10, y + 10, 6, 8, 0, 0, Math.PI * 2);
+          ctx.stroke();
         }
         pillarShade(ctx, w, h);
       },

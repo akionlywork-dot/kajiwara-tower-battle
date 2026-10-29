@@ -28,6 +28,8 @@
 //            ここに値がある人は、ランキングで専用の枠と札になる。消すと、ふつうの称号の表示に戻る（次に送られたときに、また入る）
 //   achList … 持っている実績（称号）の id の一覧（カンマ区切り）。「プロフィールを公開」が ON の人だけ。
 //            ランキングには出さず、?stats=titles の「みんなの称号の取得率」を数えるのにだけ使う
+//   nameColor … 名前の色の id（NAME_COLORS にあるものだけ。いつもの色なら空）
+//   fav     … お気に入りのキャラの ID（「プロフィールを公開」が ON の人だけ）
 //
 // アップデート予告（ゲームの管理者モードで設定し、タイトル画面に「〇月〇日 〇時にアップデートします」と出す）：
 //   シートではなく、このスクリプトのプロパティ（notice）に1つだけ保存する。?notice=1 で読む
@@ -49,18 +51,21 @@ const NAME_MAX = 10; // 名前の最大文字数（ゲームのプロフィー�
 const TITLE_MAX = 20; // 称号の最大文字数
 const ICON_MAX = 12000; // 写真アイコンの最大の長さ（文字数。1つのセルに入る量より十分小さく）
 const HEADERS = ["id", "name", "score", "count", "height", "date", "hidden", "title", "icon",
-  "ach", "achTotal", "dex", "dexTotal", "bg", "platform", "plays", "pieces", "onlineWins", "onlineLosses", "staff", "achList"];
+  "ach", "achTotal", "dex", "dexTotal", "bg", "platform", "plays", "pieces", "onlineWins", "onlineLosses", "staff", "achList", "nameColor", "fav"];
 const PROFILE_COL = 10; // プロフィールの列が始まる場所（ach の列。1から数える）
 const STAFF_COL = HEADERS.indexOf("staff") + 1; // スタッフの称号の列（1から数える）
 const ACH_LIST_COL = HEADERS.indexOf("achList") + 1; // 持っている実績の id の一覧の列
+const NAME_COLOR_COL = HEADERS.indexOf("nameColor") + 1; // 名前の色・お気に入りのキャラの列（この2つは並んでいる）
+// 名前の色の id（config.js の nameColors のうち、色があるものと同じにする。ここに無い id は保存しない）
+const NAME_COLORS = ["sky", "pink", "orange", "green", "purple", "gold", "rainbow"];
 const ACH_LIST_MAX = 300; // 実績の id の数の上限（おかしな量のデータを保存しないように）
 const STATS_CACHE = 300; // 「みんなの称号の取得率」を覚えておく秒数（毎回シートを全部読まないように）
 const PROFILE_KEYS = HEADERS.slice(PROFILE_COL - 1, STAFF_COL - 1); // ["ach", …, "onlineLosses"]
 // スタッフの称号の id と称号の文字（ゲームの js/frames.js の STAFF と同じにする。ここに無い id は保存しない）
 const STAFF_TITLES = { developer: "開発者", admin: "管理者", employee: "社員", operator: "運営" };
 // 背景・土台の id（config.js の themes の backgrounds・platforms と同じにする。ここに無い id は保存しない）
-const BACKGROUNDS = ["sky", "sunset", "sakura", "night", "galaxy", "halloween_night", "wonderland", "aurora"];
-const PLATFORMS = ["wood", "stone", "ice", "gold", "diamond", "pumpkin", "steel", "cardboard"];
+const BACKGROUNDS = ["sky", "sunset", "sakura", "night", "galaxy", "halloween_night", "wonderland", "aurora", "desert", "rainbow", "golden_night", "dawn"];
+const PLATFORMS = ["wood", "stone", "ice", "gold", "diamond", "pumpkin", "steel", "cardboard", "ship", "wa", "block", "yoga"];
 const MIN_INTERVAL = 5; // 同じ人が続けて送れる間隔（秒）
 // 管理者モードの確認用の番号（config.js の admin.passHash と同じにする）。アップデート予告を書きこめるのは、
 // この番号に合う鍵（管理者モードを開いた端末に保存されている）を送ってきたときだけ。"" なら、だれも書きこめない
@@ -89,6 +94,8 @@ function doGet(e) {
       if (r.icon) row.icon = r.icon;
       if (r.profile) row.profile = r.profile; // プロフィールを公開している人だけ
       if (r.staff) row.staff = r.staff; // スタッフの称号の人だけ
+      if (r.nameColor) row.nameColor = r.nameColor; // 名前の色
+      if (r.profile && r.fav) row.profile.fav = r.fav; // お気に入りのキャラ（プロフィールを公開している人だけ）
       if (mine && r.id === me) row.me = true;
       return row;
     }),
@@ -125,6 +132,8 @@ function doPost(e) {
   const icon = cleanIcon_(d.icon);
   const profile = profileCells_(d.profile); // シートに書く値（公開していなければ、全部 ""）
   const achList = achListCell_(d.profile); // 持っている実績の id の一覧（公開していなければ ""）
+  const nameColor = NAME_COLORS.indexOf(String(d.nameColor || "")) >= 0 ? String(d.nameColor) : "";
+  const fav = d.profile && /^[a-z0-9_]{1,40}$/.test(String(d.profile.fav || "")) ? String(d.profile.fav) : ""; // 公開している人だけ
   const count = Number(d.count);
   const height = Math.round(Number(d.height) * 100) / 100;
   const score = Number(d.score);
@@ -150,13 +159,14 @@ function doPost(e) {
     const today = Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd");
     const found = rows.find((r) => r.id === id);
     if (!found) {
-      sh.appendRow([text_(id), text_(name), score, count, height, text_(today), "", title ? text_(title) : "", icon].concat(profile, [staff, achList]));
+      sh.appendRow([text_(id), text_(name), score, count, height, text_(today), "", title ? text_(title) : "", icon].concat(profile, [staff, achList, nameColor, fav]));
     } else {
       // 名前・称号・アイコンはいつも新しいものに。スコアは前より高いときだけ書きかえる（hidden はそのまま）
       sh.getRange(found.row, 2).setValue(text_(name));
       sh.getRange(found.row, 8, 1, 2).setValues([[title ? text_(title) : "", icon]]);
       sh.getRange(found.row, PROFILE_COL, 1, PROFILE_KEYS.length).setValues([profile]); // 公開をやめた人は、ここで消える
       sh.getRange(found.row, STAFF_COL, 1, 2).setValues([[staff, achList]]); // スタッフの称号をはずした人・公開をやめた人は、ここで消える
+      sh.getRange(found.row, NAME_COLOR_COL, 1, 2).setValues([[nameColor, fav]]);
       if (score > found.score) sh.getRange(found.row, 3, 1, 4).setValues([[score, count, height, text_(today)]]);
     }
     SpreadsheetApp.flush();
@@ -273,6 +283,8 @@ function readRows_(mode) {
     profile: readProfile_(v.slice(PROFILE_COL - 1, STAFF_COL - 1)),
     staff: Object.prototype.hasOwnProperty.call(STAFF_TITLES, String(v[STAFF_COL - 1] || "")) ? String(v[STAFF_COL - 1]) : "",
     achList: String(v[ACH_LIST_COL - 1] || ""),
+    nameColor: NAME_COLORS.indexOf(String(v[NAME_COLOR_COL - 1] || "")) >= 0 ? String(v[NAME_COLOR_COL - 1]) : "",
+    fav: String(v[NAME_COLOR_COL] || ""),
   }));
 }
 
