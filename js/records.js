@@ -13,10 +13,11 @@ const Records = (() => {
 
   // ---------- 記録する（main.js から呼ばれる） ----------
   // キャラを1体積めた（shape：積んだキャラ。レア度・オーラごとの数も数える。実績の判定に使う）
-  function addPiece(shape) {
+  // comp：競技モードのゲームか（競技は全キャラ同じ確率なので、レア度・オーラごとの数には数えない）
+  function addPiece(shape, comp = false) {
     const s = stats();
     s.totalPieces++;
-    if (shape) {
+    if (shape && !comp) {
       const rarity = shape.rarity || "N";
       s.placed = s.placed || {};
       s.placed[rarity] = (s.placed[rarity] || 0) + 1;
@@ -59,6 +60,17 @@ const Records = (() => {
     s.bestHeight = Math.max(s.bestHeight, height);
     const isNew = !s.best || score > s.best.score;
     if (isNew) s.best = { score, count, height };
+    Save.write();
+    return isNew;
+  }
+
+  // 競技モードが終わった。競技のハイスコア（フリーとは別）を更新したら true を返す
+  function addCompResult(score, count, height) {
+    const s = stats();
+    s.compPlays = (s.compPlays || 0) + 1;
+    s.compTotalScore = (s.compTotalScore || 0) + score;
+    const isNew = !s.compBest || score > s.compBest.score;
+    if (isNew) s.compBest = { score, count, height };
     Save.write();
     return isNew;
   }
@@ -156,6 +168,13 @@ const Records = (() => {
       item("最高の積んだ数", `${s.bestCount}<small>体</small>`) +
       item("最高の高さ", `${s.bestHeight.toFixed(2)}<small>m</small>`) +
       `</div>` +
+      `<h3 class="section-title">🏁 競技</h3>` +
+      `<div class="stat-grid">` +
+      item("プレイ回数", `${s.compPlays || 0}<small>回</small>`) +
+      item("ハイスコア", s.compBest ? `${s.compBest.score}<small>点</small>` : "---") +
+      item("平均スコア", s.compPlays ? `${Math.round((s.compTotalScore || 0) / s.compPlays)}<small>点</small>` : "---") +
+      item("最高の積んだ数", s.compBest ? `${s.compBest.count}<small>体</small>` : "---") +
+      `</div>` +
       `<h3 class="section-title">ふたりで</h3>` +
       `<div class="stat-grid">` +
       item("対戦回数", `${s.versusPlays}<small>回</small>`) +
@@ -209,5 +228,5 @@ const Records = (() => {
     return rows ? `<h3 class="section-title">イベント</h3><div class="stat-grid">${rows}</div>` : "";
   }
 
-  return { init, addPiece, addDrawn, addStampSent, addChallengeWin, addEventResult, eventWins, addSoloResult, addRuleResult, addCpuResult, addOnlineResult, addOpponentResult, opponentRecord, addVersusResult };
+  return { init, addPiece, addCompResult, addDrawn, addStampSent, addChallengeWin, addEventResult, eventWins, addSoloResult, addRuleResult, addCpuResult, addOnlineResult, addOpponentResult, opponentRecord, addVersusResult };
 })();

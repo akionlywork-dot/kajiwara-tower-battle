@@ -20,6 +20,7 @@ const Settings = (() => {
     rankingIcon: false, // ランキングに写真アイコンも載せるか（写真を設定している人に、1回だけ聞く）
     onlineIcon: false, // オンライン対戦の相手に、写真アイコンを見せるか（初めは見せない）
     rankingProfile: false, // ランキングでプロフィール（実績の数・図鑑の数など）を公開するか（ランキングに参加している人だけ）
+    compIntro: true, // 競技を選んだときに、ルールの説明を出すか（「次から表示しない」で false）
     adminFps: false, // 管理者モード：FPS を表示
     adminStats: false, // 管理者モード：キャラの数と高さを表示
     adminLoad: false, // 管理者モード：読み込み状況を表示

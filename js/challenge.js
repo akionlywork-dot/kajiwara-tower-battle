@@ -4,7 +4,7 @@
 //
 // URL の形：https://.../?seed=12345&mode=solo&rule=wind&score=1270&name=あき
 //   seed  : キャラの出る順番を決める番号（同じ番号なら、同じ順番でキャラが出る）
-//   mode  : モード（今は "solo" だけ。省略すると solo）
+//   mode  : モード（"solo"：フリー / "comp"：競技。省略すると solo。競技のときは rule を付けない）
 //   rule  : 特殊ルールの名前（config.js の rules。ふつうのルールなら省略）
 //   score : 送った人のスコア
 //   name  : 送った人の名前
@@ -22,7 +22,7 @@ const Challenge = (() => {
   }
 
   // URL のパラメータから挑戦状を読み取る
-  // 返り値：{ seed, mode, rule, score, name } / 挑戦状の URL でなければ null / 値がおかしければ "invalid"
+  // 返り値：{ seed, mode, rule, score, name, comp（競技か） } / 挑戦状の URL でなければ null / 値がおかしければ "invalid"
   function parse(search) {
     const q = new URLSearchParams(search);
     if (!q.has("seed")) return null;
@@ -32,9 +32,9 @@ const Challenge = (() => {
     const rule = q.get("rule") || null;
     // 名前：制御文字を取りのぞき、前後の空白を消して、最大 NAME_MAX 文字
     const name = [...String(q.get("name") || "").replace(/[\u0000-\u001f\u007f]/g, "").trim()].slice(0, NAME_MAX).join("");
-    if (seed === null || score === null || mode !== "solo") return "invalid";
-    if (rule && !Rules.get(rule)) return "invalid";
-    return { seed, mode, rule, score, name: name || "だれか" };
+    if (seed === null || score === null || (mode !== "solo" && mode !== "comp")) return "invalid";
+    if (rule && (mode === "comp" || !Rules.get(rule))) return "invalid";
+    return { seed, mode, rule, score, name: name || "だれか", comp: mode === "comp" };
   }
 
   // 整数の文字列なら数に、そうでなければ null（範囲外も null）
@@ -45,8 +45,8 @@ const Challenge = (() => {
   }
 
   // 挑戦状の URL を作る（今開いているページの URL に、パラメータを付ける）
-  function makeUrl({ seed, rule, score, name }) {
-    const q = new URLSearchParams({ seed: String(seed), mode: "solo" });
+  function makeUrl({ seed, rule, score, name, comp }) {
+    const q = new URLSearchParams({ seed: String(seed), mode: comp ? "comp" : "solo" });
     if (rule) q.set("rule", rule);
     q.set("score", String(score));
     q.set("name", name);

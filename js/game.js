@@ -45,6 +45,11 @@ const Game = (() => {
   let engine;
   let worldH = 800;
   let viewScale = 1; // ゲーム座標 → 画面のピクセル の倍率
+  // ゲームの場（幅 WORLD_W の範囲）を、キャンバスのどこに描くか（画面のピクセル）。
+  // 場の幅は「画面の高さ × 9/16」まで。キャンバスがそれより広いとき（パソコンの横長の画面など）は、
+  // 場を真ん中に置き、左右には背景（空・雲・地面）だけを広げて描く。ゲームの中身（WORLD_W・土台・物理）は同じ
+  let fieldLeft = 0;
+  let fieldW = 1;
   let camY = 0; // カメラの位置（画面の一番上が、ゲーム内のどの y か）
   let camTargetY = 0; // カメラが向かう先
   let platform; // 土台
@@ -115,7 +120,11 @@ const Game = (() => {
     const ch = canvas.clientHeight;
     canvas.width = Math.round(cw * dpr);
     canvas.height = Math.round(ch * dpr);
-    viewScale = cw / WORLD_W;
+    // スマホ（縦長）は、今までどおりキャンバスの幅いっぱいが場（計算の誤差で場が少しずれないよう、2px のゆとり）
+    const maxField = (ch * 9) / 16;
+    fieldW = cw <= maxField + 2 ? cw : maxField;
+    fieldLeft = (cw - fieldW) / 2;
+    viewScale = fieldW / WORLD_W;
     worldH = ch / viewScale;
     // ゲームやデモをしていないときは、土台の位置を画面に合わせなおす（背景の絵のため）
     if (!engine) platformTop = worldH - DEMO_PLATFORM_FROM_BOTTOM;
@@ -147,6 +156,8 @@ const Game = (() => {
           b.landed = true;
           // 最後に落としたキャラが着地したら「置いた音」を鳴らす
           if (b === dropped && callbacks.onLand) callbacks.onLand();
+          // ★5（まぼろし）は、着地した瞬間に虹色の光がはじける（aura.js。タイトルのデモではしない）
+          if (b === dropped && state !== "demo") Aura.burst(b.shape, b.position.x, b.position.y);
         }
       }
     });
@@ -181,6 +192,8 @@ const Game = (() => {
 
     // 特殊ルール（rules.js）。無ければ null
     rule = (opts && opts.rule) || null;
+    // competitive：競技モードのルール（config.js の competitive）。競技でなければ null
+    comp = (opts && opts.competitive) || null;
     // fair：オンライン対戦（相手にも同じキャラが出る）。管理者モードの「次に出すキャラ」や、
     //   テスト日付・イベントの確認表示を使わず、実際の日付で抽選する（相手に影響しないように）
     fair = !!(opts && opts.fair);
@@ -222,7 +235,8 @@ const Game = (() => {
 
   // キャラの形（特殊ルールで大きさが変わることがある）
   function ruleShape(shape) {
-    const scale = rule && rule.shapeScale ? rule.shapeScale(rule.params) : 1;
+    // 競技：全キャラ同じ大きさ（competitive.scale。1 なら標準の大きさ）
+    const scale = comp ? Number(comp.scale) || 1 : rule && rule.shapeScale ? rule.shapeScale(rule.params) : 1;
     return scale === 1 ? shape : Shape.scaled(shape, scale);
   }
 
@@ -269,6 +283,7 @@ const Game = (() => {
     if (!shapes.length) return;
     callbacks = {};
     rule = null;
+    comp = null;
     createWorld(DEMO_PLATFORM_FROM_BOTTOM);
     state = "demo";
     demo = {
@@ -505,6 +520,7 @@ const Game = (() => {
     photo = null;
     paused = false;
     fair = false;
+    comp = null;
     createWorld(PLATFORM_FROM_BOTTOM);
     setTurnTimeLimit(0);
     state = "sandbox";
@@ -643,6 +659,7 @@ const Game = (() => {
   // 管理者モード：次に出すキャラを決めておく（キャラの ID。null ならふつうにランダム）
   let forcedId = null;
   let fair = false; // オンライン対戦のゲームか（start の opts.fair）
+  let comp = null; // 競技モードのルール（config.js の competitive。start の opts.competitive）。競技でなければ null
   function setForcedShape(id) {
     forcedId = id;
   }
@@ -677,12 +694,15 @@ const Game = (() => {
   }
 
   // キャラの出やすさ（weight）。0 なら出ない
-  const chance = (s) => (typeof s.weight === "number" ? Math.max(0, s.weight) : 1);
+  const chanceOf = (s) => (typeof s.weight === "number" ? Math.max(0, s.weight) : 1);
 
   // キャラを選ぶ。出やすさ（weight）に合わせて、くじ引きのように選ぶ（同じキャラが2回続かないように）
   function randomShape() {
-    // 期間限定のキャラは、イベントの期間中だけ出る（events.js）
-    const open = shapes.filter((s) => LimitedEvents.available(s, fair));
+    // 期間限定のキャラは、イベントの期間中だけ出る（events.js）。
+    // 競技：出てくるキャラは Chars.inCompetitive のものだけ（期間限定・サイズ違い・★4・★5 は出ない）
+    const open = comp ? shapes.filter((s) => Chars.inCompetitive(s)) : shapes.filter((s) => LimitedEvents.available(s, fair));
+    // 競技（equalChance）：全キャラ同じ確率（レア度・weight を使わない）
+    const chance = comp && comp.equalChance !== false ? () => 1 : chanceOf;
     const pool = open.length > 1 ? open.filter((s) => s !== lastShape) : open.length ? open : shapes;
     // 出やすさが 0 のキャラ（まぼろしなど、まだ登場しないキャラ）は選ばれない
     const total = pool.reduce((sum, s) => sum + chance(s), 0);
@@ -702,8 +722,10 @@ const Game = (() => {
 
   // 開発者用：n 回抽選して、キャラごとの出た回数を返す（Map：キャラの ID → 回数）。
   // 本物と同じ選び方（同じキャラが続かない決まりも同じ）。今のゲームの順番には影響しない
-  function drawTest(n) {
-    const saved = { last: lastShape, rand: pieceRandom };
+  // competitive：競技のルール（config.js の competitive）で抽選する
+  function drawTest(n, competitive = null) {
+    const saved = { last: lastShape, rand: pieceRandom, comp };
+    comp = competitive;
     pieceRandom = Math.random;
     lastShape = null;
     const counts = new Map();
@@ -713,6 +735,7 @@ const Game = (() => {
     }
     lastShape = saved.last;
     pieceRandom = saved.rand;
+    comp = saved.comp;
     return counts;
   }
 
@@ -747,9 +770,10 @@ const Game = (() => {
     lastDropLeft = null;
   }
 
-  function rotate() {
+  // dir：1 なら右回り、-1 なら左回り（キーボードの Q）
+  function rotate(dir = 1) {
     if (paused || state !== "aim" || !held) return;
-    held.angle += Math.PI / 4; // 45度
+    held.angle += (dir < 0 ? -1 : 1) * (Math.PI / 4); // 45度
     rotations++;
     flipRun = 0;
     clampHeld();
@@ -798,6 +822,7 @@ const Game = (() => {
     remote = true;
     remoteBodies = new Map();
     awaitingDrop = false;
+    comp = null;
     state = "remote";
     resetCounters();
   }
@@ -1215,11 +1240,12 @@ const Game = (() => {
   function draw() {
     const dpr = window.devicePixelRatio || 1;
     if (photo) photo.view.h = photo.view.w * (canvas.height / canvas.width); // 画面の形が変わっても合わせる
-    const v = photo ? photo.view : { left: 0, top: camY, w: WORLD_W, h: worldH };
+    // ふだん：場の左右に広がった背景もふくめて、キャンバスの幅いっぱいを写す（k：1 ＝ 拡大・縮小していない）
+    const v = photo ? photo.view : { left: -fieldLeft / viewScale, top: camY, w: canvas.clientWidth / viewScale, h: worldH, k: 1 };
     renderScene(ctx, v, (canvas.width / v.w), !photo);
-    // 特殊ルールの表示（風の筋など。画面の座標で描く）
+    // 特殊ルールの表示（風の筋など。場の座標で描く）
     if (!photo && rule && rule.draw) {
-      ctx.setTransform(viewScale * dpr, 0, 0, viewScale * dpr, 0, 0);
+      ctx.setTransform(viewScale * dpr, 0, 0, viewScale * dpr, fieldLeft * dpr, 0);
       rule.draw(ctx, ruleAPI, rule.params, rule.state);
     }
   }
@@ -1339,12 +1365,14 @@ const Game = (() => {
     if (photo) return;
     const aspect = canvas.width / canvas.height;
     const fit = fitView(aspect, sceneBounds(), 0.06);
-    // 塔が低いときも、ふだんの画面より拡大はしない（下の端はそのままで、幅を画面と同じにする）
-    if (fit.w < WORLD_W) {
+    // 塔が低いときも、ふだんの画面より拡大はしない（下の端はそのままで、幅を画面と同じにする。
+    // 横長の画面では、場の左右に広がった背景の分もふくめた幅）
+    const normalW = canvas.clientWidth / viewScale;
+    if (fit.w < normalW) {
       const bottom = fit.top + fit.h;
-      fit.left = fit.left + fit.w / 2 - WORLD_W / 2;
-      fit.w = WORLD_W;
-      fit.h = WORLD_W / aspect;
+      fit.left = fit.left + fit.w / 2 - normalW / 2;
+      fit.w = normalW;
+      fit.h = normalW / aspect;
       fit.top = bottom - fit.h;
     }
     photo = { view: fit, fitW: fit.w, wasPaused: paused };
@@ -1488,7 +1516,7 @@ const Game = (() => {
   // 空・雲・星は「遠くにある」ので、写す範囲いっぱいに、画面上の大きさを変えずに描く
   // （k：ふだんの画面に比べて、何倍の範囲を写しているか）
   function drawBackground() {
-    const k = view.w / WORLD_W;
+    const k = view.k || view.w / WORLD_W;
     const sky = skyAt(skyHeight);
     const g = ctx.createLinearGradient(0, view.top, 0, view.top + view.h);
     g.addColorStop(0, sky.top);
@@ -1942,8 +1970,25 @@ const Game = (() => {
     // 自由配置モード（管理者モード）：タップした場所にキャラを置く・置いたキャラをドラッグで動かす
     const worldPoint = (e) => {
       const r = canvas.getBoundingClientRect();
-      return { x: (e.clientX - r.left) / viewScale, y: camY + (e.clientY - r.top) / viewScale };
+      return { x: (e.clientX - r.left - fieldLeft) / viewScale, y: camY + (e.clientY - r.top) / viewScale };
     };
+
+    // ---------- マウス（パソコン） ----------
+    // マウスのときだけ（指・ペンは今までどおりドラッグ）：カーソルを左右に動かすと、持っているキャラが追いかける。
+    // 左クリックで落とす、右クリック・ホイールで回転（右クリックのメニューは出さない）。
+    // 「指を離したら落とす」の設定は、マウスでは「クリックで落とす」と同じ扱い
+    const isMouse = (e) => e.pointerType === "mouse";
+    // マウスで持っているキャラを動かせるか（相手の番・CPU の番・ポーズ中は動かせない。main.js が setInputEnabled で止める）
+    const mouseReady = () => !photo && !paused && inputEnabled && !!held && (state === "aim" || state === "remote");
+    // 誤って落とさないように：場の外（左右の背景）・画面の上のスコアのあたり・キャラが出てすぐのクリックは、落とさない
+    const MOUSE_TOP_GUARD = 70; // 画面の上から何ピクセルまでを、クリックしても落とさないか
+    const MOUSE_READY_MS = 250; // キャラが出てから、何ミリ秒はクリックしても落とさないか
+    const clickInField = (e) => {
+      const p = local(e);
+      return p.x >= fieldLeft && p.x <= fieldLeft + fieldW && p.y > MOUSE_TOP_GUARD;
+    };
+    let wheelAt = 0;
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     canvas.addEventListener("pointerdown", (e) => {
       if (state === "sandbox") {
         canvas.setPointerCapture(e.pointerId);
@@ -1954,6 +1999,15 @@ const Game = (() => {
         canvas.setPointerCapture(e.pointerId);
         fingers.set(e.pointerId, local(e));
         if (fingers.size === 2) pinchDist = fingerDist();
+        return;
+      }
+      if (isMouse(e)) {
+        if (!mouseReady()) return;
+        notifyInput("mouse");
+        if (e.button === 2) return rotate(); // 右クリック：回転
+        if (e.button !== 0 || !clickInField(e)) return;
+        if (state === "aim" && simTime - aimStartAt < MOUSE_READY_MS) return;
+        drop(); // 左クリック：落とす
         return;
       }
       if (paused || state !== "aim" || !inputEnabled) return;
@@ -1980,6 +2034,11 @@ const Game = (() => {
         }
         return;
       }
+      if (isMouse(e)) {
+        // マウス：カーソルの位置に、持っているキャラを合わせる（ボタンを押さなくてよい）
+        if (mouseReady()) moveHeldTo((local(e).x - fieldLeft) / viewScale);
+        return;
+      }
       if (!dragging || paused) return;
       const dx = (e.clientX - lastX) / viewScale;
       lastX = e.clientX;
@@ -2004,13 +2063,28 @@ const Game = (() => {
     canvas.addEventListener(
       "wheel",
       (e) => {
-        if (!photo) return;
+        if (!photo) {
+          // ホイール：回転（下に回すと右回り、上に回すと左回り。続けて回りすぎないように少し間をあける）
+          if (!mouseReady()) return;
+          e.preventDefault();
+          const now = performance.now();
+          if (now - wheelAt < 150 || Math.abs(e.deltaY) < 1) return;
+          wheelAt = now;
+          notifyInput("mouse");
+          rotate(e.deltaY > 0 ? 1 : -1);
+          return;
+        }
         e.preventDefault();
         const p = local(e);
         photoZoom(Math.exp(-e.deltaY * 0.0015), p.x, p.y);
       },
       { passive: false }
     );
+  }
+
+  // マウス・キーボードを使ったことを知らせる（controls.js が、操作のヒントを出す）
+  function notifyInput(kind) {
+    if (typeof Controls !== "undefined") Controls.used(kind);
   }
 
   function setDebug(on) {
@@ -2031,6 +2105,7 @@ const Game = (() => {
     get platformSize() { return platformSize; }, // 土台と柱の大きさ（プロフィールの見本の絵に使う）
     get state() { return state; },
     get rotations() { return rotations; }, // このゲームで回転を使った回数
+    get competitive() { return !!comp; }, // 競技モードのゲームか
     // 実績のための数：反転を使った回数・続けて反転を押した一番多い数・出たキャラの ID（最後の数体）・最後に落としたときの制限時間の残り
     get flips() { return flips; },
     get flipStreak() { return flipStreak; },
@@ -2038,6 +2113,8 @@ const Game = (() => {
     get lastDropLeft() { return lastDropLeft; },
     get paused() { return paused; },
     get heldX() { return held ? held.x : WORLD_W / 2; }, // 持っているキャラの位置
+    get hasHeld() { return !!held; }, // キャラを持っているか（キーボードで動かせるか）
+    get turnTimeLeft() { return timeLeft(); }, // 今の手番の、制限時間の残り（ミリ秒。制限がなければ null）
     // ゲーム中（ポーズできる状態）か
     get playing() { return !!engine && ["aim", "falling", "settled"].includes(state); },
     // デバッグ用：ブラウザのコンソールから Game.debugInfo() で中身を確認できる

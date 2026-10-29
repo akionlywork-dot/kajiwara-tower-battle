@@ -51,6 +51,10 @@ const Save = (() => {
         drawn: {}, // レア度ごとの、自分の番に出た数（積めなくても数える。例 { MR: 1 }）
         stampsSent: 0, // オンライン対戦のリザルトで送ったスタンプの数
         challengeWins: 0, // 挑戦状で、相手のスコアを上回った回数
+        // 競技モード（フリーのスコアアタックとは別に記録する）
+        compPlays: 0, // プレイ回数
+        compTotalScore: 0, // スコアの合計（平均を出すため）
+        compBest: null, // 競技のハイスコア { score, count, height }
       },
       // 実績の世代番号（config.js の achievementsEpoch）。config の番号の方が大きければ、1回だけ実績と戦績をリセットする
       //   epochResetNotice：リセットしたことを、次にタイトル画面が出たときに知らせるか
@@ -63,6 +67,8 @@ const Save = (() => {
         asked: false, // 「ランキングに送りますか？」を聞いたか
         iconAsked: false, // 「写真アイコンも載せますか？」を聞いたか
         sentScore: 0, // 最後に送ったスコア（これより高くなったら、また送る）
+        sentScoreComp: 0, // 競技のランキングに最後に送ったスコア
+        sentProfileComp: "", // 競技のランキングに最後に送った名前・称号・アイコンの目印
         sentProfile: "", // 最後に送った名前・称号・アイコンの目印（変えたら、また送る）
         lastRank: null, // 最後に分かった自分の順位（ランキングを開いた・送ったとき。オンライン対戦の対戦カードに出す）
       },

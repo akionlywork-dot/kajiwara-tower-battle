@@ -4,7 +4,13 @@
 // Google スプレッドシートの「拡張機能 → Apps Script」に、このファイルの中身を全部貼り付けて
 // 「ウェブアプリ」としてデプロイする。手順は README の「ランキング（オンライン）」を参照。
 //
-// シート「ranking」に、1人1行（その人の一番いいスコア）で記録する：
+// ランキングは2つ。どちらも1人1行（その人の一番いいスコア）で記録する：
+//   フリー（いつものスコアアタック）… シート「ranking」
+//   競技（config.js の competitive）… シート「ranking_comp」（無ければ自動で作る）
+//   ゲームが送ってくる mode が "comp" なら競技、それ以外（"free"・古いバージョンで mode が無い）ならフリー。
+//   ゲームが読みに来るときも ?mode=comp で競技、無ければフリー。返す JSON に mode を入れる
+//   （ゲームは、mode: "comp" が返ってくる＝このファイルが競技に対応している、と分かってから競技のスコアを送る）
+// 列（どちらのシートも同じ）：
 //   id     … 端末ごとのランダムな番号（ランキングの画面には出ない）
 //   name   … 名前
 //   score / count / height … スコア・積んだ数・高さ（m）
@@ -20,7 +26,16 @@
 //   onlineWins / onlineLosses … オンライン対戦の勝ち・負け
 // =============================================
 
-const SHEET_NAME = "ranking";
+// ランキングの種類ごとのシートの名前と、スコアの計算（config.js の score・competitive と同じにする）：
+//   スコア ＝ 積んだ数 × perPiece ＋ 高さ(m) × perMeter
+const PER_PIECE = 100;
+const PER_METER = 100;
+const COMP_PER_PIECE = 100; // config.js の competitive.perPiece
+const COMP_PER_METER = 100; // config.js の competitive.perMeter
+const MODES = {
+  free: { sheet: "ranking", perPiece: PER_PIECE, perMeter: PER_METER },
+  comp: { sheet: "ranking_comp", perPiece: COMP_PER_PIECE, perMeter: COMP_PER_METER },
+};
 const TOP = 100; // ランキングに出す人数
 const NAME_MAX = 10; // 名前の最大文字数（ゲームのプロフィールと同じ）
 const TITLE_MAX = 20; // 称号の最大文字数
@@ -30,21 +45,21 @@ const HEADERS = ["id", "name", "score", "count", "height", "date", "hidden", "ti
 const PROFILE_COL = 10; // プロフィールの列が始まる場所（ach の列。1から数える）
 const PROFILE_KEYS = HEADERS.slice(PROFILE_COL - 1); // ["ach", …, "onlineLosses"]
 // 背景・土台の id（config.js の themes の backgrounds・platforms と同じにする。ここに無い id は保存しない）
-const BACKGROUNDS = ["sky", "sunset", "sakura", "night", "galaxy", "halloween_night"];
-const PLATFORMS = ["wood", "stone", "ice", "gold", "diamond", "pumpkin"];
-// スコアの計算（config.js の score と同じにする）：積んだ数 × PER_PIECE ＋ 高さ(m) × PER_METER
-const PER_PIECE = 100;
-const PER_METER = 100;
+const BACKGROUNDS = ["sky", "sunset", "sakura", "night", "galaxy", "halloween_night", "wonderland", "aurora"];
+const PLATFORMS = ["wood", "stone", "ice", "gold", "diamond", "pumpkin", "steel", "cardboard"];
 const MIN_INTERVAL = 5; // 同じ人が続けて送れる間隔（秒）
 const TZ = "Asia/Tokyo";
 
 // ---------- ランキングを返す（ゲームのランキング画面が読みに来る） ----------
-// ?me=端末の番号 を付けると、その人の順位も返す
+// ?mode=comp で競技（無ければフリー）。?me=端末の番号 を付けると、その人の順位も返す
 function doGet(e) {
-  const me = e && e.parameter ? String(e.parameter.me || "") : "";
-  const list = ranked_(readRows_());
+  const p = e && e.parameter ? e.parameter : {};
+  const mode = modeOf_(p.mode);
+  const me = String(p.me || "");
+  const list = ranked_(readRows_(mode));
   const mine = me ? list.find((r) => r.id === me) : null;
   return json_({
+    mode: mode,
     updated: Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd HH:mm"),
     total: list.length,
     ranking: list.slice(0, TOP).map((r) => {
@@ -59,7 +74,8 @@ function doGet(e) {
 }
 
 // ---------- スコアを受け取る（ゲームが自動で送ってくる） ----------
-// 本文（JSON）：{ id, name, title, icon, score, count, height, profile }
+// 本文（JSON）：{ mode, id, name, title, icon, score, count, height, profile }
+//   mode … "comp" なら競技のシート、それ以外（"free"・無い）ならフリーのシートに書く
 //   profile … 「ランキングでプロフィールを公開」が ON の人だけ。OFF の人・古いバージョンからは届かない（そのときは消す）
 //     { ach: [達成数, 全部], dex: [登録数, 全部], bg, platform, plays, pieces, online: [勝ち, 負け] }
 function doPost(e) {
@@ -69,6 +85,8 @@ function doPost(e) {
   } catch (err) {
     return json_({ ok: false, error: "bad request" });
   }
+  const mode = modeOf_(d.mode);
+  const conf = MODES[mode];
   const id = String(d.id || "");
   if (!/^[0-9a-zA-Z-]{16,64}$/.test(id)) return json_({ ok: false, error: "bad id" });
   const name = cleanName_(d.name);
@@ -82,20 +100,21 @@ function doPost(e) {
   const ok =
     Number.isInteger(count) && count >= 0 && count <= 500 &&
     height >= 0 && height <= 200 &&
-    Number.isInteger(score) && Math.abs(score - (count * PER_PIECE + Math.floor(Number(d.height) * PER_METER))) <= 1;
+    Number.isInteger(score) && Math.abs(score - (count * conf.perPiece + Math.floor(Number(d.height) * conf.perMeter))) <= 1;
   if (!ok) return json_({ ok: false, error: "bad score" });
 
-  // 短い間に何度も送ってくるのを防ぐ
+  // 短い間に何度も送ってくるのを防ぐ（フリーと競技は別に数える。ゲームは2つを続けて送るため）
   const cache = CacheService.getScriptCache();
-  if (cache.get("t:" + id)) return json_({ ok: false, error: "too fast" });
-  cache.put("t:" + id, "1", MIN_INTERVAL);
+  const key = "t:" + (mode === "free" ? "" : mode + ":") + id;
+  if (cache.get(key)) return json_({ ok: false, error: "too fast" });
+  cache.put(key, "1", MIN_INTERVAL);
 
   // 同時に書きこまないように、順番待ちをする
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const sh = sheet_();
-    const rows = readRows_();
+    const sh = sheet_(mode);
+    const rows = readRows_(mode);
     const today = Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd");
     const found = rows.find((r) => r.id === id);
     if (!found) {
@@ -108,20 +127,27 @@ function doPost(e) {
       if (score > found.score) sh.getRange(found.row, 3, 1, 4).setValues([[score, count, height, text_(today)]]);
     }
     SpreadsheetApp.flush();
-    const list = ranked_(readRows_());
+    const list = ranked_(readRows_(mode));
     const mine = list.find((r) => r.id === id);
-    return json_({ ok: true, rank: mine ? mine.rank : null, total: list.length });
+    return json_({ ok: true, mode: mode, rank: mine ? mine.rank : null, total: list.length });
   } finally {
     lock.release();
   }
 }
 
 // ---------- ここから下は、上で使う部品 ----------
-function sheet_() {
+// "comp" なら競技、それ以外はフリー
+function modeOf_(v) {
+  return String(v || "") === "comp" ? "comp" : "free";
+}
+
+// その種類のシート（無ければ、見出しの行（hidden の列もふくむ）を付けて作る）
+function sheet_(mode) {
+  const name = MODES[modeOf_(mode)].sheet;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sh = ss.getSheetByName(SHEET_NAME);
+  let sh = ss.getSheetByName(name);
   if (!sh) {
-    sh = ss.insertSheet(SHEET_NAME);
+    sh = ss.insertSheet(name);
     sh.appendRow(HEADERS);
     sh.setFrozenRows(1);
   } else if (String(sh.getRange(1, HEADERS.length).getValue()) !== HEADERS[HEADERS.length - 1]) {
@@ -131,9 +157,9 @@ function sheet_() {
   return sh;
 }
 
-// シートの全員分（見出しの行は除く）
-function readRows_() {
-  const values = sheet_().getDataRange().getValues();
+// その種類のシートの全員分（見出しの行は除く）
+function readRows_(mode) {
+  const values = sheet_(mode).getDataRange().getValues();
   values.shift();
   return values.map((v, i) => ({
     row: i + 2,

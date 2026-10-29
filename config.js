@@ -7,7 +7,7 @@ window.GAME_CONFIG = {
   achievementsEpoch: 2,
 
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v2.0.0",
+  version: "v3.1.0",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -157,14 +157,14 @@ window.GAME_CONFIG = {
   //   stars  : 図鑑に表示する★の数
   //   ※ 管理者モードの「出現率のテスト」で、1万回抽選した実際の回数を確かめられる
   rarity: {
-    N: { name: "ふつう", rate: 79.89, color: "#b9c4d6", stars: 1 },
+    N: { name: "ふつう", rate: 76.5, color: "#b9c4d6", stars: 1 },
     R: { name: "レア", rate: 15, color: "#3d9bff", stars: 2 },
     // ★3：サイズ違いのキャラ（characters.js の variant）も、このレア度
     SR: { name: "めっちゃレア", rate: 5, color: "#ffc21a", stars: 3 },
     // ★4：オーラをまとったキャラ（characters.js の aura）
-    UR: { name: "みたことない", rate: 0.1, color: "#ff5ec8", stars: 4 },
+    UR: { name: "みたことない", rate: 2.5, color: "#ff5ec8", stars: 4 },
     // ★5：まぼろし。出ると、画面が虹色に光る専用の演出（「まぼろし！！！」）。図鑑では専用の枠、まだのキャラは「？」
-    MR: { name: "まぼろし", rate: 0.01, color: "#7ef0ff", stars: 5 },
+    MR: { name: "まぼろし", rate: 1, color: "#7ef0ff", stars: 5 },
   },
 
   // サイズ違いのキャラ（characters.js の variant: "big" / "small"）
@@ -206,6 +206,19 @@ window.GAME_CONFIG = {
     // 「始める」を送ってから演出を始めるまでのゆとり。2台で同じ時刻に始めるため、
     // 届くまでの時間（つないだときに測る）を差し引いて、相手に「〇秒後に始めて」と伝える
     introLead: 0.7,
+  },
+
+  // 競技モード（「ひとりで」の「競技」。ランキング（競技）の対象）
+  // みんなが同じ条件で競うためのルール。特殊ルールのギミック・期間限定のキャラはなし。
+  // 競技で出たキャラは図鑑に登録しない。レア度の数・レア度の実績（★3を積むなど）にも数えない
+  competitive: {
+    rarities: ["N", "R", "SR"], // 出てくるキャラのレア度（★1〜★3）。サイズ違い（variant）・★4・★5・期間限定のキャラは出さない
+    equalChance: true, // 確率：true なら、出てくるキャラ全部が同じ確率（レア度・weight を使わない）
+    scale: 1, // 大きさ：全キャラ同じ倍率（1 ＝ 標準の大きさ）
+    // 点数：積んだ数 × perPiece ＋ 高さ(m) × perMeter（全キャラ同じ点数）。
+    // 変えるときは、server/ranking.gs の COMP_PER_PIECE・COMP_PER_METER も同じ数にする
+    perPiece: 100,
+    perMeter: 100,
   },
 
   // 特殊ルール（モード選択の「特殊ルール」から選ぶ。1人モードで遊ぶ）

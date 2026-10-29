@@ -61,6 +61,18 @@
       }
     },
     {
+      "id": "stack50",
+      "name": "50体積み",
+      "title": "積み上げ界の幻",
+      "rank": "mythic",
+      "description": "1回のゲームで、自分で50体積んだ（対戦では、相手が積んだ分は数えない）",
+      "category": "積む",
+      "condition": {
+        "type": "ownCount",
+        "value": 50
+      }
+    },
+    {
       "id": "flip10",
       "name": "鏡の世界",
       "title": "鏡の魔術師",
@@ -140,7 +152,7 @@
       "name": "1000点突破",
       "title": "スコアラー",
       "rank": "bronze",
-      "description": "スコアアタックで1000点以上をとった",
+      "description": "どのモードでも1000点以上をとった",
       "condition": {
         "type": "score",
         "value": 1000
@@ -152,7 +164,7 @@
       "name": "2000点突破",
       "title": "ハイスコアラー",
       "rank": "silver",
-      "description": "スコアアタックで2000点以上をとった",
+      "description": "どのモードでも2000点以上をとった",
       "category": "スコア",
       "condition": {
         "type": "score",
@@ -164,11 +176,23 @@
       "name": "3000点突破",
       "title": "伝説のスコアラー",
       "rank": "legend",
-      "description": "スコアアタックで3000点以上をとった",
+      "description": "どのモードでも3000点以上をとった",
       "category": "スコア",
       "condition": {
         "type": "score",
         "value": 3000
+      }
+    },
+    {
+      "id": "score5000",
+      "name": "5000点突破",
+      "title": "幻のスコアラー",
+      "rank": "mythic",
+      "description": "どのモードでも5000点以上をとった",
+      "category": "スコア",
+      "condition": {
+        "type": "score",
+        "value": 5000
       }
     },
     {

@@ -262,7 +262,8 @@ const HalloweenHome = (() => {
     const fog = conf().fog || {};
     const fx = still ? 0 : ((t * (fog.speed == null ? 8 : fog.speed)) % W + W) % W;
     ctx.globalAlpha = fog.alpha == null ? 0.8 : fog.alpha;
-    for (const ox of [-W, 0]) ctx.drawImage(s.fog.canvas, fx + ox, groundY - 70, s.fog.w, s.fog.h);
+    // パソコンの横長の画面では、場の左右にも背景が広がるので、霧も左右に3つずつ多めに並べる
+    for (let ox = -4 * W; ox <= 3 * W; ox += W) ctx.drawImage(s.fog.canvas, fx + ox, groundY - 70, s.fog.w, s.fog.h);
     ctx.globalAlpha = 1;
     drawGhosts(ctx, groundY, t, still);
   }

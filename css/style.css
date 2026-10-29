@@ -1779,6 +1779,108 @@ select {
   margin-bottom: var(--space-s);
 }
 
+/* ---------- 競技モード ---------- */
+/* ゲーム中・リザルト・挑戦状の「🏁 競技」の札（特殊ルールの紫とちがう、青緑） */
+.rule-tag.comp-tag {
+  background: rgba(20, 150, 140, 0.9);
+}
+
+/* 「ひとりで」の画面の、競技のボタンと「ランキング（競技）対象」の札 */
+.rule-row.rule-comp {
+  margin-top: var(--space-s);
+  background: linear-gradient(120deg, rgba(20, 150, 140, 0.45), rgba(40, 90, 160, 0.35));
+}
+
+.ranking-tag.ranking-tag-comp {
+  color: #fff;
+  background: #14968c;
+}
+
+/* レアの表示に書きそえる「競技なので図鑑には登録されません」 */
+.rare-banner .rare-nodex {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 10px;
+  border-radius: var(--radius-round);
+  color: #fff;
+  background: rgba(20, 30, 55, 0.75);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: bold;
+}
+
+/* 競技の説明のダイアログ */
+.comp-dialog-box {
+  text-align: left;
+}
+
+.comp-dialog-title {
+  margin: 0 0 var(--space-s);
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.comp-dialog-rules {
+  margin: 0 0 var(--space-m);
+  padding-left: 1.2em;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.comp-dialog-rules li + li {
+  margin-top: 4px;
+}
+
+.comp-dialog-rules .comp-dialog-warn {
+  color: #ffd84d;
+}
+
+.comp-dialog-hide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-s);
+  margin-bottom: var(--space-m);
+  font-size: 14px;
+}
+
+.comp-dialog-hide input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-primary);
+}
+
+/* ランキング画面の上の「フリー / 競技」のタブ */
+.ranking-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 0 var(--space-m) var(--space-s);
+  padding: 4px;
+  border-radius: var(--radius-round);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.ranking-tab {
+  height: 36px;
+  border: 0;
+  border-radius: var(--radius-round);
+  color: inherit;
+  background: transparent;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: bold;
+  opacity: 0.75;
+  cursor: pointer;
+}
+
+.ranking-tab.active {
+  color: var(--color-text-dark);
+  background: #fff;
+  opacity: 1;
+}
+
 /* 危ない操作（リセットなど）のボタン */
 .btn.btn-danger {
   display: flex;
@@ -4739,4 +4841,351 @@ button.rank-row:active {
 
 .rp-stat.wide b {
   font-size: 17px;
+}
+
+/* =============================================
+   パソコン（マウス・キーボード・横長の画面）
+   パソコン向けにするかは、機種名ではなく、画面の幅と (hover: hover) and (pointer: fine) で決める。
+   スマホ（指で操作する機器）には、ここのレイアウトは効かない（ヒントの見た目・選んでいる枠だけは共通）
+   ============================================= */
+
+/* キーボードで選んでいるボタンがわかる枠（Tab で選んだときだけ。指やマウスで押したときは出ない） */
+.btn:focus-visible,
+.menu-icon:focus-visible,
+.list-row:focus-visible,
+.profile-chip:focus-visible,
+.toggle:focus-visible,
+.ranking-tab:focus-visible,
+.theme-tile:focus-visible,
+.title-row:focus-visible,
+.dex-card:focus-visible,
+button:focus-visible {
+  outline: 3px solid var(--color-gold);
+  outline-offset: 3px;
+}
+
+/* キーの名前（設定画面の「操作方法」・ヒント・右のパネル） */
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 1px 7px;
+  border-radius: 6px;
+  color: var(--color-text-dark);
+  background: #fff;
+  box-shadow: 0 2px 0 #b9c4d6;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: bold;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* 操作の一覧（設定画面の「操作方法」・横長の画面の右のパネル） */
+.controls-help h4,
+.side-keys h4 {
+  margin: var(--space-s) 0 4px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.control-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.control-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  padding: 4px 0;
+  font-size: 13px;
+  text-align: left;
+}
+
+.control-list kbd {
+  flex-shrink: 0;
+}
+
+.settings-controls .controls-help {
+  padding: var(--space-s) var(--space-m);
+  border-radius: var(--radius-s);
+  background: var(--color-panel);
+}
+
+/* キーやマウスを初めて使ったときの、操作のヒント（画面の下に少しのあいだ出る。タップは下に通す） */
+.control-hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(110px + var(--safe-bottom));
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  width: max-content;
+  max-width: 92%;
+  padding: 8px 14px;
+  border-radius: var(--radius-m);
+  font-size: 13px;
+  font-weight: bold;
+  background: rgba(20, 30, 55, 0.82);
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition: opacity 0.3s, transform 0.3s;
+  pointer-events: none;
+}
+
+.control-hint.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.control-hint span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 横長の画面の左右のパネル（ふだんは出さない） */
+.side-panel {
+  display: none;
+}
+
+/* ---------- タブレット（幅が中くらい）：今の縦長の表示を、少し大きくする ----------
+   ゲームの場は game.js が「画面の高さ × 9/16」までにするので、広がった分は左右の背景になる（ゲームの条件は同じ） */
+@media (min-width: 700px) and (max-width: 1023.98px) {
+  #app {
+    max-width: calc(100vh * 2 / 3);
+    max-width: calc(100dvh * 2 / 3);
+  }
+}
+
+/* ---------- パソコンの横長の画面 ----------
+   幅 1024px 以上・横長・マウスなど細かく指せる機器（(hover: hover) and (pointer: fine)）のとき：
+   ・背景（空・雲・地面）を画面いっぱいに広げる。ゲームの場は真ん中（幅 --field-w。game.js と同じ「高さ × 9/16」）
+   ・場の左右にパネル（左：スコアなど／右：手番・制限時間・操作の一覧）。上の表示（hud）と下の操作ボタンは出さない
+   ・メニューの画面は、最大の幅を決めて真ん中に。一覧の画面（図鑑・ランキング・実績など）は、列を増やす */
+@media (min-width: 1024px) and (orientation: landscape) and (hover: hover) and (pointer: fine) {
+  #app {
+    max-width: none;
+    box-shadow: none;
+    /* ゲームの場の幅と、場の左右の余白（どちらも #app の幅に対する値） */
+    --field-w: min(100%, calc(100dvh * 9 / 16));
+    --side: calc((100% - var(--field-w)) / 2);
+  }
+
+  /* ゲームの場の上に重ねるものは、場の幅に合わせる */
+  #hud,
+  #turn-banner,
+  #rematch-banner,
+  #rare-banner,
+  #toasts,
+  #stamp-bar,
+  #vs-intro,
+  #sandbox-ui,
+  #screen-title,
+  .control-hint {
+    left: var(--side);
+    right: var(--side);
+  }
+
+  .control-hint {
+    right: auto;
+    left: 50%;
+    bottom: calc(40px + var(--safe-bottom));
+  }
+
+  .cpu-thinking {
+    left: 50%;
+  }
+
+  /* 上の表示（スコア・手番）と下の操作ボタンは、パネルとマウス・キーで操作できるので出さない（ポーズボタンは残す） */
+  #hud-info,
+  #controls {
+    display: none;
+  }
+
+  #hud {
+    justify-content: flex-end;
+  }
+
+  /* 左右のパネル */
+  .side-panel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-m);
+    width: var(--side);
+    padding: var(--space-xl) var(--space-l);
+  }
+
+  /* .game-ui の left: 0・right: 0 を、片側だけにする */
+  .side-left {
+    left: 0;
+    right: auto;
+    align-items: flex-end;
+  }
+
+  .side-right {
+    left: auto;
+    right: 0;
+    align-items: flex-start;
+  }
+
+  .side-panel > div:empty {
+    display: none;
+  }
+
+  .side-left #side-left-body,
+  .side-turn,
+  .side-timer,
+  .side-keys {
+    width: 100%;
+    max-width: 300px;
+    padding: var(--space-m) var(--space-l);
+    border-radius: var(--radius-l);
+    background: rgba(20, 30, 55, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+
+  .side-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-m);
+    padding: 6px 0;
+    font-size: 15px;
+  }
+
+  .side-item + .side-item {
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .side-item b {
+    font-size: 24px;
+  }
+
+  .side-item b small {
+    margin-left: 2px;
+    font-size: 13px;
+  }
+
+  .side-item.side-score b {
+    font-size: 44px;
+    color: var(--color-gold);
+  }
+
+  .side-rule {
+    margin-bottom: var(--space-s);
+  }
+
+  .side-note {
+    margin: var(--space-s) 0 0;
+    font-size: 13px;
+  }
+
+  .side-player {
+    padding: 8px 12px;
+    border-radius: var(--radius-m);
+    font-size: 17px;
+    font-weight: bold;
+    opacity: 0.55;
+  }
+
+  .side-player small {
+    margin-left: 6px;
+    font-size: 12px;
+  }
+
+  .side-player.now {
+    opacity: 1;
+  }
+
+  .side-player.p1.now {
+    background: var(--color-p1);
+  }
+
+  .side-player.p2.now {
+    background: var(--color-p2);
+  }
+
+  .side-player + .side-player {
+    margin-top: 6px;
+  }
+
+  .side-timer {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    font-size: 15px;
+  }
+
+  .side-timer b {
+    font-size: 36px;
+  }
+
+  .side-timer b.hurry {
+    color: #ff8a8a;
+  }
+
+  .side-keys .control-list li {
+    font-size: 13px;
+  }
+
+  /* メニューの画面：最大の幅を決めて真ん中に。文字とボタンを少し大きく */
+  .screen-inner {
+    max-width: 400px;
+    zoom: 1.12;
+  }
+
+  .page-inner {
+    max-width: 640px;
+  }
+
+  .screen.page .page-body {
+    font-size: 17px;
+  }
+
+  /* 一覧の画面は、広さを活かして列を増やす */
+  #screen-dex .page-inner,
+  #screen-ranking .page-inner,
+  #screen-achievements .page-inner,
+  #screen-records .page-inner,
+  #screen-titles .page-inner,
+  #screen-profile .page-inner {
+    max-width: 980px;
+  }
+
+  .dex-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  #ranking-list,
+  #achievements-list,
+  #title-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-m);
+    align-content: start;
+  }
+
+  #ranking-list > :not(.rank-row),
+  #achievements-list > :not(.ach-row),
+  #title-list > :not(.title-row) {
+    grid-column: 1 / -1;
+  }
+
+  .ranking-tabs {
+    width: 100%;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
 }

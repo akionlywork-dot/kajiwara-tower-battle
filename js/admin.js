@@ -402,9 +402,10 @@ const Admin = (() => {
   const RESET_ITEMS = {
     best: {
       label: "ハイスコア",
-      detail: "1人で遊ぶ・特殊ルールのハイスコア、積んだ数・高さの最高",
+      detail: "1人で遊ぶ・競技・特殊ルールのハイスコア、積んだ数・高さの最高",
       run(d, fresh) {
         d.stats.best = fresh.stats.best;
+        d.stats.compBest = fresh.stats.compBest; // 競技のハイスコア
         d.stats.bestCount = 0;
         d.stats.bestHeight = 0;
         d.stats.ruleBest = {};
@@ -415,7 +416,7 @@ const Admin = (() => {
       detail: "プレイ回数・勝ち負け・CPU の連勝・オンライン対戦の成績・相手ごとの成績",
       run(d, fresh) {
         const s = d.stats;
-        d.stats = Object.assign(fresh.stats, { best: s.best, bestCount: s.bestCount, bestHeight: s.bestHeight, ruleBest: s.ruleBest });
+        d.stats = Object.assign(fresh.stats, { best: s.best, bestCount: s.bestCount, bestHeight: s.bestHeight, ruleBest: s.ruleBest, compBest: s.compBest });
         d.opponents = {};
       },
     },
@@ -467,10 +468,15 @@ const Admin = (() => {
   function renderDrawTest() {
     const N = Math.round(Math.min(1000000, Math.max(100, Number($("admin-draw-n").value) || 10000)));
     $("admin-draw-n").value = N;
-    const counts = Game.drawTest(N);
+    // 競技のルールで抽選する（全キャラ同じ確率。出てくるのは Chars.inCompetitive のキャラだけ）
+    const comp = $("admin-draw-comp").checked ? window.GAME_CONFIG.competitive : null;
+    const counts = Game.drawTest(N, comp);
     const table = window.GAME_CONFIG.rarity;
-    const chars = window.CHARACTERS.filter((c) => Chars.appears(c) && LimitedEvents.available(c));
-    const total = chars.reduce((n, c) => n + Chars.chance(c), 0);
+    const chars = comp
+      ? window.CHARACTERS.filter((c) => Chars.inCompetitive(c))
+      : window.CHARACTERS.filter((c) => Chars.appears(c) && LimitedEvents.available(c));
+    const chanceOf = (c) => (comp && comp.equalChance !== false ? 1 : Chars.chance(c));
+    const total = chars.reduce((n, c) => n + chanceOf(c), 0);
     const pct = (v) => `${v.toFixed(v < 1 ? 3 : 2)}%`;
     // 差（結果 − 設定）。偶然のぶれ（標準偏差）の3倍より大きいずれには、色を付ける
     const diff = (got, want) => {
@@ -482,11 +488,11 @@ const Admin = (() => {
     const rows = Object.keys(table).map((rid) => {
       const members = chars.filter((c) => (table[c.rarity] ? c.rarity : "N") === rid);
       const got = members.reduce((n, c) => n + (counts.get(c.id) || 0), 0);
-      const want = (members.reduce((n, c) => n + Chars.chance(c), 0) / total) * 100;
+      const want = (members.reduce((n, c) => n + chanceOf(c), 0) / total) * 100;
       const head = `<tr class="admin-draw-rarity"><th>${"★".repeat(table[rid].stars)} ${UI.escape(table[rid].name)}</th><td>${pct(want)}</td><td>${got.toLocaleString()}回<br>${pct((got / N) * 100)}</td>${diff(got, want)}</tr>`;
       return head + members.map((c) => {
         const n = counts.get(c.id) || 0;
-        const w = (Chars.chance(c) / total) * 100;
+        const w = (chanceOf(c) / total) * 100;
         return `<tr><td>${UI.escape(c.name)}</td><td>${pct(w)}</td><td>${n.toLocaleString()}回<br>${pct((n / N) * 100)}</td>${diff(n, w)}</tr>`;
       }).join("");
     });

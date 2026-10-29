@@ -3,9 +3,10 @@
 // 実績・称号（条件と称号は data/achievements.json）
 //
 // condition の type（条件の種類）：
-//   count        … 1回のゲームで value 体積んだ（1人・2人どちらでも）
+//   count        … 1回のゲームで value 体積んだ（1人・2人どちらでも。対戦は2人の合計）
+//   ownCount     … 1回のゲームで、自分が value 体積んだ（対戦は自分が落として積めた数だけ。オンラインは自分の側、ともだち・CPU はプレイヤー1）
 //   height       … 1回のゲームでタワーの高さが value m に届いた
-//   score        … ひとりモード（ふつうのルール）で value 点以上
+//   score        … ひとりモードで value 点以上（スコアアタックのふつう・特殊ルール（期間限定もふくむ）・競技のどれでも。対戦は数えない）
 //   plays        … ゲームを合計 value 回遊んだ（全部のモードの合計）
 //   totalPieces  … これまでに合計 value 体積んだ
 //   versusWins   … 2人対戦でプレイヤー1が value 回勝った
@@ -67,12 +68,14 @@ const Achievements = (() => {
     const v = cond.value || 0;
     const solo = !!game && game.mode === "solo";
     switch (cond.type) {
+      case "ownCount":
+        return !!game && (game.ownCount || 0) >= v;
       case "count":
         return !!game && game.count >= v;
       case "height":
         return !!game && game.height >= v;
       case "score":
-        return solo && !game.rule && game.score >= v; // 特殊ルールは数えない
+        return solo && game.score >= v; // ひとりモードなら、どのルールでも（対戦は数えない）
       case "noRotate":
         return solo && game.rotations === 0 && game.count >= v;
       case "quickStreak":
@@ -148,7 +151,7 @@ const Achievements = (() => {
       case "plays": {
         // 全部のモードの合計（ひとり・特殊ルール・ともだちと・CPU・オンライン）
         const cpuPlays = Object.values(s.cpu || {}).reduce((sum, r) => sum + (r.plays || 0), 0);
-        return { now: s.soloPlays + (s.rulePlays || 0) + s.versusPlays + cpuPlays + ((s.online || {}).plays || 0), goal: v };
+        return { now: s.soloPlays + (s.rulePlays || 0) + (s.compPlays || 0) + s.versusPlays + cpuPlays + ((s.online || {}).plays || 0), goal: v };
       }
       case "totalPieces":
         return { now: s.totalPieces, goal: v };

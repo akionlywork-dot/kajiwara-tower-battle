@@ -38,9 +38,8 @@ window.CHARACTERS = [
   { file: "images/chara07.webp", name: "篠笛教師", rarity: "N", description: "白シャツで棒をかかげる、先生風のポーズ。" },
   { file: "images/chara08.webp", name: "篠笛マスター", rarity: "R", description: "サングラスで前かがみ。何かを吹いている？" },
   { file: "images/chara09.webp", name: "片足バランス", rarity: "N", description: "片足で前のめりにバランスをとる。積むと一番グラグラするかも。" },
-  // ★3 ミニ床アレルギー：前は ★1「床アレルギー」（id "chara10"）。保存データの "chara10" は、save.js が "chara10_small" に直す。
-  // この画像の当たり判定の設定（tolerance・smooth）は、この行のものを使う
-  { id: "chara10_small", file: "images/chara10.webp", name: "ミニ床アレルギー", rarity: "SR", variant: "small", description: "小さくなった床アレルギー。前かがみで手を床につく。", tolerance: 2, smooth: 4 },
+  // 床アレルギー（標準の大きさ。v2.1.0 で ★1 に戻した）。この画像の当たり判定の設定（tolerance・smooth）は、この行のものを使う（ミニ床アレルギーも同じ）
+  { file: "images/chara10.webp", name: "床アレルギー", rarity: "N", description: "前かがみで手を床につく。", tolerance: 2, smooth: 4 },
   { file: "images/chara11.webp", name: "虫嫌い", rarity: "SR", description: "剣を振りかぶる、白Tシャツの剣士。" },
   { file: "images/chara12.webp", name: "横ガニ90度", rarity: "R", description: "片足を上げて手を広げる、おどけたポーズ。" },
   // ★4（激レア）：オーラをまとったキャラ（名前・説明文は仮）
@@ -49,6 +48,8 @@ window.CHARACTERS = [
   { id: "chara07_light", base: "images/chara07.webp", name: "光の篠笛教師", rarity: "UR", aura: "light", description: "光の粒を集めて、棒をかかげる。" },
   { id: "chara09_dark", base: "images/chara09.webp", name: "闇の片足バランス", rarity: "UR", aura: "dark", description: "稲妻を走らせながら、片足で立つ。" },
   // ★3（めっちゃレア）：サイズ違い（画像は元のキャラのもの。倍率は config.js の sizeVariants）
+  // ミニ床アレルギー：v2.0.0 までの古い保存データにある "chara10"（★1 床アレルギー）は、save.js が "chara10_small" に直している
+  { id: "chara10_small", base: "images/chara10.webp", name: "ミニ床アレルギー", rarity: "SR", variant: "small", description: "小さくなった床アレルギー。前かがみで手を床につく。" },
   { id: "chara06_big", base: "images/chara06.webp", name: "ビッグエイリアン", rarity: "SR", variant: "big", description: "見上げるほど大きくなったブンリキエイリアン。立てると、ぐらぐら。" },
   { id: "chara05_big", base: "images/chara05.webp", name: "ビッグ案内人", rarity: "SR", variant: "big", description: "大きな旗をかかげる、見上げるほどの台湾案内人。細長いので、寝かせるのがコツ。" },
   // ★5（まぼろし）：とても出にくい（config.js の rarity の MR の rate を3体で分け合う）。名前・説明文は仮

@@ -8,9 +8,12 @@
 //   写真アイコンは、本人が「載せる」を選んだときだけ、小さくして送る。
 //   「ランキングでプロフィールを公開」が ON の人だけ、実績の数・図鑑の数・背景と土台の id・プレイ回数・
 //   積んだ数の合計・オンライン対戦の勝敗も送る（OFF にすると、次に送ったときにサーバーから消える）。
-//   スコアアタック（ふつうのルール）だけが対象（特殊ルールは載せない）。最初に1回だけ「送ってもいいか」を聞く
+//   ランキングは「フリー」（スコアアタックのふつうのルール）と「競技」（config.js の competitive）の2つ。
+//   画面の上のタブで切りかえる。特殊ルールは載せない。最初に1回だけ「送ってもいいか」を聞く（参加の設定は2つで共通）。
+//   競技のスコアは、サーバー（ranking.gs）が競技に対応しているとき（GET ?mode=comp に mode: "comp" が返る）だけ送る
+//   （古い ranking.gs のままだと、競技のスコアがフリーのランキングに混ざってしまうため）
 // ranking.url が "" のとき：
-//   data/ranking.json（手で書きかえて更新する）を表示する。スコアはどこにも送らない
+//   data/ranking.json（手で書きかえて更新する）を表示する。スコアはどこにも送らない。競技のタブは、json の comp を出す
 // =============================================
 
 const Ranking = (() => {
@@ -23,6 +26,15 @@ const Ranking = (() => {
   const url = () => ((window.GAME_CONFIG.ranking || {}).url || "").trim();
   const isOnline = () => !!url();
   const mem = () => Save.data.ranking;
+  // ランキングの種類：free（フリー＝スコアアタックのふつうのルール）/ comp（競技）
+  //   best：その種類の自分のハイスコア、sent・sentProfile：最後に送ったスコア・プロフィールの目印（Save.data.ranking）
+  const KINDS = {
+    free: { label: "フリー", best: () => Save.data.stats.best, sent: "sentScore", sentProfile: "sentProfile" },
+    comp: { label: "競技", best: () => Save.data.stats.compBest, sent: "sentScoreComp", sentProfile: "sentProfileComp" },
+  };
+  let tab = "free"; // ランキング画面で選んでいるタブ
+  // フリー・競技のどちらかで、ハイスコアがあるか（初めて「送ってもいいか」を聞くのに使う）
+  const anyBest = () => KINDS.free.best() || KINDS.comp.best();
 
   function init() {
     UI.onShow("ranking", open);
@@ -31,6 +43,14 @@ const Ranking = (() => {
       const row = e.target.closest("[data-index]");
       if (row && shown[row.dataset.index]) openProfile(shown[row.dataset.index]);
     });
+    // フリー・競技のタブ
+    for (const b of document.querySelectorAll("[data-rank-tab]")) {
+      b.addEventListener("click", () => {
+        if (tab === b.dataset.rankTab) return;
+        tab = b.dataset.rankTab;
+        open();
+      });
+    }
     $("rank-profile-close").addEventListener("click", closeProfile);
     $("rank-profile-mine").addEventListener("click", () => {
       closeProfile();
@@ -101,22 +121,38 @@ const Ranking = (() => {
   let shown = []; // 画面に並べている行（タップしたときに、プロフィールを出すため）
 
   async function open() {
+    const kind = tab;
     shown = [];
+    for (const b of document.querySelectorAll("[data-rank-tab]")) {
+      b.classList.toggle("active", b.dataset.rankTab === kind);
+      b.setAttribute("aria-selected", String(b.dataset.rankTab === kind));
+    }
     renderMine(null);
     const box = $("ranking-list");
     box.innerHTML = `<p class="empty-message">読み込み中…</p>`;
     let json = null;
+    let unsupported = false; // 競技に対応していない、古い ranking.gs
     if (isOnline()) {
       await submitBest(); // 名前・称号・アイコンを変えていたら、先に送っておく（自分の行に反映されるように）
       try {
-        json = await request(`${url()}?me=${encodeURIComponent(playerId())}&t=${Date.now()}`);
+        json = await request(`${url()}?mode=${kind}&me=${encodeURIComponent(playerId())}&t=${Date.now()}`);
+        if (kind === "comp" && json && json.mode !== "comp") {
+          unsupported = true;
+          json = null;
+        }
+        if (kind === "comp") compServer = { ok: !unsupported, at: Date.now() };
       } catch (e) {
         console.warn("ランキングを読み込めませんでした:", e.message);
       }
     } else {
       json = await DataFile.load("data/ranking.json");
+      if (json && kind === "comp") json = json.comp && typeof json.comp === "object" ? json.comp : { updated: json.updated, ranking: [] }; // 手で書くときは comp: { ranking: [...] }
     }
-    if (UI.current !== "ranking") return; // 読み込み中に画面を閉じた
+    if (UI.current !== "ranking" || tab !== kind) return; // 読み込み中に画面を閉じた・タブを変えた
+    if (unsupported) {
+      box.innerHTML = `<div class="coming-soon"><span>🏁</span><b>競技のランキングは準備中です</b><p>もうしばらくお待ちください。</p></div>`;
+      return;
+    }
     const divisions = json ? divisionsOf(json, !isOnline()) : null;
     if (!divisions) {
       box.innerHTML = `<p class="empty-message">ランキングを取得できません。<br>通信できる場所で、もう一度開いてください。</p>`;
@@ -134,9 +170,9 @@ const Ranking = (() => {
       (shown.length
         ? html
         : isOnline()
-        ? `<div class="coming-soon"><span>🏆</span><b>まだ記録がありません</b><p>スコアアタックで遊ぶと、ハイスコアがここに載ります。</p></div>`
+        ? `<div class="coming-soon"><span>${kind === "comp" ? "🏁" : "🏆"}</span><b>まだ記録がありません</b><p>${kind === "comp" ? "競技" : "スコアアタック"}で遊ぶと、ハイスコアがここに載ります。</p></div>`
         : `<div class="coming-soon"><span>🏆</span><b>ランキングは準備中です</b><p>お楽しみに！<br>まずはハイスコアを目指して遊んでみてください。</p></div>`);
-    if (json.me) rememberRank(json.me.rank);
+    if (json.me && kind === "free") rememberRank(json.me.rank); // 対戦カードに出す順位は、フリーのもの
     renderMine(json.me || null);
   }
 
@@ -275,16 +311,16 @@ const Ranking = (() => {
     $("rank-profile").classList.remove("active");
   }
 
-  // 画面の下：自分のハイスコア（オンラインなら順位も）
+  // 画面の下：自分のハイスコア（選んでいるタブのもの。オンラインなら順位も）
   function renderMine(me) {
-    const best = Save.data.stats.best;
+    const best = KINDS[tab].best();
     let note = "";
     if (isOnline() && best) {
       if (!Settings.get("ranking")) note = `<small class="my-rank">ランキングに参加していません（設定で変えられます）</small>`;
       else if (me) note = `<small class="my-rank">あなたは <b>${Number(me.rank)}位</b></small>`;
     }
     $("ranking-mine").innerHTML =
-      `<span class="my-record-label">あなたのハイスコア</span>` +
+      `<span class="my-record-label">あなたのハイスコア（${KINDS[tab].label}）</span>` +
       Profile.badgeHTML() +
       (best
         ? `<span class="rank-score">${best.score}<small>点</small><em>${best.count}体・${best.height.toFixed(2)}m</em>${note}</span>`
@@ -297,7 +333,7 @@ const Ranking = (() => {
   // 参加ずみの人は、前に送れなかった記録や、変えた名前・称号・アイコンを送りなおす
   async function atStartup() {
     if (!isOnline() || Admin.unlocked) return; // 管理者モードの記録は、公開のランキングに送らない
-    if ((!mem().asked && Save.data.stats.best) || needIconQuestion()) {
+    if ((!mem().asked && anyBest()) || needIconQuestion()) {
       await waitTitle();
       return afterSoloGame();
     }
@@ -311,15 +347,15 @@ const Ranking = (() => {
     }
   }
 
-  // スコアアタック（ふつうのルール）が終わったときに main.js から呼ばれる。
+  // スコアアタック（ふつうのルール）・競技が終わったときに main.js から呼ばれる。
   // 初めてなら「送ってもいいか」を聞く（写真アイコンがある人には、写真を載せるかも聞く）
   async function afterSoloGame() {
     if (!isOnline() || Admin.unlocked) return;
-    if (!mem().asked && Save.data.stats.best) {
+    if (!mem().asked && anyBest()) {
       mem().asked = true;
       Save.write();
       const yes = await UI.confirm(
-        `あなたのハイスコア（${Save.data.stats.best.score}点）を、みんなのランキングに載せますか？\nこれからも、自己ベストを更新したら自動で送ります。\n\n送るもの：名前「${Save.playerName(1)}」・称号・スコア・積んだ数・高さ\n名前と称号はランキングで公開されます。\n（設定画面でいつでも変えられます）`,
+        `あなたのハイスコア（${anyBest().score}点）を、みんなのランキングに載せますか？\nこれからも、自己ベストを更新したら自動で送ります。\n\n送るもの：名前「${Save.playerName(1)}」・称号・スコア・積んだ数・高さ\n名前と称号はランキングで公開されます。\n（設定画面でいつでも変えられます）`,
         "送る",
         true,
         "送らない"
@@ -374,7 +410,7 @@ const Ranking = (() => {
       dex: [Dex.count(), Dex.total()],
       bg: Save.data.cosmetics.background,
       platform: Save.data.cosmetics.platform,
-      plays: s.soloPlays + (s.rulePlays || 0) + s.versusPlays + cpu + (online.plays || 0),
+      plays: s.soloPlays + (s.rulePlays || 0) + (s.compPlays || 0) + s.versusPlays + cpu + (online.plays || 0),
       pieces: s.totalPieces,
     };
     if (c) p.ach = [c.got, c.total];
@@ -382,32 +418,55 @@ const Ranking = (() => {
     return p;
   }
 
-  // 自己ベストを送る（参加していない・送る必要がないときは何もしない）
-  // 自己ベストが前に送ったものより高いか、名前・称号・写真アイコンが変わったときだけ送る
+  // 自己ベストを送る（参加していない・送る必要がないときは何もしない）。フリーと競技の両方
   async function submitBest() {
-    const best = Save.data.stats.best;
-    if (!isOnline() || !Settings.get("ranking") || !best || Admin.unlocked) return;
+    if (!isOnline() || !Settings.get("ranking") || Admin.unlocked) return;
+    await submitKind("free");
+    await submitKind("comp");
+  }
+
+  // サーバー（ranking.gs）が競技に対応しているか（GET ?mode=comp に mode: "comp" が返るか）。
+  // 対応していれば覚えておく。対応していなければ、5分たつまで聞きなおさない
+  let compServer = null; // { ok, at }
+  async function compSupported() {
+    if (compServer && (compServer.ok || Date.now() - compServer.at < 5 * 60 * 1000)) return compServer.ok;
+    try {
+      const json = await request(`${url()}?mode=comp&t=${Date.now()}`);
+      compServer = { ok: !!json && json.mode === "comp", at: Date.now() };
+    } catch (e) {
+      return false; // 通信できなかった（覚えずに、次の機会に聞く）
+    }
+    return compServer.ok;
+  }
+
+  // 1つの種類（free / comp）の自己ベストを送る。
+  // 自己ベストが前に送ったものより高いか、名前・称号・写真アイコンが変わったときだけ送る
+  async function submitKind(kind) {
+    const k = KINDS[kind];
+    const best = k.best();
+    if (!best) return;
     const p = Save.data.profile;
     const name = Save.playerName(1);
     const title = Profile.titleText(p.titleId);
     const icon = Settings.get("rankingIcon") && p.icon ? await Profile.smallIcon(p.icon) : "";
     const profile = Settings.get("rankingProfile") ? publicProfile() : null;
     const profileKey = `${name}\n${title}\n${digest(icon)}\n${JSON.stringify(profile)}`;
-    if (best.score <= mem().sentScore && profileKey === mem().sentProfile) return;
+    if (best.score <= (mem()[k.sent] || 0) && profileKey === mem()[k.sentProfile]) return;
+    if (kind === "comp" && !(await compSupported())) return; // 古い ranking.gs には、競技のスコアを送らない
     try {
       const res = await request(url(), {
         method: "POST",
         // text/plain で送る（Apps Script は、事前の確認の通信（CORS のプリフライト）に答えられないため）
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ id: playerId(), name, title, icon, score: best.score, count: best.count, height: best.height, profile }),
+        body: JSON.stringify({ mode: kind, id: playerId(), name, title, icon, score: best.score, count: best.count, height: best.height, profile }),
       });
       if (!res || !res.ok) throw new Error((res && res.error) || "error");
-      const improved = best.score > mem().sentScore;
-      mem().sentScore = best.score;
-      mem().sentProfile = profileKey;
+      const improved = best.score > (mem()[k.sent] || 0);
+      mem()[k.sent] = best.score;
+      mem()[k.sentProfile] = profileKey;
       Save.write();
-      if (res.rank) rememberRank(res.rank);
-      if (improved && res.rank) UI.toast(`🏆 ランキング <b>${Number(res.rank)}位</b>（${Number(res.total)}人中）`);
+      if (res.rank && kind === "free") rememberRank(res.rank);
+      if (improved && res.rank) UI.toast(`${kind === "comp" ? "🏁" : "🏆"} ランキング（${k.label}） <b>${Number(res.rank)}位</b>（${Number(res.total)}人中）`);
     } catch (e) {
       // 続けて送りすぎて断られたときは、少し待ってから送りなおす（写真を外したときなど、すぐ反映させたいので）。
       // 通信できなかったときは、次のゲームのあと（か、次に開いたとき）にもう一度送る

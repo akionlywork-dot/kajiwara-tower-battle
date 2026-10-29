@@ -36,7 +36,7 @@
   <!-- アプリとしてインストールするための設定（PWA） -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="css/style.css?v=2.0.0">
+  <link rel="stylesheet" href="css/style.css?v=3.1.0">
 </head>
 <body>
   <div id="app">
@@ -78,6 +78,18 @@
       <span id="flag-date" class="admin-flag admin-flag-date hidden"></span>
     </div>
     <pre id="admin-hud" class="admin-hud hidden"></pre>
+
+    <!-- 横長の画面（パソコン）だけ：ゲームの場の左右のパネル（main.js の updateSidePanels。出すかは style.css） -->
+    <aside id="side-left" class="game-ui side-panel side-left" aria-label="スコア">
+      <div id="side-left-body"></div>
+    </aside>
+    <aside id="side-right" class="game-ui side-panel side-right" aria-label="操作">
+      <div id="side-turn" class="side-turn"></div>
+      <div id="side-timer" class="side-timer"></div>
+      <div id="side-keys" class="side-keys"></div>
+    </aside>
+    <!-- パソコン：キーやマウスを初めて使ったときに出す、操作のヒント（controls.js） -->
+    <div id="control-hint" class="control-hint hidden" aria-live="polite"></div>
 
     <!-- 2人対戦の「〇〇の番」表示 -->
     <div id="turn-banner" class="hidden"></div>
@@ -268,10 +280,19 @@
           <button id="btn-solo" class="list-row rule-row rule-normal">
             <span class="rule-icon">🏆</span>
             <span class="rule-main">
-              <b>スコアアタック <span class="ranking-tag">ランキング対象</span></b>
-              <small>いつものルール。ハイスコアはランキングに載ります</small>
+              <b>スコアアタック <span class="ranking-tag">ランキング（フリー）対象</span></b>
+              <small>いつものルール。ハイスコアはランキング（フリー）に載ります</small>
             </span>
             <span id="normal-best" class="rule-best"></span>
+          </button>
+          <!-- 競技：みんなが同じ条件で競う（config.js の competitive）。ランキング（競技）の対象 -->
+          <button id="btn-comp" class="list-row rule-row rule-normal rule-comp">
+            <span class="rule-icon">🏁</span>
+            <span class="rule-main">
+              <b>競技 <span class="ranking-tag ranking-tag-comp">ランキング（競技）対象</span></b>
+              <small>全キャラが同じ確率・同じ大きさ・同じ点数の、公平なルール。図鑑には登録されません</small>
+            </span>
+            <span id="comp-best" class="rule-best"></span>
           </button>
           <h3 class="section-title">特殊ルール</h3>
           <div id="rules-list"></div>
@@ -335,8 +356,13 @@
 
           <h3 class="settings-heading">あそびかた</h3>
           <div class="setting-row">
-            <span>指を離したら落とす<small>ドラッグして指を離すと落下</small></span>
+            <span>指を離したら落とす<small>ドラッグして指を離すと落下（マウスのときは、いつもクリックで落とす）</small></span>
             <button class="toggle" data-setting="release" role="switch" aria-label="指を離したら落とす"></button>
+          </div>
+          <!-- パソコン（マウスなど細かく指せる機器）のときだけ：マウス・キーの一覧（controls.js の KEYS から作る） -->
+          <div id="setting-controls" class="settings-controls hidden">
+            <h3 class="settings-heading">操作方法</h3>
+            <div id="setting-controls-list" class="controls-help"></div>
           </div>
 
           <!-- ランキング（config.js の ranking.url を設定したときだけ表示。ranking.js） -->
@@ -568,6 +594,11 @@
           <button class="btn btn-icon" data-back="title" aria-label="もどる">‹</button>
           <h2>ランキング</h2>
         </header>
+        <!-- フリー（いつものスコアアタック）と 競技 を切りかえる（ranking.js） -->
+        <div class="ranking-tabs" role="tablist">
+          <button class="ranking-tab" data-rank-tab="free" role="tab">フリー</button>
+          <button class="ranking-tab" data-rank-tab="comp" role="tab">🏁 競技</button>
+        </div>
         <div id="ranking-list" class="page-body"></div>
         <!-- 画面の下に固定：自分のハイスコア -->
         <div class="page-footer">
@@ -811,6 +842,7 @@
               </label>
               <button id="btn-admin-draw" class="btn btn-small btn-sub">抽選する</button>
             </div>
+            <label class="admin-check-backup"><input id="admin-draw-comp" type="checkbox"> 競技のルールで抽選する（全キャラ同じ確率）</label>
             <div id="admin-draw" class="admin-draw"></div>
 
             <!-- 2. スコアのリセット -->
@@ -850,6 +882,19 @@
       </div>
     </div>
 
+    <!-- ===== 競技の説明（初めて競技を選んだとき。main.js の showCompIntro） ===== -->
+    <div id="comp-dialog" class="dialog">
+      <div class="dialog-box comp-dialog-box">
+        <p class="comp-dialog-title">🏁 競技のルール</p>
+        <ul id="comp-dialog-rules" class="comp-dialog-rules"></ul>
+        <label class="comp-dialog-hide"><input id="comp-dialog-hide" type="checkbox"> 次から表示しない</label>
+        <div class="dialog-buttons">
+          <button id="comp-dialog-cancel" class="btn btn-sub">もどる</button>
+          <button id="comp-dialog-ok" class="btn btn-primary">始める</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== 通知（「実績解除！」など。UI.toast で使う） ===== -->
     <div id="toasts"></div>
 
@@ -869,49 +914,50 @@
 
   <!-- ?v= のあとの番号：更新したら config.js の version と一緒に上げる（スマホに古いファイルが残らないように） -->
   <!-- ライブラリ（lib/ に同梱） -->
-  <script src="lib/decomp.min.js?v=2.0.0"></script>
-  <script src="lib/matter.min.js?v=2.0.0"></script>
-  <script src="lib/peerjs.min.js?v=2.0.0"></script>
-  <script src="lib/mqtt.min.js?v=2.0.0"></script>
+  <script src="lib/decomp.min.js?v=3.1.0"></script>
+  <script src="lib/matter.min.js?v=3.1.0"></script>
+  <script src="lib/peerjs.min.js?v=3.1.0"></script>
+  <script src="lib/mqtt.min.js?v=3.1.0"></script>
   <!-- 設定ファイル -->
-  <script src="config.js?v=2.0.0"></script>
+  <script src="config.js?v=3.1.0"></script>
   <!-- 読み込みの状況（開発用。devMode か ?debug=1 のときだけ表示）。ほかより先に読み込む -->
-  <script src="js/load-status.js?v=2.0.0"></script>
-  <script src="characters.js?v=2.0.0"></script>
-  <script src="js/chars.js?v=2.0.0"></script>
+  <script src="js/load-status.js?v=3.1.0"></script>
+  <script src="characters.js?v=3.1.0"></script>
+  <script src="js/chars.js?v=3.1.0"></script>
   <!-- ゲーム本体 -->
-  <script src="js/settings.js?v=2.0.0"></script>
-  <script src="js/save.js?v=2.0.0"></script>
-  <script src="js/audio.js?v=2.0.0"></script>
-  <script src="js/shape.js?v=2.0.0"></script>
-  <script src="js/aura.js?v=2.0.0"></script>
-  <script src="js/platform-art.js?v=2.0.0"></script>
-  <script src="js/game.js?v=2.0.0"></script>
-  <script src="js/rules.js?v=2.0.0"></script>
-  <script src="js/cpu.js?v=2.0.0"></script>
-  <script src="js/challenge.js?v=2.0.0"></script>
-  <script src="js/card.js?v=2.0.0"></script>
-  <script src="js/stamps.js?v=2.0.0"></script>
-  <script src="js/halloween-home.js?v=2.0.0"></script>
-  <script src="js/halloween.js?v=2.0.0"></script>
-  <script src="js/title-fx.js?v=2.0.0"></script>
-  <script src="js/online.js?v=2.0.0"></script>
-  <script src="js/ui.js?v=2.0.0"></script>
-  <script src="js/themes.js?v=2.0.0"></script>
-  <script src="js/frames.js?v=2.0.0"></script>
-  <script src="js/profile.js?v=2.0.0"></script>
-  <script src="js/data-file.js?v=2.0.0"></script>
-  <script src="js/news.js?v=2.0.0"></script>
-  <script src="js/events.js?v=2.0.0"></script>
-  <script src="js/ranking.js?v=2.0.0"></script>
-  <script src="js/records.js?v=2.0.0"></script>
-  <script src="js/dex.js?v=2.0.0"></script>
-  <script src="js/achievements.js?v=2.0.0"></script>
-  <script src="js/vs-intro.js?v=2.0.0"></script>
-  <script src="js/backup.js?v=2.0.0"></script>
-  <script src="js/admin.js?v=2.0.0"></script>
-  <script src="js/sandbox.js?v=2.0.0"></script>
-  <script src="js/pwa.js?v=2.0.0"></script>
-  <script src="js/main.js?v=2.0.0"></script>
+  <script src="js/settings.js?v=3.1.0"></script>
+  <script src="js/save.js?v=3.1.0"></script>
+  <script src="js/audio.js?v=3.1.0"></script>
+  <script src="js/shape.js?v=3.1.0"></script>
+  <script src="js/aura.js?v=3.1.0"></script>
+  <script src="js/platform-art.js?v=3.1.0"></script>
+  <script src="js/game.js?v=3.1.0"></script>
+  <script src="js/rules.js?v=3.1.0"></script>
+  <script src="js/cpu.js?v=3.1.0"></script>
+  <script src="js/challenge.js?v=3.1.0"></script>
+  <script src="js/card.js?v=3.1.0"></script>
+  <script src="js/stamps.js?v=3.1.0"></script>
+  <script src="js/halloween-home.js?v=3.1.0"></script>
+  <script src="js/halloween.js?v=3.1.0"></script>
+  <script src="js/title-fx.js?v=3.1.0"></script>
+  <script src="js/online.js?v=3.1.0"></script>
+  <script src="js/ui.js?v=3.1.0"></script>
+  <script src="js/themes.js?v=3.1.0"></script>
+  <script src="js/frames.js?v=3.1.0"></script>
+  <script src="js/profile.js?v=3.1.0"></script>
+  <script src="js/data-file.js?v=3.1.0"></script>
+  <script src="js/news.js?v=3.1.0"></script>
+  <script src="js/events.js?v=3.1.0"></script>
+  <script src="js/ranking.js?v=3.1.0"></script>
+  <script src="js/records.js?v=3.1.0"></script>
+  <script src="js/dex.js?v=3.1.0"></script>
+  <script src="js/achievements.js?v=3.1.0"></script>
+  <script src="js/vs-intro.js?v=3.1.0"></script>
+  <script src="js/backup.js?v=3.1.0"></script>
+  <script src="js/controls.js?v=3.1.0"></script>
+  <script src="js/admin.js?v=3.1.0"></script>
+  <script src="js/sandbox.js?v=3.1.0"></script>
+  <script src="js/pwa.js?v=3.1.0"></script>
+  <script src="js/main.js?v=3.1.0"></script>
 </body>
 </html>

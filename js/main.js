@@ -17,6 +17,7 @@
   // ---------- ゲームの進行状況 ----------
   let mode = "solo"; // "solo"=ひとりで（スコアアタック・特殊ルール） / "versus"=2人対戦
   let ruleId = null; // 特殊ルールの名前（ふつうのルールなら null）
+  let comp = false; // 競技モードか（1人モードの、特殊ルールでないときだけ。config.js の competitive）
   let cpuLevel = null; // CPU対戦の強さ（"easy" / "normal" / "hard"）。人どうしなら null
   // オンライン対戦の情報。{ role: "host"|"guest", me: 自分のプレイヤー番号, names: { 1: 名前, 2: 名前 } }
   // オンライン対戦をしていなければ null
@@ -167,9 +168,11 @@
   // newRuleId: 特殊ルールの名前（config.js の rules の名前）。ふつうのルールなら null
   // newCpu: CPU対戦の強さ。人どうしの対戦や1人モードなら null
   // first: 先攻（1 か 2）。オンライン対戦のホストが、演出の前に決めておいた先攻。null なら、ここでランダムに決める
-  function startGame(newMode, newRuleId = null, newCpu = null, first = null) {
+  // newComp: 競技モードか（1人モードのときだけ）
+  function startGame(newMode, newRuleId = null, newCpu = null, first = null, newComp = false) {
     mode = newMode;
     ruleId = newRuleId;
+    comp = newMode === "solo" && !newRuleId && !!newComp;
     cpuLevel = newCpu;
     gameToken++;
     showThinking(false);
@@ -184,7 +187,7 @@
     lastEdge = null;
     resetAchievementCounts();
     // 挑戦中は挑戦状と同じ順番、そうでなければ新しい順番
-    seed = challenge && mode === "solo" && ruleId === challenge.rule ? challenge.seed : Challenge.newSeed();
+    seed = challenge && mode === "solo" && ruleId === challenge.rule && comp === !!challenge.comp ? challenge.seed : Challenge.newSeed();
     UI.clearConfetti();
     Stamps.end(); // スタンプはリザルトのあいだだけ
     UI.show(null);
@@ -199,8 +202,8 @@
         onLand: () => playSe("place"),
         onRare: (shape, info) => {
           showRareBanner(shape, info);
-          // 自分の番に出たレアを数える（CPU・オンライン対戦の相手の番はのぞく）
-          if (!isCpuTurn() && !(mode === "online" && player !== myPlayer())) {
+          // 自分の番に出たレアを数える（CPU・オンライン対戦の相手の番、競技はのぞく）
+          if (!comp && !isCpuTurn() && !(mode === "online" && player !== myPlayer())) {
             Records.addDrawn(shape);
             Achievements.check(gameStatus());
           }
@@ -212,7 +215,7 @@
         onGameOver: showResult,
       },
       // 制限時間はオンライン対戦だけ（ホストが数えて、時間切れなら相手の手番でもホストが落とす）
-      { turnTimeLimit: turnTimeLimit(), rule: Rules.get(ruleId), seed, fair: mode === "online" }
+      { turnTimeLimit: turnTimeLimit(), rule: Rules.get(ruleId), seed, fair: mode === "online", competitive: comp ? CONFIG.competitive : null }
     );
     applySettings();
     Sound.startBgm();
@@ -244,8 +247,8 @@
     countForAchievements(droppedShape, stats.height, lastDropper === myPlayer());
     aimTimes.push(stats.aimMs);
     lastEdge = stats.edge;
-    Records.addPiece(droppedShape);
-    if (droppedShape) Dex.register(droppedShape.id);
+    Records.addPiece(droppedShape, comp);
+    if (droppedShape && !comp) Dex.register(droppedShape.id); // 競技で積んだキャラは、図鑑に登録しない
     Achievements.check(gameStatus()); // 「10体積んだ」などの実績を、ゲーム中に判定する
     if (isVs()) {
       player = player === 1 ? 2 : 1; // 手番を交代
@@ -266,7 +269,7 @@
   // 反転して積んだ数・ビッグを積んでからの数・積んだときの高さ・制限時間ギリギリ（残りミリ秒）
   let achieve = null;
   function resetAchievementCounts() {
-    achieve = { flipPlaced: 0, bigAt: null, heights: [], buzzer: null, over: false };
+    achieve = { flipPlaced: 0, bigAt: null, heights: [], buzzer: null, over: false, ownCount: 0 };
   }
   resetAchievementCounts();
 
@@ -277,6 +280,7 @@
 
   // 1体積めたとき。mine：自分が落としたキャラか（オンライン対戦の相手・CPU の分は、ギリギリの判定に使わない）
   function countForAchievements(shape, height, mine) {
+    if (mine) achieve.ownCount++; // 自分が積んだ数（実績「50体積み」。対戦の相手・CPU の分は数えない）
     if (shape && shape.flip) achieve.flipPlaced++;
     if (shape && shape.variant === "big" && achieve.bigAt === null) achieve.bigAt = stacked;
     achieve.heights.push(height);
@@ -725,21 +729,23 @@
     if (on) el.innerHTML = `${UI.escape(nameOf(2))}<br>考え中<span class="dots"></span>`;
   }
 
-  // 1人モードのスコア ＝ 積んだ数 × 1体の点数 ＋ 高さ(m) × 1mの点数（配点は config.js）
+  // 1人モードのスコア ＝ 積んだ数 × 1体の点数 ＋ 高さ(m) × 1mの点数（配点は config.js の score。競技は competitive）
   function calcScore() {
-    return stacked * CONFIG.score.perPiece + Math.floor(maxHeight * CONFIG.score.perMeter);
+    const s = comp ? CONFIG.competitive : CONFIG.score;
+    return stacked * s.perPiece + Math.floor(maxHeight * s.perMeter);
   }
 
   // 今のゲームの状況（実績の判定に使う）
   //   rotations：回転を使った回数、aimTimes：1手ごとにかかった時間、edge：最後に積んだキャラの、土台の端からの距離
   function gameStatus() {
     return {
-      mode, rule: ruleId, count: stacked, height: maxHeight, score: calcScore(), rotations: Game.rotations, aimTimes, edge: lastEdge,
+      mode, rule: ruleId, comp, count: stacked, height: maxHeight, score: calcScore(), rotations: Game.rotations, aimTimes, edge: lastEdge,
       // 新しい実績のための数（achievements.js の条件の説明を参照）
       flips: Game.flips,
       flipStreak: Game.flipStreak,
       drawn: Game.drawn,
       flipPlaced: achieve.flipPlaced,
+      ownCount: achieve.ownCount,
       afterBig: achieve.bigAt === null ? 0 : stacked - achieve.bigAt,
       heights: achieve.heights,
       buzzer: achieve.buzzer,
@@ -749,6 +755,7 @@
 
   // 特殊ルールの名前の札（ふつうのルールなら ""）
   function ruleTag() {
+    if (comp) return `<span class="rule-tag comp-tag">🏁 競技</span>`;
     const r = Rules.get(ruleId);
     return r ? `<span class="rule-tag">${r.params.icon || ""} ${UI.escape(r.params.name)}</span>` : "";
   }
@@ -764,7 +771,42 @@
     } else {
       $("hud-info").innerHTML = `<span class="player-tag p${player}">${UI.escape(nameOf(player))} の番</span> ${ruleTag()}<br>${sub}`;
     }
+    updateSidePanels();
   }
+
+  // ---------- 横長の画面（パソコン）の、左右のパネル ----------
+  // 表示するかは style.css が決める（幅 1024px 以上・横長・マウスなど細かく指せる機器）。中身はいつも書いておく
+  //   左：スコア・積んだ数・高さ・ハイスコア ／ 右：対戦の2人と手番・制限時間・操作の一覧（controls.js）
+  function updateSidePanels() {
+    const item = (label, value, cls = "") => `<div class="side-item ${cls}"><span>${label}</span><b>${value}</b></div>`;
+    let left = ruleTag() ? `<div class="side-rule">${ruleTag()}</div>` : "";
+    if (mode === "solo") {
+      const best = ruleId ? Save.data.stats.ruleBest[ruleId] : comp ? Save.data.stats.compBest : Save.data.stats.best;
+      left +=
+        item("スコア", `${calcScore()}<small>点</small>`, "side-score") +
+        item("積んだ数", `${stacked}<small>体</small>`) +
+        item("高さ", `${maxHeight.toFixed(2)}<small>m</small>`) +
+        item("ハイスコア", best ? `${best.score}<small>点</small>` : "---") +
+        (challenge ? `<p class="side-note">🎯 ${UI.escape(challenge.name)}さんの ${challenge.score}点 に挑戦中</p>` : "");
+    } else {
+      left += item("積んだ数", `${stacked}<small>体</small>`) + item("高さ", `${maxHeight.toFixed(2)}<small>m</small>`);
+    }
+    $("side-left-body").innerHTML = left;
+    // 対戦：2人の名前と、今の手番
+    $("side-turn").innerHTML = isVs()
+      ? [1, 2].map((n) => `<div class="side-player p${n} ${n === player ? "now" : ""}">${UI.escape(nameOf(n))}${n === player ? "<small>の番</small>" : ""}</div>`).join("")
+      : "";
+    updateSideTimer();
+  }
+
+  // 制限時間（オンライン対戦）：残りの秒数。ゲーム中は 0.2秒ごとに書きなおす
+  function updateSideTimer() {
+    const left = UI.current === null ? Game.turnTimeLeft : null;
+    $("side-timer").innerHTML = typeof left === "number" ? `<span>制限時間</span><b class="${left < 3000 ? "hurry" : ""}">${Math.ceil(left / 1000)}<small>秒</small></b>` : "";
+  }
+  setInterval(() => {
+    if (UI.current === null && mode === "online") updateSideTimer();
+  }, 200);
 
   // レアキャラが出たときの「レア！」「めっちゃレア！！」「激レア！！！」
   // ★4（激レア）は、専用のバナーと、画面が一瞬光る演出と、専用の効果音
@@ -774,7 +816,8 @@
     const legendary = info.stars >= 5; // ★5（まぼろし）：画面が虹色に光る、いちばん豪華な演出
     // 文字は config.js のレア度の名前 ＋「！」（★2は1つ、★3は2つ、★4は3つ）。例「めっちゃレア！！」
     const label = info.name + "！".repeat(Math.max(1, Math.min(3, info.stars - 1)));
-    el.innerHTML = `<span>${label}</span><small>${UI.escape(shape.name)}</small>`;
+    // 競技：レアの演出は出すが、図鑑には登録されないことを書きそえる
+    el.innerHTML = `<span>${label}</span><small>${UI.escape(shape.name)}</small>` + (comp && mode === "solo" ? `<em class="rare-nodex">競技なので図鑑には登録されません</em>` : "");
     el.style.setProperty("--rare-color", info.color);
     el.className = legendary ? "rare-banner ultimate legendary" : ultimate ? `rare-banner ultimate aura-${shape.aura || "light"}` : info.stars >= 3 ? "rare-banner super" : "rare-banner";
     el.style.animation = "none"; // アニメーションを最初から
@@ -816,16 +859,19 @@
       const score = calcScore();
       if (challenge && score > challenge.score) Records.addChallengeWin(); // 実績「挑戦状キラー」
       // 戦績に記録（ハイスコアも更新）。特殊ルールのハイスコアは、ルールごとに別に記録する
+      // 競技のハイスコアは、フリー（ふつうのスコアアタック）とは別に記録する
       const isNew = ruleId
         ? Records.addRuleResult(ruleId, score, stacked, maxHeight)
+        : comp
+        ? Records.addCompResult(score, stacked, maxHeight)
         : Records.addSoloResult(score, stacked, maxHeight);
-      const best = ruleId ? Save.data.stats.ruleBest[ruleId] : Save.data.stats.best;
-      lastResult = { mode, rule: ruleId, seed, score, count: stacked, height: maxHeight, isNewRecord: isNew };
+      const best = ruleId ? Save.data.stats.ruleBest[ruleId] : comp ? Save.data.stats.compBest : Save.data.stats.best;
+      lastResult = { mode, rule: ruleId, comp, seed, score, count: stacked, height: maxHeight, isNewRecord: isNew };
 
       box.innerHTML =
         challengeResultHTML(score) +
         Profile.badgeHTML() +
-        (ruleId ? `<div class="result-rule">${ruleTag()}</div>` : "") +
+        (ruleId || comp ? `<div class="result-rule">${ruleTag()}</div>` : "") +
         (isNew ? `<div class="new-record">NEW RECORD!</div>` : `<h2 class="result-heading">ゲームオーバー</h2>`) +
         `<div class="result-score"><span id="result-score-num">0</span><small> 点</small></div>` +
         `<div class="result-stats">` +
@@ -834,7 +880,7 @@
         `<div>ハイスコア<b>${best.score}</b></div>` +
         `</div>`;
       UI.countUp($("result-score-num"), score, 900);
-      // ランキング（ふつうのルールだけ）：スコアを見てもらってから、送る（初めてなら送っていいか聞く）。
+      // ランキング（ふつうのルール＝フリー と 競技）：スコアを見てもらってから、送る（初めてなら送っていいか聞く）。
       // すぐに「もう一度」を押したときは聞かずに、次の機会に聞く
       if (!ruleId) {
         setTimeout(() => (UI.current === "result" ? Ranking.afterSoloGame() : Ranking.submitBest()), 1500);
@@ -1007,10 +1053,39 @@
     }
   }
 
+  // ---------- 競技の説明 ----------
+  // 競技のルールと「図鑑には登録されません」を出す。「始める」なら true（「次から表示しない」に印があれば、もう出さない）
+  function showCompIntro() {
+    const conf = CONFIG.competitive || {};
+    const count = window.CHARACTERS.filter((c) => Chars.inCompetitive(c)).length;
+    const stars = (conf.rarities || []).map((id) => (CONFIG.rarity[id] || {}).stars || 0).filter(Boolean);
+    const range = stars.length ? `★${Math.min(...stars)}〜★${Math.max(...stars)}` : "";
+    $("comp-dialog-rules").innerHTML = [
+      `<li>${range}の${count}体が、<b>全部同じ確率</b>で落ちてきます（サイズ違い・期間限定のキャラは出ません）</li>`,
+      `<li>全キャラ<b>同じ大きさ</b>。特殊ルールのギミックはありません</li>`,
+      `<li>点数は1体 ${conf.perPiece}点（どのキャラも同じ）＋ 高さ1mごとに ${conf.perMeter}点</li>`,
+      `<li>ハイスコアは、<b>ランキング（競技）</b>に載ります（ふつうのスコアアタックとは別）</li>`,
+      `<li class="comp-dialog-warn">競技で出たキャラは、<b>図鑑には登録されません</b></li>`,
+    ].join("");
+    $("comp-dialog-hide").checked = false;
+    $("comp-dialog").classList.add("active");
+    return new Promise((resolve) => {
+      const close = (ok) => {
+        $("comp-dialog").classList.remove("active");
+        $("comp-dialog-ok").onclick = $("comp-dialog-cancel").onclick = null;
+        if (ok && $("comp-dialog-hide").checked) Settings.set("compIntro", false);
+        resolve(ok);
+      };
+      $("comp-dialog-ok").onclick = () => close(true);
+      $("comp-dialog-cancel").onclick = () => close(false);
+    });
+  }
+
   // ---------- リザルトカード ----------
   // モードの名前（カードに載せる）
   function modeName() {
     const r = Rules.get(ruleId);
+    if (mode === "solo" && comp) return challenge ? `🏁 競技の挑戦状（${challenge.name}さん ${challenge.score}点）` : "🏁 競技";
     if (mode === "solo") return challenge ? `挑戦状（${challenge.name}さん ${challenge.score}点）` : r ? `特殊ルール「${r.params.name}」` : "スコアアタック";
     if (mode === "online") return "オンライン対戦";
     if (cpuLevel && r) return `${r.params.icon || ""} ${r.params.name}`; // イベントのステージ（おばけ屋敷など）
@@ -1063,9 +1138,9 @@
   function sendChallenge() {
     if (!lastResult || lastResult.mode !== "solo") return;
     const name = Save.playerName(1);
-    const url = Challenge.makeUrl({ seed: lastResult.seed, rule: lastResult.rule, score: lastResult.score, name });
+    const url = Challenge.makeUrl({ seed: lastResult.seed, rule: lastResult.rule, score: lastResult.score, name, comp: lastResult.comp });
     const r = Rules.get(lastResult.rule);
-    const text = `${name}から挑戦状！かじわらタワーバトル${r ? `（${r.params.name}）` : ""}で ${lastResult.score}点 を超えられる？`;
+    const text = `${name}から挑戦状！かじわらタワーバトル${lastResult.comp ? "（競技）" : r ? `（${r.params.name}）` : ""}で ${lastResult.score}点 を超えられる？`;
     Share.url(text, url);
   }
 
@@ -1075,14 +1150,14 @@
     $("challenge-popup-content").innerHTML =
       `<p class="challenge-from">${UI.escape(c.name)}さんからの挑戦状</p>` +
       `<div class="challenge-score">${c.score}<small> 点</small></div>` +
-      (r ? `<span class="rule-tag">${r.params.icon || ""} ${UI.escape(r.params.name)}</span>` : "") +
-      `<p class="challenge-note">同じ順番でキャラが出てきます。この点数を超えたら勝ち！</p>`;
+      (c.comp ? `<span class="rule-tag comp-tag">🏁 競技</span>` : r ? `<span class="rule-tag">${r.params.icon || ""} ${UI.escape(r.params.name)}</span>` : "") +
+      `<p class="challenge-note">同じ順番でキャラが出てきます。この点数を超えたら勝ち！${c.comp ? "<br>競技のルールで遊びます（図鑑には登録されません）" : ""}</p>`;
     $("challenge-popup").classList.add("active");
     $("challenge-accept").onclick = () => {
       $("challenge-popup").classList.remove("active");
       if (!shapesReady) return; // キャラの画像を読み込めなかった
       challenge = c;
-      startGame("solo", c.rule);
+      startGame("solo", c.rule, null, null, c.comp);
     };
     $("challenge-later").onclick = () => $("challenge-popup").classList.remove("active");
   }
@@ -1118,6 +1193,11 @@
   });
   // スコアアタック：ふつうのルール（ルールを選ぶ画面のいちばん上）
   on("btn-solo", () => startGame("solo"));
+  // 競技（「ふつう」のすぐ下）：初めてのうちは、ルールの説明を出してから始める
+  on("btn-comp", async () => {
+    if (Settings.get("compIntro") && !(await showCompIntro())) return;
+    startGame("solo", null, null, null, true);
+  });
   on("btn-versus", () => startGame("versus"));
   // CPU と対戦（data-cpu に強さ）
   for (const btn of document.querySelectorAll("[data-cpu]")) {
@@ -1136,14 +1216,14 @@
   on("btn-flip", () => !isCpuTurn() && !isRemoteTurn() && Game.flip());
   // ポーズ
   on("btn-resume", resumeGame);
-  on("btn-restart", () => startGame(mode, ruleId, cpuLevel));
+  on("btn-restart", () => startGame(mode, ruleId, cpuLevel, null, comp));
   on("btn-pause-settings", () => openSettings("pause"));
   on("btn-pause-title", goTitle);
   // 設定
   on("btn-settings-back", () => UI.show(settingsReturnTo));
   // リザルト
   on("btn-retry", () => {
-    if (mode !== "online") return startGame(mode, ruleId, cpuLevel);
+    if (mode !== "online") return startGame(mode, ruleId, cpuLevel, null, comp);
     // オンライン対戦：お互いが押したら始まる（もう一度押すと取り消し）
     toggleRematch();
   });
@@ -1152,6 +1232,8 @@
   UI.onShow("rules", () => {
     const best = Save.data.stats.best;
     $("normal-best").innerHTML = best ? `ハイスコア<b>${best.score}</b>` : "";
+    const compBest = Save.data.stats.compBest;
+    $("comp-best").innerHTML = compBest ? `ハイスコア<b>${compBest.score}</b>` : "";
     $("rules-list").innerHTML = Rules.list()
       .map((r) => {
         const best = Save.data.stats.ruleBest[r.id];
@@ -1216,6 +1298,12 @@ ${location.origin}${location.pathname}`), "image/png");
     Profile.refresh();
   }
   Admin.onChange = applyAdmin;
+  // パソコンの操作（キーボード）：相手の番・CPU の番・ポーズ中は、画面のボタンと同じく受け付けない
+  Controls.init({
+    canPlay: () => UI.current === null && !Game.paused && !isCpuTurn() && !isRemoteTurn(),
+    pause: () => (mode === "online" ? null : pauseGame()), // オンライン対戦は止められない
+    resume: resumeGame,
+  });
   Admin.onStartSandbox = () => {
     // 自由配置モード（管理者モード）：対戦中なら終わらせてから始める
     goTitle();

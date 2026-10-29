@@ -49,6 +49,15 @@ const Chars = (() => {
   // ゲームに出てくるキャラか（出やすさが 0 のキャラ＝まぼろしなど、まだ登場しないキャラは false）
   const appears = (c) => chance(c) > 0;
 
+  // 競技モードに出てくるキャラか（config.js の competitive）。
+  // characters.js のキャラにも、ゲームの形（main.js が作る shape。variant・event・rarity を持つ）にも使える。
+  // 出てくるのは、competitive.rarities のレア度で、サイズ違い（variant）でも期間限定（event）でもないキャラ
+  function inCompetitive(c) {
+    const conf = window.GAME_CONFIG.competitive || {};
+    const rarities = Array.isArray(conf.rarities) ? conf.rarities : ["N", "R", "SR"];
+    return !!c && !c.variant && !c.event && rarities.includes(rarityId(c));
+  }
+
   // ID のキャラ（無ければ null）
   function byId(id) {
     return list.find((c) => c.id === id) || null;
@@ -61,5 +70,5 @@ const Chars = (() => {
     return c ? c.id : idOf(file);
   }
 
-  return { list, byId, idOf, idFromFile, chance, appears };
+  return { list, byId, idOf, idFromFile, chance, appears, inCompetitive };
 })();
