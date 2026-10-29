@@ -959,6 +959,7 @@
     resetRematch(); // 「もう一度」の希望は、試合ごとに最初から
     // 戦績を記録したあとで、実績を判定する（「10回プレイ」「対戦で10勝」など）
     Achievements.check(gameStatus());
+    PWA.atResult(mode === "online"); // 初めてのゲームのあとに1度だけ、アプリとしてインストールの案内
     UI.show("result");
   }
 

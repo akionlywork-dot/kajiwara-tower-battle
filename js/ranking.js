@@ -484,7 +484,35 @@ const Ranking = (() => {
     };
     if (c) p.ach = [c.got, c.total];
     if (online.plays > 0) p.online = [online.wins, online.plays - online.wins];
+    // 持っている実績（称号）の id の一覧。ranking.gs が「みんなの取得率」を数えるのに使う（ランキングには出さない）
+    p.achIds = Achievements.unlockedList().map((a) => a.id).sort();
     return p;
+  }
+
+  // ---------- みんなの称号の取得率（ranking.gs の ?stats=titles） ----------
+  // { players: プロフィールを公開している人の数, counts: { 実績の id: 持っている人の数 } }。
+  // 古い ranking.gs・通信できないときは null。10分のあいだは、前に読んだものを使う
+  let statsCache = null; // { at, data }
+  async function titleStats() {
+    if (!isOnline()) return null;
+    if (statsCache && Date.now() - statsCache.at < 10 * 60 * 1000) return statsCache.data;
+    try {
+      const json = await request(`${url()}?stats=titles&t=${Date.now()}`);
+      const ok = json && json.mode === "stats" && Number(json.players) > 0 && json.counts && typeof json.counts === "object";
+      statsCache = { at: Date.now(), data: ok ? { players: Number(json.players), counts: json.counts } : null };
+    } catch (e) {
+      return null;
+    }
+    return statsCache.data;
+  }
+
+  // 「持っている人 〇%」の文字（集計にない称号・スタッフの称号は ""）
+  function rateText(stats, id) {
+    if (!stats || !id || Frames.isStaff(id)) return "";
+    const n = Math.max(0, Number(stats.counts[id]) || 0);
+    const pct = (n / stats.players) * 100;
+    const text = pct === 0 ? "0" : pct < 1 ? "1未満" : String(Math.round(pct));
+    return `持っている人 ${text}%`;
   }
 
   // 自己ベストを送る（参加していない・送る必要がないときは何もしない）。フリーと競技の両方
@@ -546,5 +574,5 @@ const Ranking = (() => {
     }
   }
 
-  return { init, atStartup, afterSoloGame, submitBest, joined, opponentKey, ensureConsent, renderConsent };
+  return { init, atStartup, afterSoloGame, submitBest, joined, opponentKey, ensureConsent, renderConsent, titleStats, rateText };
 })();

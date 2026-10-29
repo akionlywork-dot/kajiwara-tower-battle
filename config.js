@@ -7,7 +7,7 @@ window.GAME_CONFIG = {
   achievementsEpoch: 2,
 
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v3.0.3",
+  version: "v3.0.4",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る

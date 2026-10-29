@@ -295,6 +295,14 @@ const Achievements = (() => {
         return `<h3 class="ach-section">${UI.escape(cat)}<small>${done} / ${open.length}</small></h3>` + list.map(rowHTML).join("");
       })
       .join("");
+    // みんなの取得率（ranking.gs の集計。届いたら、各行に「持っている人 〇%」を足す。隠し実績は、達成するまで出さない）
+    Ranking.titleStats().then((stats) => {
+      if (!stats || UI.current !== "achievements") return;
+      for (const row of box.querySelectorAll(".ach-row[data-ach]")) {
+        const rate = Ranking.rateText(stats, row.dataset.ach);
+        if (rate && !row.querySelector(".ach-rate")) row.querySelector(".ach-main").insertAdjacentHTML("beforeend", `<small class="ach-rate">${rate}</small>`);
+      }
+    });
   }
 
   // 期間限定の実績で、期間外（開催前・終了）で、まだ達成していない（もう取れない）か
@@ -325,7 +333,7 @@ const Achievements = (() => {
       ? `<span class="ach-progress"><i style="width:${Math.min(100, (p.now / p.goal) * 100)}%"></i></span><span class="ach-progress-text">${Math.min(p.now, p.goal)} / ${p.goal}</span>`
       : "";
     return `
-      <div class="ach-row ${at ? "ach-done" : "ach-locked"} ${secret ? "ach-secret" : ""}">
+      <div class="ach-row ${at ? "ach-done" : "ach-locked"} ${secret ? "ach-secret" : ""}"${secret ? "" : ` data-ach="${UI.escape(a.id)}"`}>
         <span class="ach-icon">${at ? "🏆" : secret ? "❓" : "🔒"}</span>
         <span class="ach-main">
           <b>${secret ? "？？？" : UI.escape(a.name)}${a.event ? ` <span class="limited-tag">期間限定</span>` : ""}</b>

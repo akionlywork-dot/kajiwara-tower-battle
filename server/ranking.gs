@@ -26,6 +26,8 @@
 //   onlineWins / onlineLosses … オンライン対戦の勝ち・負け
 //   staff  … スタッフの称号の id（developer・admin・employee・operator のどれか。ゲームの管理者モードで獲得し、つけている人だけ）。
 //            ここに値がある人は、ランキングで専用の枠と札になる。消すと、ふつうの称号の表示に戻る（次に送られたときに、また入る）
+//   achList … 持っている実績（称号）の id の一覧（カンマ区切り）。「プロフィールを公開」が ON の人だけ。
+//            ランキングには出さず、?stats=titles の「みんなの称号の取得率」を数えるのにだけ使う
 // =============================================
 
 // ランキングの種類ごとのシートの名前と、スコアの計算（config.js の score・competitive と同じにする）：
@@ -43,9 +45,12 @@ const NAME_MAX = 10; // 名前の最大文字数（ゲームのプロフィー�
 const TITLE_MAX = 20; // 称号の最大文字数
 const ICON_MAX = 12000; // 写真アイコンの最大の長さ（文字数。1つのセルに入る量より十分小さく）
 const HEADERS = ["id", "name", "score", "count", "height", "date", "hidden", "title", "icon",
-  "ach", "achTotal", "dex", "dexTotal", "bg", "platform", "plays", "pieces", "onlineWins", "onlineLosses", "staff"];
+  "ach", "achTotal", "dex", "dexTotal", "bg", "platform", "plays", "pieces", "onlineWins", "onlineLosses", "staff", "achList"];
 const PROFILE_COL = 10; // プロフィールの列が始まる場所（ach の列。1から数える）
 const STAFF_COL = HEADERS.indexOf("staff") + 1; // スタッフの称号の列（1から数える）
+const ACH_LIST_COL = HEADERS.indexOf("achList") + 1; // 持っている実績の id の一覧の列
+const ACH_LIST_MAX = 300; // 実績の id の数の上限（おかしな量のデータを保存しないように）
+const STATS_CACHE = 300; // 「みんなの称号の取得率」を覚えておく秒数（毎回シートを全部読まないように）
 const PROFILE_KEYS = HEADERS.slice(PROFILE_COL - 1, STAFF_COL - 1); // ["ach", …, "onlineLosses"]
 // スタッフの称号の id と称号の文字（ゲームの js/frames.js の STAFF と同じにする。ここに無い id は保存しない）
 const STAFF_TITLES = { developer: "開発者", admin: "管理者", employee: "社員", operator: "運営" };
@@ -57,8 +62,10 @@ const TZ = "Asia/Tokyo";
 
 // ---------- ランキングを返す（ゲームのランキング画面が読みに来る） ----------
 // ?mode=comp で競技（無ければフリー）。?me=端末の番号 を付けると、その人の順位も返す
+// ?stats=titles で、みんなの称号の取得率（titleStats_）を返す
 function doGet(e) {
   const p = e && e.parameter ? e.parameter : {};
+  if (p.stats === "titles") return json_(titleStats_());
   const mode = modeOf_(p.mode);
   const me = String(p.me || "");
   const list = ranked_(readRows_(mode));
@@ -106,6 +113,7 @@ function doPost(e) {
   const title = staff ? STAFF_TITLES[staff] : cleanText_(d.title, TITLE_MAX);
   const icon = cleanIcon_(d.icon);
   const profile = profileCells_(d.profile); // シートに書く値（公開していなければ、全部 ""）
+  const achList = achListCell_(d.profile); // 持っている実績の id の一覧（公開していなければ ""）
   const count = Number(d.count);
   const height = Math.round(Number(d.height) * 100) / 100;
   const score = Number(d.score);
@@ -131,13 +139,13 @@ function doPost(e) {
     const today = Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd");
     const found = rows.find((r) => r.id === id);
     if (!found) {
-      sh.appendRow([text_(id), text_(name), score, count, height, text_(today), "", title ? text_(title) : "", icon].concat(profile, [staff]));
+      sh.appendRow([text_(id), text_(name), score, count, height, text_(today), "", title ? text_(title) : "", icon].concat(profile, [staff, achList]));
     } else {
       // 名前・称号・アイコンはいつも新しいものに。スコアは前より高いときだけ書きかえる（hidden はそのまま）
       sh.getRange(found.row, 2).setValue(text_(name));
       sh.getRange(found.row, 8, 1, 2).setValues([[title ? text_(title) : "", icon]]);
       sh.getRange(found.row, PROFILE_COL, 1, PROFILE_KEYS.length).setValues([profile]); // 公開をやめた人は、ここで消える
-      sh.getRange(found.row, STAFF_COL).setValue(staff); // スタッフの称号をはずした人は、ここで消える
+      sh.getRange(found.row, STAFF_COL, 1, 2).setValues([[staff, achList]]); // スタッフの称号をはずした人・公開をやめた人は、ここで消える
       if (score > found.score) sh.getRange(found.row, 3, 1, 4).setValues([[score, count, height, text_(today)]]);
     }
     SpreadsheetApp.flush();
@@ -210,7 +218,38 @@ function readRows_(mode) {
     icon: String(v[8] || ""),
     profile: readProfile_(v.slice(PROFILE_COL - 1, STAFF_COL - 1)),
     staff: Object.prototype.hasOwnProperty.call(STAFF_TITLES, String(v[STAFF_COL - 1] || "")) ? String(v[STAFF_COL - 1]) : "",
+    achList: String(v[ACH_LIST_COL - 1] || ""),
   }));
+}
+
+// ---------- みんなの称号の取得率 ----------
+// 届いた profile の achIds（持っている実績の id）を、シートに書く文字にする（カンマ区切り。おかしい id は入れない）
+function achListCell_(p) {
+  if (!p || typeof p !== "object" || !Array.isArray(p.achIds)) return "";
+  const ids = p.achIds.map(String).filter((id) => /^[a-z0-9_]{1,40}$/.test(id));
+  return Array.from(new Set(ids)).slice(0, ACH_LIST_MAX).join(",");
+}
+
+// プロフィールを公開している人のうち、それぞれの実績（称号）を持っている人の数。
+// フリー・競技の両方のシートを見て、同じ端末（id）は1人と数える（新しい方の一覧を使う）。hidden の人は数えない
+//   返す JSON：{ mode: "stats", players: 数えた人の数, counts: { 実績の id: 持っている人の数 } }
+function titleStats_() {
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get("stats:titles");
+  if (hit) return JSON.parse(hit);
+  const lists = {}; // 端末の番号 → 実績の id の一覧
+  for (const mode of Object.keys(MODES)) {
+    for (const r of readRows_(mode)) {
+      if (!r.id || r.hidden || !r.achList) continue;
+      lists[r.id] = r.achList.split(",");
+    }
+  }
+  const counts = {};
+  const ids = Object.keys(lists);
+  for (const id of ids) for (const a of lists[id]) counts[a] = (counts[a] || 0) + 1;
+  const result = { mode: "stats", players: ids.length, counts: counts };
+  cache.put("stats:titles", JSON.stringify(result), STATS_CACHE);
+  return result;
 }
 
 // ---------- プロフィール（公開している人だけ） ----------

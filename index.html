@@ -36,7 +36,7 @@
   <!-- アプリとしてインストールするための設定（PWA） -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="css/style.css?v=3.0.3">
+  <link rel="stylesheet" href="css/style.css?v=3.0.4">
 </head>
 <body>
   <div id="app">
@@ -168,6 +168,12 @@
               <span>プロフィール</span>
             </button>
           </nav>
+
+          <!-- アプリとしてインストールの案内（ブラウザで開いている人だけ。pwa.js。「あとで」で7日間出さない） -->
+          <div id="install-hint" class="install-hint hidden">
+            <button id="btn-install-hint" class="install-hint-main">📲 アプリとしてインストール</button>
+            <button id="btn-install-later" class="install-hint-later">あとで</button>
+          </div>
         </div>
       </div>
 
@@ -432,6 +438,12 @@
       <div id="confetti"></div>
       <div class="screen-inner">
         <div id="result-content"></div>
+        <!-- 初めてのゲームのあとに1度だけ：アプリとしてインストールの案内（pwa.js の atResult） -->
+        <div id="result-install" class="result-install hidden">
+          <span>📲 アプリにすると全画面で遊べます</span>
+          <button id="btn-result-install" class="btn btn-small btn-primary">インストール</button>
+          <button id="btn-result-install-later" class="install-hint-later">あとで</button>
+        </div>
         <div class="menu">
           <!-- オンライン対戦で、相手が「もう一度」を押したときに出る -->
           <p id="rematch-note" class="rematch-note hidden"></p>
@@ -921,6 +933,18 @@
       </div>
     </div>
 
+    <!-- ===== アプリとしてインストールの手順（iPhone・Mac の Safari・アプリの中のブラウザ。pwa.js） ===== -->
+    <div id="install-guide" class="dialog">
+      <div class="dialog-box install-guide-box">
+        <p id="install-guide-title" class="install-guide-title"></p>
+        <ol id="install-guide-steps" class="install-guide-steps"></ol>
+        <div class="dialog-buttons">
+          <button id="install-guide-copy" class="btn btn-primary hidden">URL をコピー</button>
+          <button id="install-guide-close" class="btn btn-sub">閉じる</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== 通知（「実績解除！」など。UI.toast で使う） ===== -->
     <div id="toasts"></div>
 
@@ -940,50 +964,50 @@
 
   <!-- ?v= のあとの番号：更新したら config.js の version と一緒に上げる（スマホに古いファイルが残らないように） -->
   <!-- ライブラリ（lib/ に同梱） -->
-  <script src="lib/decomp.min.js?v=3.0.3"></script>
-  <script src="lib/matter.min.js?v=3.0.3"></script>
-  <script src="lib/peerjs.min.js?v=3.0.3"></script>
-  <script src="lib/mqtt.min.js?v=3.0.3"></script>
+  <script src="lib/decomp.min.js?v=3.0.4"></script>
+  <script src="lib/matter.min.js?v=3.0.4"></script>
+  <script src="lib/peerjs.min.js?v=3.0.4"></script>
+  <script src="lib/mqtt.min.js?v=3.0.4"></script>
   <!-- 設定ファイル -->
-  <script src="config.js?v=3.0.3"></script>
+  <script src="config.js?v=3.0.4"></script>
   <!-- 読み込みの状況（開発用。devMode か ?debug=1 のときだけ表示）。ほかより先に読み込む -->
-  <script src="js/load-status.js?v=3.0.3"></script>
-  <script src="characters.js?v=3.0.3"></script>
-  <script src="js/chars.js?v=3.0.3"></script>
+  <script src="js/load-status.js?v=3.0.4"></script>
+  <script src="characters.js?v=3.0.4"></script>
+  <script src="js/chars.js?v=3.0.4"></script>
   <!-- ゲーム本体 -->
-  <script src="js/settings.js?v=3.0.3"></script>
-  <script src="js/save.js?v=3.0.3"></script>
-  <script src="js/audio.js?v=3.0.3"></script>
-  <script src="js/shape.js?v=3.0.3"></script>
-  <script src="js/aura.js?v=3.0.3"></script>
-  <script src="js/platform-art.js?v=3.0.3"></script>
-  <script src="js/game.js?v=3.0.3"></script>
-  <script src="js/rules.js?v=3.0.3"></script>
-  <script src="js/cpu.js?v=3.0.3"></script>
-  <script src="js/challenge.js?v=3.0.3"></script>
-  <script src="js/card.js?v=3.0.3"></script>
-  <script src="js/stamps.js?v=3.0.3"></script>
-  <script src="js/halloween-home.js?v=3.0.3"></script>
-  <script src="js/halloween.js?v=3.0.3"></script>
-  <script src="js/title-fx.js?v=3.0.3"></script>
-  <script src="js/online.js?v=3.0.3"></script>
-  <script src="js/ui.js?v=3.0.3"></script>
-  <script src="js/themes.js?v=3.0.3"></script>
-  <script src="js/frames.js?v=3.0.3"></script>
-  <script src="js/profile.js?v=3.0.3"></script>
-  <script src="js/data-file.js?v=3.0.3"></script>
-  <script src="js/news.js?v=3.0.3"></script>
-  <script src="js/events.js?v=3.0.3"></script>
-  <script src="js/ranking.js?v=3.0.3"></script>
-  <script src="js/records.js?v=3.0.3"></script>
-  <script src="js/dex.js?v=3.0.3"></script>
-  <script src="js/achievements.js?v=3.0.3"></script>
-  <script src="js/vs-intro.js?v=3.0.3"></script>
-  <script src="js/backup.js?v=3.0.3"></script>
-  <script src="js/controls.js?v=3.0.3"></script>
-  <script src="js/admin.js?v=3.0.3"></script>
-  <script src="js/sandbox.js?v=3.0.3"></script>
-  <script src="js/pwa.js?v=3.0.3"></script>
-  <script src="js/main.js?v=3.0.3"></script>
+  <script src="js/settings.js?v=3.0.4"></script>
+  <script src="js/save.js?v=3.0.4"></script>
+  <script src="js/audio.js?v=3.0.4"></script>
+  <script src="js/shape.js?v=3.0.4"></script>
+  <script src="js/aura.js?v=3.0.4"></script>
+  <script src="js/platform-art.js?v=3.0.4"></script>
+  <script src="js/game.js?v=3.0.4"></script>
+  <script src="js/rules.js?v=3.0.4"></script>
+  <script src="js/cpu.js?v=3.0.4"></script>
+  <script src="js/challenge.js?v=3.0.4"></script>
+  <script src="js/card.js?v=3.0.4"></script>
+  <script src="js/stamps.js?v=3.0.4"></script>
+  <script src="js/halloween-home.js?v=3.0.4"></script>
+  <script src="js/halloween.js?v=3.0.4"></script>
+  <script src="js/title-fx.js?v=3.0.4"></script>
+  <script src="js/online.js?v=3.0.4"></script>
+  <script src="js/ui.js?v=3.0.4"></script>
+  <script src="js/themes.js?v=3.0.4"></script>
+  <script src="js/frames.js?v=3.0.4"></script>
+  <script src="js/profile.js?v=3.0.4"></script>
+  <script src="js/data-file.js?v=3.0.4"></script>
+  <script src="js/news.js?v=3.0.4"></script>
+  <script src="js/events.js?v=3.0.4"></script>
+  <script src="js/ranking.js?v=3.0.4"></script>
+  <script src="js/records.js?v=3.0.4"></script>
+  <script src="js/dex.js?v=3.0.4"></script>
+  <script src="js/achievements.js?v=3.0.4"></script>
+  <script src="js/vs-intro.js?v=3.0.4"></script>
+  <script src="js/backup.js?v=3.0.4"></script>
+  <script src="js/controls.js?v=3.0.4"></script>
+  <script src="js/admin.js?v=3.0.4"></script>
+  <script src="js/sandbox.js?v=3.0.4"></script>
+  <script src="js/pwa.js?v=3.0.4"></script>
+  <script src="js/main.js?v=3.0.4"></script>
 </body>
 </html>

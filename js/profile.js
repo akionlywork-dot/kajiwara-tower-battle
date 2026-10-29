@@ -166,17 +166,36 @@ const Profile = (() => {
       .filter(([id]) => Frames.staffGranted(id))
       .map(([id, s]) => ({ id, title: s.title, rank: "staff", got: true, description: "スタッフの称号" }));
     all.unshift(...staff);
+    // 持っている称号だけを並べる（持っていないものは出さず、見出しの数「持っている数 / 全部」でわかるようにする）
     let html = rowHTML({ id: "", none: true });
     for (const [rank, label] of RANK_GROUPS) {
-      const list = all.filter((a) => a.rank === rank);
+      const list = all.filter((a) => a.rank === rank && !(a.closed && !a.got)); // 期間が終わって、もう取れないものは数えない
       if (!list.length) continue;
-      const got = list.filter((a) => a.got).length;
-      html += `<h3 class="section-title title-group">${label}<small>${got} / ${list.length}</small></h3>` + list.map(rowHTML).join("");
+      const got = list.filter((a) => a.got);
+      html +=
+        `<h3 class="section-title title-group">${label}<small>${got.length} / ${list.length}</small></h3>` +
+        (got.length ? got.map(rowHTML).join("") : `<p class="title-group-empty">まだ持っていません</p>`);
     }
     $("title-list").innerHTML = html;
+    // みんなの取得率（ranking.gs の集計。届いたら書きなおす）
+    Ranking.titleStats().then((stats) => {
+      if (stats && UI.current === "titles") fillTitleRates(stats);
+    });
   }
 
-  // 1つ分の行。取ったものはタップで選べる。まだのものは灰色の枠と「？？？」、下に取り方
+  // 持っている称号の行に「持っている人 〇%」を足す（プロフィールを公開しているプレイヤーのうち）
+  function fillTitleRates(stats) {
+    for (const row of document.querySelectorAll("#title-list .title-row[data-title]")) {
+      const id = row.dataset.title;
+      const rate = Ranking.rateText(stats, id);
+      const main = row.querySelector(".title-row-main");
+      if (!rate || !main || main.querySelector(".title-rate")) continue;
+      main.insertAdjacentHTML("beforeend", `<small class="title-rate">${rate}</small>`);
+    }
+  }
+
+  // 1つ分の行。取ったものはタップで選べる（一覧に並ぶのは、持っている称号だけ）。
+  // まだのもの（a.got が false）は、灰色の枠と「？？？」、下に取り方（今は一覧に出さないので使わない）
   function rowHTML(a) {
     const selected = (pickId || "") === a.id;
     const mark = selected ? `<span class="title-check" aria-label="選んでいる">✓</span>` : "";

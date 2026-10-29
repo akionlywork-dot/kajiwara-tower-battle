@@ -520,6 +520,92 @@ select {
   animation: fade-up 0.5s ease 1s both;
 }
 
+/* タイトル画面：アプリとしてインストールの案内（メニューのすぐ下の小さな帯。pwa.js） */
+.install-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-s);
+  margin-top: var(--space-s);
+  animation: fade-up 0.5s ease 1.4s both;
+}
+
+.install-hint-main {
+  padding: 6px 14px;
+  border: 0;
+  border-radius: var(--radius-round);
+  color: var(--color-text-dark);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 0 var(--color-sub-shadow);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.install-hint-later {
+  padding: 6px 8px;
+  border: 0;
+  color: inherit;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+/* リザルト画面：初めてのゲームのあとに1度だけ出る、アプリとしてインストールの案内 */
+.result-install {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px var(--space-s);
+  margin: var(--space-s) 0;
+  padding: var(--space-s) var(--space-m);
+  border-radius: var(--radius-m);
+  font-size: 13px;
+  font-weight: bold;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* インストールの手順のダイアログ */
+.install-guide-box {
+  text-align: left;
+}
+
+.dialog-box .install-guide-title {
+  margin: 0 0 var(--space-s);
+  font-size: 17px;
+  text-align: center;
+}
+
+.install-guide-steps {
+  margin: 0 0 var(--space-m);
+  text-align: left;
+  padding-left: 1.4em;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.install-guide-steps li + li {
+  margin-top: 6px;
+}
+
+/* 共有ボタン（□に↑）・ホーム画面に追加（□に＋）の絵 */
+.install-share-icon {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  margin: 0 2px;
+  padding: 2px;
+  border-radius: 6px;
+  vertical-align: middle;
+  color: #2f7cf6;
+  background: #eef3fb;
+}
+
 /* 右下のバージョン番号 */
 .version {
   position: absolute;
@@ -3960,6 +4046,22 @@ body.sandbox-on .load-status {
 /* まだ取っていない称号の見本では、飾りも灰色に */
 .avatar.frame-locked[class*="deco-"]::after {
   filter: grayscale(1) opacity(0.6);
+}
+
+/* 称号を選ぶ画面・実績画面：みんなの取得率（「持っている人 〇%」。ranking.gs の集計） */
+.title-rate,
+.ach-rate {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+/* 称号を選ぶ画面：その格の称号を、まだ1つも持っていないとき */
+.title-group-empty {
+  margin: 0 0 var(--space-s);
+  font-size: 12px;
+  opacity: 0.6;
 }
 
 /* =============================================
