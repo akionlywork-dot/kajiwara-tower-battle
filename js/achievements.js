@@ -38,6 +38,8 @@
 //                  競技では数えない（★4 の公安・別班も同じ確率で出て、すぐそろってしまうため）
 //   sameChar     … 1回のゲームで、同じキャラを value 体積んだ
 //   variety      … 1回のゲームで、ちがうキャラを value 種類積んだ（競技では数えない）
+//   rarityStack  … rarities に書いたレア度のキャラを、1回のゲームで（同じタワーに）合わせて value 体以上積んだ（同じキャラでもよい。競技では数えない）
+//                  例 { "type": "rarityStack", "rarities": ["MR", "SEC"], "value": 2 }
 //   rarityMix    … rarities に書いたレア度のキャラを、1回のゲームで全部（1体ずつ以上）積んだ（競技では数えない）
 //                  例 { "type": "rarityMix", "rarities": ["N", "R", "SR", "UR", "MR"] }
 //                  例 { "type": "together", "ids": ["chara18", "chara19"] }
@@ -116,6 +118,11 @@ const Achievements = (() => {
         return !!game && Math.max(0, ...Object.values(game.placedCounts || {})) >= v;
       case "variety":
         return !!game && !game.comp && (game.placedIds || []).length >= v;
+      case "rarityStack": {
+        const rarities = cond.rarities || [];
+        const n = Object.entries((game && game.placedCounts) || {}).reduce((sum, [id, k]) => sum + (rarities.includes((Chars.byId(id) || {}).rarity || "N") ? k : 0), 0);
+        return !!game && !game.comp && rarities.length > 0 && n >= (v || 1);
+      }
       case "rarityMix": {
         const rarities = cond.rarities || [];
         const placed = new Set((game && game.placedIds || []).map((id) => (Chars.byId(id) || {}).rarity || "N"));

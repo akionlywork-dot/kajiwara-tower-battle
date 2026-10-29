@@ -419,7 +419,7 @@
       "hidden": true,
       "name": "シークレットとの遭遇",
       "title": "秘密を知る者",
-      "rank": "mythic",
+      "rank": "legend",
       "description": "★6（シークレット）のキャラが出た（積めなくてもよい）",
       "category": "レア",
       "condition": {
@@ -653,15 +653,18 @@
     {
       "id": "sec_placed",
       "hidden": true,
-      "name": "シークレットを積む",
+      "name": "まぼろしの共演",
       "title": "キング・オブ・タワー",
       "rank": "mythic",
-      "description": "★6（シークレット）のキャラを積んだ",
+      "description": "★5（まぼろし）・★6（シークレット）のキャラを、同じタワーに合わせて2体以上積んだ",
       "category": "レア",
       "condition": {
-        "type": "rarityPlaced",
-        "rarity": "SEC",
-        "value": 1
+        "type": "rarityStack",
+        "rarities": [
+          "MR",
+          "SEC"
+        ],
+        "value": 2
       }
     },
     {
@@ -669,13 +672,12 @@
       "hidden": true,
       "name": "新顔コンプリート",
       "title": "新時代の目撃者",
-      "rank": "mythic",
-      "description": "v3.1.0 で増えた11体を、全部図鑑に登録した",
+      "rank": "legend",
+      "description": "v3.1.0 で増えたキャラのうち、シークレット以外の10体を、全部図鑑に登録した",
       "category": "図鑑",
       "condition": {
         "type": "dexAll",
         "ids": [
-          "chara16",
           "chara17",
           "chara18",
           "chara19",

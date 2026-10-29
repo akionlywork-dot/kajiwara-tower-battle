@@ -665,7 +665,9 @@ const Game = (() => {
   }
 
   function nextPiece() {
-    const forced = !fair && forcedId && shapeById(forcedId);
+    // 管理者モードの「次に出すキャラ」。競技では、競技に出ないキャラ（★5・★6 など）は使わない
+    const pick = !fair && forcedId && shapeById(forcedId);
+    const forced = pick && (!comp || Chars.inCompetitive(pick)) ? pick : null;
     held = { shape: ruleShape(forced || randomShape()), x: WORLD_W / 2, angle: 0 };
     drawn.push(held.shape.id); // 出た順（実績「デジャヴ」）。長くなりすぎないよう、最後の数体だけ残す
     if (drawn.length > 8) drawn.shift();
