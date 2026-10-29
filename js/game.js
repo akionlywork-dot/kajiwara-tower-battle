@@ -157,7 +157,7 @@ const Game = (() => {
           // 最後に落としたキャラが着地したら「置いた音」を鳴らす
           if (b === dropped && callbacks.onLand) callbacks.onLand();
           // ★5（まぼろし）は、着地した瞬間に虹色の光がはじける（aura.js。タイトルのデモではしない）
-          if (b === dropped && state !== "demo") Aura.burst(b.shape, b.position.x, b.position.y);
+          if (b === dropped && state !== "demo" && !comp) Aura.burst(b.shape, b.position.x, b.position.y); // 競技では出さない
         }
       }
     });
@@ -1898,6 +1898,8 @@ const Game = (() => {
   // オーラの光は aura.js が、一度作った画像を貼るだけなので軽い。
   // emit が true なら、オーラの粒（光の粒・もや・キラッ）も出す（ゲーム画面だけ。写真・画像には出さない）
   function drawSprite(shape, x, y, angle, alpha, aura, emit) {
+    // 競技：レア度のオーラ・光・ふち・粒は描かない（全キャラ画像そのまま。ゲーム中・リザルトカードの画像・フォトモードのどれも）
+    if (comp) aura = null;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(x, y);

@@ -15,7 +15,7 @@ const Settings = (() => {
     debug: false, // 当たり判定を表示（確認用）
     cardSize: "landscape", // リザルトカードの形（"landscape"=横長 / "portrait"=縦長）
     cardIcon: false, // リザルトカードに写真アイコンを載せるか（初めは載せない）
-    ranking: false, // ハイスコアをランキングに自動で送るか（最初に1回だけ聞く）
+    ranking: false, // ランキングへの参加に同意したか（スコアアタック・競技を初めて遊ぶときに聞く。同意した人のハイスコアを自動で送る）
     eventPreview: false, // 管理者モード：イベント期間中として表示する（確認用）
     rankingIcon: false, // ランキングに写真アイコンも載せるか（写真を設定している人に、1回だけ聞く）
     onlineIcon: false, // オンライン対戦の相手に、写真アイコンを見せるか（初めは見せない）

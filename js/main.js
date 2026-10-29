@@ -65,15 +65,23 @@
     if (Game.playing && !isCpuTurn()) Game.setTurnTimeLimit(turnTimeLimit());
   }
 
-  // 1手の制限時間（秒）。オンライン対戦だけ（config.js の online.turnTime）。ほかのモードは制限なし
+  // 1手の制限時間（秒）。ともだちと対戦（config.js の versus.turnTimeLimit）・オンライン対戦（online.turnTime）は、いつも制限時間あり。
+  // CPU対戦・ひとりモードは制限なし
   function turnTimeLimit() {
-    return mode === "online" ? Number(CONFIG.online.turnTime) || 0 : 0;
+    if (mode === "online") return Number(CONFIG.online.turnTime) || 0;
+    if (mode === "versus" && !cpuLevel) return Number((CONFIG.versus || {}).turnTimeLimit) || 0;
+    return 0;
   }
 
   // 設定画面のスイッチ（data-setting="bgm" などの名前で、どの設定か分かる）
   const toggles = document.querySelectorAll(".toggle[data-setting]");
   function updateToggles() {
     for (const t of toggles) t.setAttribute("aria-checked", String(Settings.get(t.dataset.setting)));
+    const vs = Number((CONFIG.versus || {}).turnTimeLimit) || 0;
+    const on = Number(CONFIG.online.turnTime) || 0;
+    $("setting-time-note").textContent =
+      `ともだちと・オンライン対戦は、いつも制限時間あり（1手 ${vs === on ? `${vs}秒` : `ともだちと ${vs}秒・オンライン ${on}秒`}。時間切れになると、その場で自動で落ちる）。CPU対戦・ひとりで遊ぶときは、制限時間なし`;
+    Ranking.renderConsent();
     // data-needs="ranking" の行（プロフィールを公開・写真アイコン）は、ランキングに参加しているときだけ選べる
     for (const row of document.querySelectorAll(".setting-row[data-needs]")) {
       const off = !Settings.get(row.dataset.needs);
@@ -201,7 +209,7 @@
         },
         onLand: () => playSe("place"),
         onRare: (shape, info) => {
-          showRareBanner(shape, info);
+          if (!comp) showRareBanner(shape, info); // 競技：「レア！」・画面が光る演出・効果音は出さない（全キャラ同じ見た目）
           // 自分の番に出たレアを数える（CPU・オンライン対戦の相手の番、競技はのぞく）
           if (!comp && !isCpuTurn() && !(mode === "online" && player !== myPlayer())) {
             Records.addDrawn(shape);
@@ -805,7 +813,7 @@
     $("side-timer").innerHTML = typeof left === "number" ? `<span>制限時間</span><b class="${left < 3000 ? "hurry" : ""}">${Math.ceil(left / 1000)}<small>秒</small></b>` : "";
   }
   setInterval(() => {
-    if (UI.current === null && mode === "online") updateSideTimer();
+    if (UI.current === null && (mode === "online" || mode === "versus")) updateSideTimer();
   }, 200);
 
   // レアキャラが出たときの「レア！」「めっちゃレア！！」「激レア！！！」
@@ -816,8 +824,7 @@
     const legendary = info.stars >= 5; // ★5（まぼろし）：画面が虹色に光る、いちばん豪華な演出
     // 文字は config.js のレア度の名前 ＋「！」（★2は1つ、★3は2つ、★4は3つ）。例「めっちゃレア！！」
     const label = info.name + "！".repeat(Math.max(1, Math.min(3, info.stars - 1)));
-    // 競技：レアの演出は出すが、図鑑には登録されないことを書きそえる
-    el.innerHTML = `<span>${label}</span><small>${UI.escape(shape.name)}</small>` + (comp && mode === "solo" ? `<em class="rare-nodex">競技なので図鑑には登録されません</em>` : "");
+    el.innerHTML = `<span>${label}</span><small>${UI.escape(shape.name)}</small>`;
     el.style.setProperty("--rare-color", info.color);
     el.className = legendary ? "rare-banner ultimate legendary" : ultimate ? `rare-banner ultimate aura-${shape.aura || "light"}` : info.stars >= 3 ? "rare-banner super" : "rare-banner";
     el.style.animation = "none"; // アニメーションを最初から
@@ -1065,6 +1072,7 @@
       `<li>全キャラ<b>同じ大きさ</b>。特殊ルールのギミックはありません</li>`,
       `<li>点数は1体 ${conf.perPiece}点（どのキャラも同じ）＋ 高さ1mごとに ${conf.perMeter}点</li>`,
       `<li>ハイスコアは、<b>ランキング（競技）</b>に載ります（ふつうのスコアアタックとは別）</li>`,
+      `<li>キャラの光やレアの表示は出ません（全キャラ同じ見た目）</li>`,
       `<li class="comp-dialog-warn">競技で出たキャラは、<b>図鑑には登録されません</b></li>`,
     ].join("");
     $("comp-dialog-hide").checked = false;
@@ -1153,9 +1161,10 @@
       (c.comp ? `<span class="rule-tag comp-tag">🏁 競技</span>` : r ? `<span class="rule-tag">${r.params.icon || ""} ${UI.escape(r.params.name)}</span>` : "") +
       `<p class="challenge-note">同じ順番でキャラが出てきます。この点数を超えたら勝ち！${c.comp ? "<br>競技のルールで遊びます（図鑑には登録されません）" : ""}</p>`;
     $("challenge-popup").classList.add("active");
-    $("challenge-accept").onclick = () => {
+    $("challenge-accept").onclick = async () => {
       $("challenge-popup").classList.remove("active");
       if (!shapesReady) return; // キャラの画像を読み込めなかった
+      if (!(await Ranking.ensureConsent())) return; // 挑戦状もスコアアタック・競技なので、同意してから
       challenge = c;
       startGame("solo", c.rule, null, null, c.comp);
     };
@@ -1192,12 +1201,20 @@
     $("mode-best").textContent = best ? `スコアアタック ${best.score}点` : "";
   });
   // スコアアタック：ふつうのルール（ルールを選ぶ画面のいちばん上）
-  on("btn-solo", () => startGame("solo"));
-  // 競技（「ふつう」のすぐ下）：初めてのうちは、ルールの説明を出してから始める
-  on("btn-comp", async () => {
-    if (Settings.get("compIntro") && !(await showCompIntro())) return;
-    startGame("solo", null, null, null, true);
-  });
+  // スコアアタック・特殊ルール・競技は、ランキングへの参加に同意してから始める（ranking.js の ensureConsent）。
+  // 「やめる」なら始めずに、モード選択に戻る（対戦は同意しなくても遊べる）
+  async function startSolo(newRuleId = null, newComp = false) {
+    if (!(await Ranking.ensureConsent())) {
+      if (UI.current === "rules") UI.show("mode");
+      return;
+    }
+    // 競技：初めてのうちは、ルールの説明を出してから始める
+    if (newComp && Settings.get("compIntro") && !(await showCompIntro())) return;
+    startGame("solo", newRuleId, null, null, newComp);
+  }
+  on("btn-solo", () => startSolo());
+  // 競技（「ふつう」のすぐ下）
+  on("btn-comp", () => startSolo(null, true));
   on("btn-versus", () => startGame("versus"));
   // CPU と対戦（data-cpu に強さ）
   for (const btn of document.querySelectorAll("[data-cpu]")) {
@@ -1251,7 +1268,7 @@
   });
   $("rules-list").addEventListener("click", (e) => {
     const row = e.target.closest("[data-rule]");
-    if (row) startGame("solo", row.dataset.rule);
+    if (row) startSolo(row.dataset.rule);
   });
   on("btn-result-title", goTitle);
   on("btn-challenge", sendChallenge);

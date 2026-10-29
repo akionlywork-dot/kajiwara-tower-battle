@@ -74,6 +74,9 @@ function doGet(e) {
 }
 
 // ---------- スコアを受け取る（ゲームが自動で送ってくる） ----------
+// 記録を消す（ゲームの設定画面で「ランキングへの参加の同意を取り消す」を押したとき）：
+//   本文（JSON）：{ action: "delete", id }。その端末の番号の行を、フリー・競技の両方のシートから消す
+//   返す JSON：{ ok: true, action: "delete", deleted: 消した行の数 }
 // 本文（JSON）：{ mode, id, name, title, icon, score, count, height, profile }
 //   mode … "comp" なら競技のシート、それ以外（"free"・無い）ならフリーのシートに書く
 //   profile … 「ランキングでプロフィールを公開」が ON の人だけ。OFF の人・古いバージョンからは届かない（そのときは消す）
@@ -85,6 +88,7 @@ function doPost(e) {
   } catch (err) {
     return json_({ ok: false, error: "bad request" });
   }
+  if (d.action === "delete") return deleteRecords_(String(d.id || ""));
   const mode = modeOf_(d.mode);
   const conf = MODES[mode];
   const id = String(d.id || "");
@@ -130,6 +134,28 @@ function doPost(e) {
     const list = ranked_(readRows_(mode));
     const mine = list.find((r) => r.id === id);
     return json_({ ok: true, mode: mode, rank: mine ? mine.rank : null, total: list.length });
+  } finally {
+    lock.release();
+  }
+}
+
+// 端末の番号 id の行を、フリー・競技の両方のシートから消す（下の行から消す。上から消すと、行の番号がずれるため）
+function deleteRecords_(id) {
+  if (!/^[0-9a-zA-Z-]{16,64}$/.test(id)) return json_({ ok: false, error: "bad id" });
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    let deleted = 0;
+    for (const mode of Object.keys(MODES)) {
+      const sh = sheet_(mode);
+      const rows = readRows_(mode).filter((r) => r.id === id).sort((a, b) => b.row - a.row);
+      for (const r of rows) {
+        sh.deleteRow(r.row);
+        deleted++;
+      }
+    }
+    SpreadsheetApp.flush();
+    return json_({ ok: true, action: "delete", deleted: deleted });
   } finally {
     lock.release();
   }

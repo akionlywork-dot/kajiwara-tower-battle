@@ -78,7 +78,7 @@ const Controls = (() => {
     if (dialog) {
       if (e.key === "Escape") {
         e.preventDefault();
-        clickFirst(dialog, ["#dialog-cancel:not(.hidden)", "#comp-dialog-cancel", "#challenge-later", "#share-close", ".btn-sub:not(.hidden)", "#dialog-ok"]);
+        clickFirst(dialog, ["#dialog-cancel:not(.hidden)", "#comp-dialog-cancel", "#consent-cancel", "#challenge-later", "#share-close", ".btn-sub:not(.hidden)", "#dialog-ok"]);
       } else if (e.key === "Enter" && !typing(e) && !(e.target.closest && e.target.closest(".dialog button"))) {
         // ボタンを選んでいるときは、そのボタンがそのまま押される（ブラウザのふつうの動き）
         e.preventDefault();

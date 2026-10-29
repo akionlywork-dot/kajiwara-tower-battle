@@ -1796,17 +1796,51 @@ select {
   background: #14968c;
 }
 
-/* レアの表示に書きそえる「競技なので図鑑には登録されません」 */
-.rare-banner .rare-nodex {
-  display: inline-block;
-  margin-top: 6px;
-  padding: 2px 10px;
-  border-radius: var(--radius-round);
-  color: #fff;
-  background: rgba(20, 30, 55, 0.75);
-  font-size: 12px;
-  font-style: normal;
+/* ランキングへの参加の同意（ranking.js の ensureConsent） */
+.consent-dialog-box {
+  text-align: left;
+}
+
+.consent-dialog-box .consent-title {
+  margin: 0 0 var(--space-s);
+  font-size: 18px;
   font-weight: bold;
+  text-align: center;
+}
+
+.consent-dialog-box .consent-text {
+  margin: 0 0 var(--space-s);
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.consent-dialog-box .consent-list {
+  margin: 0 0 var(--space-s);
+  padding: var(--space-s) var(--space-m);
+  border-radius: var(--radius-s);
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.consent-dialog-box .consent-note {
+  margin: 0 0 var(--space-s);
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.consent-profile {
+  display: flex;
+  margin: 0 auto var(--space-m);
+}
+
+/* 設定画面：説明だけの行（制限時間）・ランキングへの参加の状態 */
+.setting-row.setting-info {
+  cursor: default;
+}
+
+.ranking-consent-row .btn:disabled,
+.ranking-consent-row .btn.hidden {
+  display: none;
 }
 
 /* 競技の説明のダイアログ */

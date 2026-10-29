@@ -9,7 +9,11 @@
 //   「ランキングでプロフィールを公開」が ON の人だけ、実績の数・図鑑の数・背景と土台の id・プレイ回数・
 //   積んだ数の合計・オンライン対戦の勝敗も送る（OFF にすると、次に送ったときにサーバーから消える）。
 //   ランキングは「フリー」（スコアアタックのふつうのルール）と「競技」（config.js の competitive）の2つ。
-//   画面の上のタブで切りかえる。特殊ルールは載せない。最初に1回だけ「送ってもいいか」を聞く（参加の設定は2つで共通）。
+//   画面の上のタブで切りかえる。特殊ルールは載せない。
+//   ランキングへの参加は、遊ぶ条件：スコアアタック（ふつう・特殊ルール）・競技を初めて遊ぶときに、同意のダイアログを出す
+//   （ensureConsent。「同意して遊ぶ」で参加（設定の ranking が true）、「やめる」なら始めない。対戦は同意しなくても遊べる）。
+//   前から「ランキングに参加」を ON にしていた人は、同意ずみとして扱う。参加の設定は、フリー・競技で共通。
+//   設定画面の「同意を取り消す」で、ranking.gs に記録を消してもらい（action: "delete"）、参加をやめる
 //   競技のスコアは、サーバー（ranking.gs）が競技に対応しているとき（GET ?mode=comp に mode: "comp" が返る）だけ送る
 //   （古い ranking.gs のままだと、競技のスコアがフリーのランキングに混ざってしまうため）
 // ranking.url が "" のとき：
@@ -51,6 +55,8 @@ const Ranking = (() => {
         open();
       });
     }
+    // 設定画面：同意を取り消す
+    $("btn-ranking-revoke").addEventListener("click", revokeConsent);
     $("rank-profile-close").addEventListener("click", closeProfile);
     $("rank-profile-mine").addEventListener("click", () => {
       closeProfile();
@@ -331,8 +337,9 @@ const Ranking = (() => {
   // アプリを開いたとき（main.js から呼ばれる）：
   // 前からハイスコアがある人には、遊ばなくても「送っていいか」を聞いて、自己ベストを載せる。
   // 参加ずみの人は、前に送れなかった記録や、変えた名前・称号・アイコンを送りなおす
+  // 同意していない人には、何もしない（スコアアタック・競技を遊ぶときに、同意のダイアログを出す）
   async function atStartup() {
-    if (!isOnline() || Admin.unlocked) return; // 管理者モードの記録は、公開のランキングに送らない
+    if (!isOnline() || Admin.unlocked || !Settings.get("ranking")) return; // 管理者モードの記録は、公開のランキングに送らない
     if ((!mem().asked && anyBest()) || needIconQuestion()) {
       await waitTitle();
       return afterSoloGame();
@@ -348,29 +355,19 @@ const Ranking = (() => {
   }
 
   // スコアアタック（ふつうのルール）・競技が終わったときに main.js から呼ばれる。
-  // 初めてなら「送ってもいいか」を聞く（写真アイコンがある人には、写真を載せるかも聞く）
+  // 同意してから初めてのゲームのあとに、プロフィールも公開するかを1回だけ聞く（mem().asked。写真アイコンがある人には、写真を載せるかも聞く）
   async function afterSoloGame() {
-    if (!isOnline() || Admin.unlocked) return;
+    if (!isOnline() || Admin.unlocked || !Settings.get("ranking")) return;
     if (!mem().asked && anyBest()) {
       mem().asked = true;
       Save.write();
-      const yes = await UI.confirm(
-        `あなたのハイスコア（${anyBest().score}点）を、みんなのランキングに載せますか？\nこれからも、自己ベストを更新したら自動で送ります。\n\n送るもの：名前「${Save.playerName(1)}」・称号・スコア・積んだ数・高さ\n名前と称号はランキングで公開されます。\n（設定画面でいつでも変えられます）`,
-        "送る",
+      const pub = await UI.confirm(
+        "プロフィールも、ランキングで公開しますか？\n\nランキングであなたの行を押した人に、実績の数・図鑑の数・選んでいる背景と土台・プレイ回数・積んだ数の合計・オンライン対戦の勝敗が見えます。\n（設定画面でいつでも変えられます）",
+        "公開する",
         true,
-        "送らない"
+        "公開しない"
       );
-      Settings.set("ranking", yes);
-      // 参加する人には、プロフィールも公開するか聞く（初めて送るときだけ。あとは設定画面で変えられる）
-      if (yes) {
-        const pub = await UI.confirm(
-          "プロフィールも、ランキングで公開しますか？\n\nランキングであなたの行を押した人に、実績の数・図鑑の数・選んでいる背景と土台・プレイ回数・積んだ数の合計・オンライン対戦の勝敗が見えます。\n（設定画面でいつでも変えられます）",
-          "公開する",
-          true,
-          "公開しない"
-        );
-        Settings.set("rankingProfile", pub);
-      }
+      Settings.set("rankingProfile", pub);
     }
     if (needIconQuestion()) {
       mem().iconAsked = true;
@@ -384,6 +381,69 @@ const Ranking = (() => {
       Settings.set("rankingIcon", yes);
     }
     await submitBest();
+  }
+
+  // ---------- ランキングへの参加の同意 ----------
+  // スコアアタック（ふつう・特殊ルール）・競技を始める前に、main.js から呼ばれる。遊んでよければ true。
+  // 同意ずみ（設定の ranking が true）なら、何も出さずに true。オンラインのランキングを使っていなければ、いつも true
+  function ensureConsent() {
+    if (!isOnline() || Settings.get("ranking")) return Promise.resolve(true);
+    const box = $("consent-dialog");
+    box.classList.add("active");
+    return new Promise((resolve) => {
+      const close = (ok) => {
+        box.classList.remove("active");
+        $("consent-ok").onclick = $("consent-cancel").onclick = $("consent-profile").onclick = null;
+        if (ok) {
+          Settings.set("ranking", true);
+          mem().asked = false; // 初めてのゲームのあとに、プロフィールも公開するかを聞く
+          Save.write();
+        }
+        resolve(ok);
+      };
+      $("consent-ok").onclick = () => close(true);
+      $("consent-cancel").onclick = () => close(false);
+      // 名前を出したくない人：プロフィールで名前を変えてから、もう一度選んでもらう
+      $("consent-profile").onclick = () => {
+        close(false);
+        UI.show("profile");
+      };
+    });
+  }
+
+  // 設定画面の「ランキングへの参加」の欄（同意しているかと、取り消しボタン）
+  function renderConsent() {
+    const on = Settings.get("ranking");
+    $("ranking-consent-state").textContent = on
+      ? "同意ずみ（スコアアタック・競技の記録がランキングに載ります）"
+      : "まだ同意していません（スコアアタック・競技を始めるときに確認します）";
+    $("btn-ranking-revoke").classList.toggle("hidden", !on);
+  }
+
+  // 同意を取り消す：ranking.gs に、この端末の記録（フリー・競技の両方）を消してもらい、参加をやめる。
+  // 次にスコアアタック・競技を遊ぶときに、また同意のダイアログが出る
+  async function revokeConsent() {
+    if (!(await UI.confirm("ランキングへの参加の同意を取り消しますか？\nランキング（フリー・競技）から、あなたの記録を消します。\n次にスコアアタック・競技を遊ぶときに、また確認します。", "取り消す"))) return;
+    let res = null;
+    try {
+      res = await request(url(), {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "delete", id: playerId() }),
+      });
+    } catch (e) {
+      console.warn("ランキングの記録を消せませんでした:", e.message);
+    }
+    if (!res || !res.ok || res.action !== "delete") {
+      // 通信できなかった・古い ranking.gs（記録を消す受付がない）：同意はそのまま
+      await UI.alert("ランキングの記録を消せませんでした。\n通信できる場所で、もう一度ためしてください。");
+      return;
+    }
+    Settings.set("ranking", false);
+    Object.assign(mem(), { sentScore: 0, sentScoreComp: 0, sentProfile: "", sentProfileComp: "", lastRank: null, asked: false });
+    Save.write();
+    if (UI.current === "settings") UI.show("settings"); // 設定画面を書きなおす（同意の状態・写真とプロフィールのスイッチ）
+    UI.toast("ランキングから、あなたの記録を消しました");
   }
 
   // 写真アイコンを載せるか、まだ聞いていない（ランキングに参加していて、写真を設定している人だけ）
@@ -475,5 +535,5 @@ const Ranking = (() => {
     }
   }
 
-  return { init, atStartup, afterSoloGame, submitBest, joined, opponentKey };
+  return { init, atStartup, afterSoloGame, submitBest, joined, opponentKey, ensureConsent, renderConsent };
 })();
