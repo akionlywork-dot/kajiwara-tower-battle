@@ -7,7 +7,7 @@ window.GAME_CONFIG = {
   achievementsEpoch: 2,
 
   // バージョン番号（タイトル画面の右下に表示される）
-  version: "v3.2.2",
+  version: "v3.2.3",
 
   // 開発用の機能を使うか。公開するときは false にする
   // true にすると、設定画面に「当たり判定を表示」のスイッチが出る
@@ -199,7 +199,7 @@ window.GAME_CONFIG = {
     easy: { name: "よわい", candidates: 6, choice: "random", noise: 45, thinkTime: 1.2, maxThink: 1.5 },
     normal: { name: "ふつう", candidates: 24, choice: "top", noise: 10, thinkTime: 1.4, maxThink: 2.5 },
     hard: { name: "つよい", candidates: 56, choice: "best", noise: 0, thinkTime: 1.6, maxThink: 3.5 },
-    // ハロウィンイベント「おばけ屋敷」の CPU（初めは「つよい」と同じ。勝ちやすさはここで調整する）。
+    // ハロウィンイベント「おばけ屋敷」の CPU（v3.2.3 から「ふつう」と同じ。勝ちやすさはここで調整する）。
     // event を書いた強さは、ふつうの CPU 対戦のボタン・戦績には出ない
     halloween: { name: "ふつう", candidates: 24, choice: "top", noise: 10, thinkTime: 1.4, maxThink: 2.5, event: "halloween2026" },
   },
@@ -275,7 +275,7 @@ window.GAME_CONFIG = {
     haunted: {
       name: "おばけ屋敷",
       icon: "🎃",
-      description: "まっくらなお屋敷で、CPU「つよい」と対戦。ときどき稲妻が光り、おばけが落ちているキャラを押してくる",
+      description: "まっくらなお屋敷で、CPU「ふつう」と対戦。ときどき稲妻が光り、おばけが落ちているキャラを押してくる",
       event: "halloween2026",
       stage: true,
       darkness: 0.86, // 暗さ（0〜1。1でまっくら）

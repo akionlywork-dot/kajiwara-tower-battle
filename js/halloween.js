@@ -48,7 +48,7 @@ const Halloween = (() => {
     if (!isOpen()) return;
     const n = wins();
     const all = rewards().length;
-    $("halloween-progress").textContent = n >= all ? `制覇！（${n}勝）` : `CPU つよい に勝ってごほうびをゲット 🎃 ${n}/${all}`;
+    $("halloween-progress").textContent = n >= all ? `制覇！（${n}勝）` : `CPU ふつう に勝ってごほうびをゲット 🎃 ${n}/${all}`;
   }
 
   // タイトル画面のかぼちゃ・こうもり（CSS）と、後ろの絵（背景「ハロウィンの夜」・かぼちゃの台・飾り。halloween-home.js）。
