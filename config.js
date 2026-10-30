@@ -178,7 +178,7 @@ window.GAME_CONFIG = {
     MR: { name: "まぼろし", rate: 1, color: "#7ef0ff", stars: 5 },
     // ★6：シークレット。まぼろしより上で、いちばん出にくい。出ると、画面が暗くなって金色の光がはじける専用の演出（「シークレット！！！」）。
     //      図鑑では金と黒の専用の枠、まだのキャラは「？」。オーラは金色（js/aura.js の SECRET）
-    SEC: { name: "シークレット", rate: 0.3, color: "#ffd54a", stars: 6 },
+    SEC: { name: "シークレット", rate: 0.1, color: "#ffd54a", stars: 6 },
   },
 
   // サイズ違いのキャラ（characters.js の variant: "big" / "small"）
@@ -201,7 +201,7 @@ window.GAME_CONFIG = {
     hard: { name: "つよい", candidates: 56, choice: "best", noise: 0, thinkTime: 1.6, maxThink: 3.5 },
     // ハロウィンイベント「おばけ屋敷」の CPU（初めは「つよい」と同じ。勝ちやすさはここで調整する）。
     // event を書いた強さは、ふつうの CPU 対戦のボタン・戦績には出ない
-    halloween: { name: "つよい", candidates: 56, choice: "best", noise: 0, thinkTime: 1.6, maxThink: 3.5, event: "halloween2026" },
+    halloween: { name: "ふつう", candidates: 24, choice: "top", noise: 10, thinkTime: 1.4, maxThink: 2.5, event: "halloween2026" },
   },
 
   // オンライン対戦
