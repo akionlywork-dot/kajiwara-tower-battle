@@ -78,6 +78,26 @@ html, body {
   -webkit-text-size-adjust: 100%; /* 横向きにしたときに文字が勝手に大きくならないようにする */
 }
 
+/* 文章の折り返し：
+   ・word-break: auto-phrase … 文節（「ランキングに」「載ります」など）の切れ目で改行し、言葉の途中で切らない
+     （html の lang="ja" で効く。Chrome・Edge・Android。iPhone の Safari では、今までどおりの改行）
+   ・overflow-wrap: break-word … 1つの文節が行に入りきらないときは、その中で改行する（はみ出さないように）
+   ・text-wrap: pretty … 最後の行が1〜2文字だけにならないように、前の行から少し送る
+   1行に収めたいところ（名前・ボタン・札など）は、それぞれの場所で white-space: nowrap にしている */
+body {
+  word-break: auto-phrase;
+  overflow-wrap: break-word;
+  text-wrap: pretty;
+}
+
+/* 見出し・ボタンは、行の長さをそろえる（1行目だけ長くて、2行目が短い、にならないように） */
+h1,
+h2,
+h3,
+.btn {
+  text-wrap: balance;
+}
+
 img {
   -webkit-user-drag: none; /* 画像を指で引っぱって動かせないようにする */
 }
@@ -250,10 +270,13 @@ select {
 /* プレイヤーの色のラベル */
 .player-tag {
   display: inline-block;
+  max-width: 100%;
   padding: var(--space-xs) var(--space-m);
   border-radius: var(--radius-round);
   color: #fff;
-  font-size: 20px;
+  /* 長い名前のときだけ小さくして、1行に収める（--fit は名前の長さ。main.js の UI.fit） */
+  font-size: clamp(13px, calc(min(52vw, 240px) / var(--fit, 1)), 20px);
+  white-space: nowrap;
   text-shadow: none;
 }
 
@@ -267,9 +290,10 @@ select {
   right: 0;
   top: 38%;
   z-index: 6;
-  padding: var(--space-m) 0;
+  padding: var(--space-m) var(--space-s);
   text-align: center;
-  font-size: 44px;
+  /* 長い名前のときだけ小さくする（--fit は文字の長さ。main.js の showTurnBanner） */
+  font-size: clamp(22px, calc(min(88vw, 400px) / var(--fit, 1)), 44px);
   font-weight: bold;
   letter-spacing: 0.05em;
   pointer-events: none;
@@ -795,7 +819,11 @@ select {
 }
 
 .page-header h2 {
-  font-size: var(--font-size-l);
+  min-width: 0;
+  overflow: hidden;
+  font-size: clamp(18px, 5.6vw, var(--font-size-l)); /* 小さいスマホでは少し小さく（右の数と並んでも1行に） */
+  white-space: nowrap;
+  text-overflow: ellipsis;
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
 }
 
@@ -946,7 +974,7 @@ select {
 .rank-row {
   display: flex;
   align-items: center;
-  gap: var(--space-m);
+  gap: clamp(6px, 2.2vw, var(--space-m)); /* スマホでは間を少しつめて、名前・称号の幅を広げる */
   height: 84px; /* どの人の行も同じ高さ（名前・称号・積んだ数がそれぞれ1行） */
   margin-bottom: var(--space-s);
   padding: var(--space-s) var(--space-m);
@@ -976,7 +1004,7 @@ select {
 .rank-main b {
   display: block;
   overflow: hidden;
-  font-size: var(--font-size-m);
+  font-size: clamp(14px, 4.4vw, var(--font-size-m));
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -1070,7 +1098,7 @@ select {
 
 .rank-score {
   flex-shrink: 0;
-  font-size: 22px;
+  font-size: clamp(16px, 5vw, 22px); /* スマホでは少し小さく（名前・称号の幅を広げる） */
   font-weight: bold;
   text-align: right;
   line-height: 1.1;
@@ -1097,7 +1125,7 @@ select {
 .rank-silver .rank-num { color: #3c4656; background: #dce4f0; }
 .rank-bronze .rank-num { color: #fff; background: #c27a45; }
 .rank-gold, .rank-silver, .rank-bronze { padding-top: var(--space-m); padding-bottom: var(--space-m); }
-.rank-gold .rank-score { color: var(--color-gold); font-size: 26px; }
+.rank-gold .rank-score { color: var(--color-gold); font-size: clamp(18px, 5.8vw, 26px); }
 
 /* ランキングがまだ無いとき（準備中） */
 .coming-soon {
@@ -1159,6 +1187,11 @@ select {
   min-width: 0;
 }
 
+/* 「120体・30.55m」は1行で */
+.my-record .rank-score em {
+  white-space: nowrap;
+}
+
 .my-record-label {
   position: absolute;
   top: 6px;
@@ -1214,10 +1247,12 @@ select {
 
 /* 見出しの右の数（図鑑の「3 / 12体」など） */
 .header-count {
+  flex-shrink: 0;
   margin-left: auto;
   padding: 4px var(--space-m);
   border-radius: var(--radius-round);
-  font-size: var(--font-size-s);
+  font-size: clamp(11px, 3.4vw, var(--font-size-s));
+  white-space: nowrap;
   font-weight: bold;
   background: var(--color-panel);
 }
@@ -1370,8 +1405,10 @@ select {
 
 /* 実績のごほうび（背景・土台。achievements.json の reward） */
 .ach-reward {
+  display: inline-block;
   margin-left: 6px;
   color: #8fe3ff;
+  white-space: nowrap;
 }
 
 .ach-locked .ach-reward {
@@ -1416,7 +1453,8 @@ select {
   display: inline-block;
   padding: 4px 24px;
   border-radius: var(--radius-round);
-  font-size: 34px;
+  font-size: clamp(20px, 8vw, 34px); /* 「みたことない！！！」もスマホの幅で1行に */
+  white-space: nowrap;
   font-weight: bold;
   color: #fff;
   background: var(--rare-color);
@@ -1763,17 +1801,19 @@ select {
   text-overflow: ellipsis;
 }
 
-/* 解放条件：見本の下に小さく1行。タップすると全文（.expanded） */
+/* 解放条件：見本の下に小さく2行まで（切れないように）。タップすると全文（.expanded） */
 .theme-tile small {
+  display: -webkit-box;
   overflow: hidden;
   font-size: 9px;
   line-height: 1.3;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   opacity: 0.85;
 }
 
 .theme-tile.expanded small {
+  display: block;
   white-space: normal;
 }
 
@@ -1966,9 +2006,11 @@ select {
   line-height: 1.4;
 }
 
+/* ルールの名前：スマホでは少し小さく（「スコアアタック」が言葉の途中で改行しないように）。
+   「ランキング対象」の札は、入らなければ下の行に回る */
 .rule-main b {
   display: block;
-  font-size: var(--font-size-m);
+  font-size: clamp(17px, 5.2vw, var(--font-size-m));
 }
 
 .rule-main small {
@@ -2002,7 +2044,12 @@ select {
 }
 
 .rule-normal .rule-main b {
-  font-size: var(--font-size-l);
+  font-size: clamp(17px, 4.8vw, var(--font-size-l));
+}
+
+/* ルールの名前は、言葉の途中で改行しない（横の札は、入らなければ下の行へ） */
+.rule-name {
+  white-space: nowrap;
 }
 
 .rule-normal .rule-best b {
@@ -2137,6 +2184,10 @@ select {
 
 .comp-dialog-rules .comp-dialog-warn {
   color: #ffd84d;
+}
+
+.comp-dialog-rules b {
+  white-space: nowrap;
 }
 
 .comp-dialog-hide {
@@ -2286,12 +2337,14 @@ select {
   color: var(--color-gold);
 }
 
-/* 2人対戦の勝者の名前（長い名前でもはみ出さないように少し小さく） */
+/* 2人対戦の勝者の名前（長い名前のときだけ小さくして、1行に収める。--fit は名前の長さ。main.js の UI.fit） */
 .winner-name {
   display: block;
   max-width: 280px;
-  font-size: 44px;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  font-size: clamp(22px, calc(min(72vw, 280px) / var(--fit, 1)), 44px);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* アイコンの調整画面 */
@@ -2989,6 +3042,23 @@ select {
 .admin-checks small {
   font-size: 11px;
   opacity: 0.7;
+}
+
+/* 補足（小さい字）は、見出し・チェックの文字を押しつぶさないように、下の行に回す */
+.admin-checks label,
+#admin-panel .field > span {
+  flex-wrap: wrap;
+  column-gap: var(--space-s);
+  row-gap: 0;
+}
+
+.admin-checks label small,
+#admin-panel .field > span small {
+  flex-basis: 100%;
+}
+
+.admin-checks label small {
+  padding-left: 22px; /* チェックの四角の分だけ下げて、文字とそろえる */
 }
 
 .admin-checks input,
@@ -3735,7 +3805,7 @@ body.sandbox-on .load-status {
 
 .rare-banner.ultimate span {
   padding: 6px 26px;
-  font-size: 36px;
+  font-size: clamp(22px, 8.6vw, 36px);
   letter-spacing: 0.02em;
   background: linear-gradient(100deg, #ff5ec8, #ffd34d 30%, #ffffff 45%, #ffd34d 60%, #8a3dff) 0 0 / 220% 100%;
   box-shadow: 0 0 36px #ff5ec8, 0 0 70px rgba(255, 211, 77, 0.7);
@@ -3750,6 +3820,47 @@ body.sandbox-on .load-status {
 @keyframes ultimate-shine {
   from { background-position: 100% 0; }
   to { background-position: -120% 0; }
+}
+
+/* 横向きのスマホ（高さが低く、指で操作する画面）：画面いっぱいに「縦向きにすると遊べます」。
+   このゲームは縦長の画面で作っているため（横向きだと、ゲームの場とメニューが細い列になってしまう）。
+   パソコン・タブレットの横向き（高さが 500px より大きい）は、今までどおり */
+.rotate-notice {
+  display: none;
+}
+
+@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  .rotate-notice {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-m);
+    color: #fff;
+    background: var(--color-bg);
+    font-size: var(--font-size-m);
+    font-weight: bold;
+    text-align: center;
+  }
+
+  .rotate-notice-icon {
+    font-size: 48px;
+    animation: rotate-hint 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes rotate-hint {
+  0%, 30% { transform: rotate(-90deg); }
+  60%, 100% { transform: rotate(0deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rotate-notice-icon {
+    animation: none;
+  }
 }
 
 /* 画面が一瞬、白く光る */
@@ -4952,10 +5063,14 @@ body.sandbox-on .load-status {
   min-width: 0;
 }
 
+/* 長い名前のときだけ小さくして、1行に収める（--fit は名前の長さ。vs-intro.js の UI.fit） */
 .vs-who b {
-  font-size: 19px;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(13px, calc(min(38vw, 190px) / var(--fit, 1)), 19px);
   line-height: 1.3;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .vs-who .title-badge {
@@ -5040,8 +5155,10 @@ body.sandbox-on .load-status {
   font-size: 16px;
 }
 
+/* 2戦目の短い VS：名前の途中では改行しない（「〇〇 vs △△」の vs のところで改行する） */
 .vs-names em {
   font-style: normal;
+  white-space: nowrap;
 }
 
 .vs-name-me {
@@ -5230,8 +5347,11 @@ body.sandbox-on .load-status {
 }
 
 .title-preview-text b {
-  font-size: var(--font-size-l);
-  overflow-wrap: anywhere;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(16px, calc(min(52vw, 240px) / var(--fit, 1)), var(--font-size-l));
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .title-preview-text .title-badge {
@@ -5392,10 +5512,21 @@ button.rank-row:active {
   min-width: 0;
 }
 
+/* 名前は、長い名前のときだけ小さくして1行に収める（--fit は名前の長さ。ranking.js の UI.fit）。
+   開発者などの札・「あなた」は、入らなければ下の行へ */
 .rp-who b {
-  font-size: var(--font-size-l);
+  max-width: 100%;
+  font-size: clamp(14px, calc(min(43vw, 170px) / var(--fit, 1)), var(--font-size-l));
   line-height: 1.25;
-  overflow-wrap: anywhere;
+}
+
+.rp-name {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 
 .rp-who .title-badge {

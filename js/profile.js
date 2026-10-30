@@ -159,7 +159,7 @@ const Profile = (() => {
     const text = titleText(pickId);
     $("title-preview").innerHTML =
       myAvatarHTML(`title-preview-avatar ${Frames.avatarClass(frame)}`) +
-      `<span class="title-preview-text"><b>${UI.escape(Save.playerName(1))}</b>${text ? Frames.titleHTML(text, frame) : `<small>称号なし</small>`}</span>`;
+      `<span class="title-preview-text"><b ${UI.fit(Save.playerName(1))}>${UI.escape(Save.playerName(1))}</b>${text ? Frames.titleHTML(text, frame) : `<small>称号なし</small>`}</span>`;
 
     // 一覧：いちばん上に「称号なし」、その下に格ごと
     const all = typeof Achievements !== "undefined" ? Achievements.titleList() : [];

@@ -96,6 +96,17 @@ const UI = (() => {
     }, 3000);
   }
 
+  // 文字の幅（全角1文字＝1、半角の英数字・記号＝0.6 で数えた、おおよその幅。単位は文字の大きさ）。
+  // 長さが変わる名前を1行に収めるのに使う：CSS の font-size で calc(使える幅 / var(--fit)) にすると、長い名前だけ小さくなる
+  function emWidth(text) {
+    return Math.max(1, [...String(text)].reduce((n, c) => n + (/[\x20-\x7e]/.test(c) ? 0.6 : 1), 0));
+  }
+
+  // 要素に付ける style 属性（例 style="--fit:10.6"）。HTML の文字の中で使う
+  function fit(text, extra = 0) {
+    return `style="--fit:${(emWidth(text) + extra).toFixed(1)}"`;
+  }
+
   // HTML に入れる文字を安全にする（名前などに < > が入っていても、そのまま文字として表示する）
   function escape(text) {
     return String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -196,7 +207,7 @@ const UI = (() => {
   );
 
   return {
-    show, onShow, onChange, replayAnimations, splash, confetti, clearConfetti, countUp, confirm, alert, toast, escape,
+    show, onShow, onChange, replayAnimations, splash, confetti, clearConfetti, countUp, confirm, alert, toast, escape, emWidth, fit,
     get current() { return current; },
   };
 })();

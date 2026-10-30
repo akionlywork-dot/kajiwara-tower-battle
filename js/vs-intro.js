@@ -142,7 +142,7 @@ const VsIntro = (() => {
         <span class="vs-side">${side === "me" ? "あなた" : "相手"}</span>
         <div class="vs-head">
           ${avatar}
-          <span class="vs-who"><b>${Custom.nameHTML(name, p.nc)}</b>${Frames.titleHTML(p.title || "", p.frame)}</span>
+          <span class="vs-who"><b ${UI.fit(name)}>${Custom.nameHTML(name, p.nc)}</b>${Frames.titleHTML(p.title || "", p.frame)}</span>
           ${fav ? `<img class="vs-fav" src="${UI.escape(fav.file)}" alt="お気に入り：${UI.escape(fav.name)}" title="お気に入り：${UI.escape(fav.name)}">` : ""}
         </div>
         ${

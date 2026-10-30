@@ -171,6 +171,11 @@
   window.addEventListener("pagehide", () => {
     if (UI.current === null) pauseGame();
   });
+  // 横向きのスマホ（高さが低く、指で操作する画面）では「縦向きにすると遊べます」を出すので、ゲーム中ならポーズする
+  const landscapePhone = window.matchMedia("(orientation: landscape) and (max-height: 500px) and (pointer: coarse)");
+  landscapePhone.addEventListener("change", (e) => {
+    if (e.matches && UI.current === null) pauseGame();
+  });
 
   // ---------- ゲーム開始 ----------
   // newRuleId: 特殊ルールの名前（config.js の rules の名前）。ふつうのルールなら null
@@ -781,7 +786,7 @@
         : "";
       $("hud-info").innerHTML = `<span class="big">${calcScore()}</span> 点 ${ruleTag()}<br>${sub}${target}`;
     } else {
-      $("hud-info").innerHTML = `<span class="player-tag p${player}">${UI.escape(nameOf(player))} の番</span> ${ruleTag()}<br>${sub}`;
+      $("hud-info").innerHTML = `<span class="player-tag p${player}" ${UI.fit(nameOf(player) + " の番")}>${UI.escape(nameOf(player))} の番</span> ${ruleTag()}<br>${sub}`;
     }
     updateSidePanels();
   }
@@ -878,6 +883,7 @@
   function showTurnBanner(first = false) {
     const el = $("turn-banner");
     el.textContent = first ? `${nameOf(player)} の先攻！` : `${nameOf(player)} の番`;
+    el.style.setProperty("--fit", UI.emWidth(el.textContent)); // 長い名前のときだけ、文字を小さくする（style.css）
     el.className = `p${player}`;
     // アニメーションを最初から再生しなおすためのおまじない
     el.style.animation = "none";
@@ -964,7 +970,7 @@
       }
       box.innerHTML =
         (youText ? `<p class="result-you">${youText}</p>` : "") +
-        `<div class="winner p${winner}"><span class="winner-name">${UI.escape(nameOf(winner))}</span><small>の勝ち！</small></div>` +
+        `<div class="winner p${winner}"><span class="winner-name" ${UI.fit(nameOf(winner))}>${UI.escape(nameOf(winner))}</span><small>の勝ち！</small></div>` +
         `<p class="result-sub">${UI.escape(nameOf(loser))} が落としました…</p>` +
         `<div class="result-stats">` +
         `<div>積んだ数<b>${stacked}体</b></div>` +

@@ -68,7 +68,7 @@ window.CHARACTERS = [
   { file: "images/chara21.webp", name: "友達", rarity: "SR", description: "手をつないだ2人組。横に広いので、土台にぴったり。" },
   { file: "images/chara22.webp", name: "読書家", rarity: "R", description: "本を読みながら、片手で本を高く積み上げる。とても細長い。" },
   { file: "images/chara23.webp", name: "若相撲", rarity: "N", description: "両手を広げて、見えないイスに座る。" },
-  { file: "images/chara24.webp", name: "て", rarity: "N", size: 60, description: "ピンと立った人差し指。てっぺんに積むのはむずかしい。" },
+  { file: "images/chara24.webp", name: "ｶｼﾞﾉﾃﾓｶﾘﾀｲ", rarity: "N", size: 60, description: "ピンと立った人差し指。てっぺんに積むのはむずかしい。" },
   { file: "images/chara25.webp", name: "ヨガ", rarity: "N", description: "四つんばいで、片足と片手をのばす。" },
   { file: "images/chara26.webp", name: "土下座", rarity: "N", description: "深々と頭を下げる。平らな背中は、積むのにちょうどいい。" },
 ];

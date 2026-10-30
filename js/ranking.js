@@ -285,7 +285,7 @@ const Ranking = (() => {
       `<div class="rp-head">
         ${avatarHTML(r, "rp-avatar")}
         <span class="rp-who">
-          <b>${Custom.nameHTML(name, r.nameColor)}${r.staffId ? staffBadge(r.staffId) : ""}${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
+          <b ${UI.fit(name)}><span class="rp-name">${Custom.nameHTML(name, r.nameColor)}</span>${r.staffId ? staffBadge(r.staffId) : ""}${r.me ? `<em class="rank-you">あなた</em>` : ""}</b>
           ${r.staffId ? "" : title ? Frames.titleHTML(title, frame) : `<span class="title-badge title-empty">称号なし</span>`}
         </span>
       </div>` +
