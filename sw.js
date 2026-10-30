@@ -8,7 +8,10 @@
 // =============================================
 
 const VERSION = "3.3.0";
-const CACHE = `kajiwara-tb-${VERSION}`;
+// 同じバージョンのまま、ファイルを直したとき（例：v3.3.0 のあとで config.js のシーズン2の名前を直した）は、REVISION を1つ上げる。
+// 画面に出るバージョンはそのままで、みんなの端末のファイルが保存しなおされる。バージョンを上げたときは 1 に戻す
+const REVISION = 2;
+const CACHE = `kajiwara-tb-${VERSION}-r${REVISION}`;
 
 // バージョン番号（?v=）を付けて読み込んでいるファイル（index.html と同じもの）
 const VERSIONED = [
