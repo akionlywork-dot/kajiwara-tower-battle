@@ -7,6 +7,20 @@
 // ランキングは2つ。どちらも1人1行（その人の一番いいスコア）で記録する：
 //   フリー（いつものスコアアタック）… シート「ranking」
 //   競技（config.js の competitive）… シート「ranking_comp」（無ければ自動で作る）
+//
+// シーズン制（config.js の seasons と同じ番号）：
+//   シーズン1 は、上のシート「ranking」「ranking_comp」（今までの記録がそのまま、シーズン1 になる）。
+//   シーズン2 からは、シートの名前の後ろに番号を付ける：「ranking_s2」「ranking_comp_s2」…（最初に書きこむときに自動で作る）
+//   今のシーズンの番号は、このスクリプトのプロパティ「season」（無ければ 1）。コードを書きかえなくても変えられる
+//   （ゲームの管理者モードの「シーズン〇を始める」で書きかえる。手で変えるときは、
+//    Apps Script の「プロジェクトの設定」→「スクリプト プロパティ」の season）
+//   ・スコアを受け取るのは、今のシーズンのものだけ。ゲームが送る season がちがうときは
+//     { ok: false, error: "season", season: 今のシーズン } を返す（season を送らない古いバージョンのゲームは、シーズン1 として扱う）
+//   ・読むときは ?season=番号（無ければ今のシーズン）。今より先のシーズンなら、空のランキングと upcoming: true
+//   ・シーズンが終わったときの1〜3位：?awards=1&me=端末の番号 で、前のシーズンまでの1〜3位を返す（ゲームが称号を出す）
+//   ・今のシーズン：?seasoninfo=1 で { action: "seasoninfo", current, starts: { シーズンの番号: 始まった日時 } }。
+//     ゲームは、これで今のシーズンを決める（管理者モードで切り替えると、みんなのゲームも次に開いたときに切り替わる）。
+//     始まった日時は、切り替えたときに、スクリプトのプロパティ「seasonStarts」に残す
 //   ゲームが送ってくる mode が "comp" なら競技、それ以外（"free"・古いバージョンで mode が無い）ならフリー。
 //   ゲームが読みに来るときも ?mode=comp で競技、無ければフリー。返す JSON に mode を入れる
 //   （ゲームは、mode: "comp" が返ってくる＝このファイルが競技に対応している、と分かってから競技のスコアを送る）
@@ -71,6 +85,17 @@ const MIN_INTERVAL = 5; // 同じ人が続けて送れる間隔（秒）
 // この番号に合う鍵（管理者モードを開いた端末に保存されている）を送ってきたときだけ。"" なら、だれも書きこめない
 const ADMIN_PASS_HASH = "3c9aa8962b53664710053311a8ec7aaed3bfc7c3e3c5b14cb49665d3dbfae97e";
 const NOTICE_MESSAGE_MAX = 80; // アップデート予告のひとことの最大文字数
+const AWARD_PLACES = 3; // シーズンが終わったときに、称号がもらえる順位（1〜3位）
+// シーズンの順位でもらう称号の文字（data/achievements.json の、condition が seasonRank の実績と同じにする）。
+// この称号は、本当にその順位だった人しか名乗れない（ちがう人から届いたら、称号を空にして保存する）
+const AWARD_TITLES = {
+  "シーズン王者": { mode: "free", place: 1 },
+  "シーズン準王者": { mode: "free", place: 2 },
+  "シーズン3位": { mode: "free", place: 3 },
+  "競技シーズン王者": { mode: "comp", place: 1 },
+  "競技シーズン準王者": { mode: "comp", place: 2 },
+  "競技シーズン3位": { mode: "comp", place: 3 },
+};
 const TZ = "Asia/Tokyo";
 
 // ---------- ランキングを返す（ゲームのランキング画面が読みに来る） ----------
@@ -81,12 +106,21 @@ function doGet(e) {
   const p = e && e.parameter ? e.parameter : {};
   if (p.stats === "titles") return json_(titleStats_());
   if (p.notice) return json_({ action: "notice", notice: readNotice_() });
+  const current = currentSeason_();
+  if (p.awards) return json_({ action: "awards", current: current, awards: awardsOf_(String(p.me || "")) });
+  if (p.seasoninfo) return json_({ action: "seasoninfo", current: current, starts: seasonStarts_() });
   const mode = modeOf_(p.mode);
+  const season = p.season ? seasonOf_(p.season) : current;
+  if (!season) return json_({ ok: false, error: "bad season" });
+  // まだ始まっていないシーズン（ゲームは新しいのに、サーバーの切り替えがまだ）：空のランキング
+  if (season > current) return json_({ mode: mode, season: season, current: current, upcoming: true, total: 0, ranking: [], me: null });
   const me = String(p.me || "");
-  const list = ranked_(readRows_(mode));
+  const list = ranked_(readRows_(mode, season));
   const mine = me ? list.find((r) => r.id === me) : null;
   return json_({
     mode: mode,
+    season: season,
+    current: current,
     updated: Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd HH:mm"),
     total: list.length,
     ranking: list.slice(0, TOP).map((r) => {
@@ -121,6 +155,11 @@ function doPost(e) {
   }
   if (d.action === "delete") return deleteRecords_(String(d.id || ""));
   if (d.action === "notice") return writeNotice_(d);
+  if (d.action === "season") return writeSeason_(d);
+  // シーズン：今のシーズンのスコアだけ受け付ける（season を送らない古いバージョンは、シーズン1）
+  const current = currentSeason_();
+  const sentSeason = d.season === undefined || d.season === null ? 1 : seasonOf_(d.season);
+  if (sentSeason !== current) return json_({ ok: false, error: "season", season: current });
   const mode = modeOf_(d.mode);
   const conf = MODES[mode];
   const id = String(d.id || "");
@@ -128,7 +167,12 @@ function doPost(e) {
   const name = cleanName_(d.name);
   // スタッフの称号：決まった id だけ。そのときは称号の文字も、その称号にそろえる
   const staff = Object.prototype.hasOwnProperty.call(STAFF_TITLES, String(d.staff || "")) ? String(d.staff) : "";
-  const title = staff ? STAFF_TITLES[staff] : cleanText_(d.title, TITLE_MAX);
+  let title = staff ? STAFF_TITLES[staff] : cleanText_(d.title, TITLE_MAX);
+  // シーズンの順位の称号は、本当にその順位だった人だけ（ちがえば、称号なしで保存する）
+  if (Object.prototype.hasOwnProperty.call(AWARD_TITLES, title)) {
+    const need = AWARD_TITLES[title];
+    if (!awardsOf_(id).some((a) => a.mode === need.mode && a.place === need.place)) title = "";
+  }
   const icon = cleanIcon_(d.icon);
   const profile = profileCells_(d.profile); // シートに書く値（公開していなければ、全部 ""）
   const achList = achListCell_(d.profile); // 持っている実績の id の一覧（公開していなければ ""）
@@ -154,8 +198,8 @@ function doPost(e) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const sh = sheet_(mode);
-    const rows = readRows_(mode);
+    const sh = sheet_(mode, current);
+    const rows = readRows_(mode, current);
     const today = Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd");
     const found = rows.find((r) => r.id === id);
     if (!found) {
@@ -170,9 +214,9 @@ function doPost(e) {
       if (score > found.score) sh.getRange(found.row, 3, 1, 4).setValues([[score, count, height, text_(today)]]);
     }
     SpreadsheetApp.flush();
-    const list = ranked_(readRows_(mode));
+    const list = ranked_(readRows_(mode, current));
     const mine = list.find((r) => r.id === id);
-    return json_({ ok: true, mode: mode, rank: mine ? mine.rank : null, total: list.length });
+    return json_({ ok: true, mode: mode, season: current, rank: mine ? mine.rank : null, total: list.length });
   } finally {
     lock.releaseLock(); // 順番待ちを終わる（Apps Script の LockService の書き方）
   }
@@ -185,12 +229,15 @@ function deleteRecords_(id) {
   lock.waitLock(10000);
   try {
     let deleted = 0;
-    for (const mode of Object.keys(MODES)) {
-      const sh = sheet_(mode);
-      const rows = readRows_(mode).filter((r) => r.id === id).sort((a, b) => b.row - a.row);
-      for (const r of rows) {
-        sh.deleteRow(r.row);
-        deleted++;
+    for (let season = 1; season <= currentSeason_(); season++) {
+      for (const mode of Object.keys(MODES)) {
+        const sh = existingSheet_(mode, season);
+        if (!sh) continue;
+        const rows = readRows_(mode, season).filter((r) => r.id === id).sort((a, b) => b.row - a.row);
+        for (const r of rows) {
+          sh.deleteRow(r.row);
+          deleted++;
+        }
       }
     }
     SpreadsheetApp.flush();
@@ -198,6 +245,61 @@ function deleteRecords_(id) {
   } finally {
     lock.releaseLock(); // 順番待ちを終わる（Apps Script の LockService の書き方）
   }
+}
+
+// ---------- シーズン ----------
+// 今のシーズンの番号（スクリプトのプロパティ「season」。無い・おかしいときは 1）
+function currentSeason_() {
+  return seasonOf_(PropertiesService.getScriptProperties().getProperty("season")) || 1;
+}
+
+// シーズンの番号として正しければ、その数（1以上の整数）。ちがえば 0
+function seasonOf_(v) {
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 1 && n <= 999 ? n : 0;
+}
+
+// 今のシーズンを書きかえる（ゲームの管理者モードから。鍵の確かめ方は、アップデート予告と同じ）
+//   本文（JSON）：{ action: "season", key: 管理者モードの鍵, season: 新しいシーズンの番号 }
+//   返す JSON：{ ok: true, action: "season", season, previous } / 鍵がちがうとき { ok: false, error: "forbidden" }
+function writeSeason_(d) {
+  if (!ADMIN_PASS_HASH || sha256Hex_("verify:" + String(d.key || "")) !== ADMIN_PASS_HASH) return json_({ ok: false, error: "forbidden" });
+  const season = seasonOf_(d.season);
+  if (!season) return json_({ ok: false, error: "bad season" });
+  const previous = currentSeason_();
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty("season", String(season));
+  // 始まった日時を残す（同じシーズンにもう一度切り替えたときは、最初の日時のまま）
+  const starts = seasonStarts_();
+  if (!starts[season]) starts[season] = new Date().toISOString();
+  props.setProperty("seasonStarts", JSON.stringify(starts));
+  CacheService.getScriptCache().remove("stats:titles");
+  return json_({ ok: true, action: "season", season: season, previous: previous });
+}
+
+// シーズンが始まった日時 { シーズンの番号: ISO の文字 }（管理者モードで切り替えたときに残したもの）
+function seasonStarts_() {
+  try {
+    const v = JSON.parse(PropertiesService.getScriptProperties().getProperty("seasonStarts") || "{}");
+    return v && typeof v === "object" ? v : {};
+  } catch (err) {
+    return {};
+  }
+}
+
+// その端末が、終わったシーズン（今のシーズンより前）で取った1〜3位：[{ season, mode, place }]
+// （hidden の人は数えない。同じ点数は同じ順位）
+function awardsOf_(id) {
+  if (!/^[0-9a-zA-Z-]{16,64}$/.test(id)) return [];
+  const out = [];
+  const current = currentSeason_();
+  for (let season = 1; season < current; season++) {
+    for (const mode of Object.keys(MODES)) {
+      const mine = ranked_(readRows_(mode, season)).find((r) => r.id === id);
+      if (mine && mine.rank <= AWARD_PLACES) out.push({ season: season, mode: mode, place: mine.rank });
+    }
+  }
+  return out;
 }
 
 // ---------- アップデート予告 ----------
@@ -249,9 +351,20 @@ function modeOf_(v) {
   return String(v || "") === "comp" ? "comp" : "free";
 }
 
-// その種類のシート（無ければ、見出しの行（hidden の列もふくむ）を付けて作る）
-function sheet_(mode) {
-  const name = MODES[modeOf_(mode)].sheet;
+// その種類・シーズンのシートの名前（シーズン1 は「ranking」「ranking_comp」、シーズン2 からは「ranking_s2」など）
+function sheetName_(mode, season) {
+  const base = MODES[modeOf_(mode)].sheet;
+  return !season || season === 1 ? base : base + "_s" + season;
+}
+
+// その種類・シーズンのシート（無ければ null。読むだけのときに使う。作らない）
+function existingSheet_(mode, season) {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName_(mode, season));
+}
+
+// その種類・シーズンのシート（無ければ、見出しの行（hidden の列もふくむ）を付けて作る）
+function sheet_(mode, season) {
+  const name = sheetName_(mode, season);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(name);
   if (!sh) {
@@ -265,9 +378,11 @@ function sheet_(mode) {
   return sh;
 }
 
-// その種類のシートの全員分（見出しの行は除く）
-function readRows_(mode) {
-  const values = sheet_(mode).getDataRange().getValues();
+// その種類・シーズンのシートの全員分（見出しの行は除く。シートが無ければ空。season を省くと今のシーズン）
+function readRows_(mode, season) {
+  const sh = existingSheet_(mode, season || currentSeason_());
+  if (!sh) return [];
+  const values = sh.getDataRange().getValues();
   values.shift();
   return values.map((v, i) => ({
     row: i + 2,
@@ -304,10 +419,12 @@ function titleStats_() {
   const hit = cache.get("stats:titles");
   if (hit) return JSON.parse(hit);
   const lists = {}; // 端末の番号 → 実績の id の一覧
-  for (const mode of Object.keys(MODES)) {
-    for (const r of readRows_(mode)) {
-      if (!r.id || r.hidden || !r.achList) continue;
-      lists[r.id] = r.achList.split(",");
+  for (let season = 1; season <= currentSeason_(); season++) {
+    for (const mode of Object.keys(MODES)) {
+      for (const r of readRows_(mode, season)) {
+        if (!r.id || r.hidden || !r.achList) continue;
+        lists[r.id] = r.achList.split(",");
+      }
     }
   }
   const counts = {};

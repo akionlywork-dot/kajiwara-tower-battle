@@ -36,7 +36,10 @@ const Save = (() => {
       stats: {
         soloPlays: 0, // 1人モードのプレイ回数
         soloTotalScore: 0, // 1人モードのスコアの合計（平均を出すため）
-        best: null, // ハイスコアの記録 { score, count, height }
+        best: null, // 今のシーズンのハイスコア { score, count, height }（シーズンが変わると、seasonBests に入れて空にする）
+        allBest: null, // 全期間のハイスコア（シーズンに関係なく、一番いいもの）
+        season: null, // best・compBest がどのシーズンのものか（config.js の seasons の id。null は、シーズン制より前の古いデータ）
+        seasonBests: {}, // 終わったシーズンのハイスコア：シーズンの id → { free, comp }
         bestCount: 0, // 1回のゲームで積んだ数の最高
         bestHeight: 0, // 1回のゲームの高さの最高（m）
         versusPlays: 0, // 2人対戦の回数
@@ -59,11 +62,15 @@ const Save = (() => {
         // 競技モード（フリーのスコアアタックとは別に記録する）
         compPlays: 0, // プレイ回数
         compTotalScore: 0, // スコアの合計（平均を出すため）
-        compBest: null, // 競技のハイスコア { score, count, height }
+        compBest: null, // 今のシーズンの、競技のハイスコア { score, count, height }
+        allCompBest: null, // 全期間の、競技のハイスコア
       },
       // 実績の世代番号（config.js の achievementsEpoch）。config の番号の方が大きければ、1回だけ実績と戦績をリセットする
       //   epochResetNotice：リセットしたことを、次にタイトル画面が出たときに知らせるか
-      meta: { achievementsEpoch: currentEpoch(), epochResetNotice: false },
+      //   seasonNotice：シーズンが変わったことを知らせるシーズンの id（知らせたら 0。1回だけ）
+      meta: { achievementsEpoch: currentEpoch(), epochResetNotice: false, seasonNotice: 0 },
+      // シーズンが終わったときの順位（1〜3位）：[{ season, mode, place }]（ranking.gs の ?awards=1 から。称号になる）
+      seasonAwards: [],
       // お知らせ：最後に読んだお知らせの id
       news: { lastReadId: 0 },
       // ランキング（オンライン）
@@ -141,7 +148,57 @@ const Save = (() => {
       }
     }
     if (savedEpoch < currentEpoch()) resetForNewEpoch(result);
+    applySeason(result, !!saved);
     return result;
+  }
+
+  // ---------- シーズン（config.js の seasons。js/seasons.js） ----------
+  const SEASON_TEST_KEY = "stack.admin.seasonTest"; // 管理者モード：この端末だけ、次のシーズンにする（テスト）
+
+  // 今のシーズンの番号：サーバーで分かった今のシーズン（seasons.js が localStorage の stack.season に覚える。分からなければ 1）。
+  // ただし、config.js の seasons に用意してあるシーズンまで。テスト中は、その次
+  function currentSeason() {
+    const ids = (window.GAME_CONFIG.seasons || []).map((s) => Number(s && s.id)).filter((n) => Number.isInteger(n) && n >= 1);
+    const prepared = ids.length ? Math.max(...ids) : 1;
+    let n = 1;
+    try {
+      n = Number((JSON.parse(localStorage.getItem("stack.season") || "null") || {}).current) || 1;
+    } catch (e) {}
+    n = Math.max(1, Math.min(n, prepared));
+    try {
+      if (localStorage.getItem(SEASON_TEST_KEY)) n += 1;
+    } catch (e) {}
+    return n;
+  }
+
+  // シーズンが変わっていたら、ベストを入れかえる。変わったら true
+  //   ・シーズン制より前の古いデータ（season が無い）：今のベストは「シーズン1」のもの。全期間のベストにも入れる
+  //   ・前のシーズンのベストは seasonBests に残し、今のシーズンのベストは空から。ランキングに送った記録・順位も、新しいシーズンでは0から
+  //   ・hadData：前からのデータか（初めて遊ぶ人には「シーズン〇が始まりました」を出さない）
+  function applySeason(d, hadData) {
+    const s = d.stats;
+    const now = currentSeason();
+    if (typeof s.season !== "number") {
+      s.season = 1;
+      if (!s.allBest) s.allBest = s.best;
+      if (!s.allCompBest) s.allCompBest = s.compBest;
+    }
+    if (!s.seasonBests || typeof s.seasonBests !== "object") s.seasonBests = {};
+    if (s.season >= now) return false;
+    if (s.best || s.compBest) s.seasonBests[s.season] = { free: s.best || null, comp: s.compBest || null };
+    s.best = null;
+    s.compBest = null;
+    s.season = now;
+    Object.assign(d.ranking, { sentScore: 0, sentScoreComp: 0, sentProfile: "", sentProfileComp: "", lastRank: null });
+    if (hadData) d.meta.seasonNotice = now;
+    return true;
+  }
+
+  // 遊んでいるあいだにシーズンが変わったか調べる（管理者モードのテストの切りかえ）。変わったら保存して true
+  function checkSeason() {
+    const changed = applySeason(data, true);
+    if (changed) write();
+    return changed;
   }
 
   // 実績が新しくなった（config.js の achievementsEpoch を上げた）ときに、1回だけ行うリセット。
@@ -169,14 +226,17 @@ const Save = (() => {
     // 以前のバージョンのハイスコア（stack.best）があれば引き継ぐ
     try {
       const oldBest = JSON.parse(localStorage.getItem("stack.best"));
-      if (oldBest && !result.stats.best) result.stats.best = oldBest;
+      if (oldBest && !result.stats.best) {
+        result.stats.best = oldBest;
+        if (!result.stats.allBest) result.stats.allBest = oldBest;
+      }
     } catch (e) {}
     return result;
   }
 
   const data = load();
-  // 実績の世代が変わってリセットしたときは、すぐに保存する（次に開いたとき、もう一度リセットしないように）
-  if (data.meta.epochResetNotice) write();
+  // 実績の世代が変わってリセットしたとき・シーズンが変わったときは、すぐに保存する（次に開いたとき、もう一度しないように）
+  if (data.meta.epochResetNotice || data.meta.seasonNotice) write();
 
   // ---------- バックアップ（書き出し・読み込み） ----------
   // 書き出すデータ：プレイデータと設定を1つにまとめる
@@ -237,5 +297,5 @@ const Save = (() => {
     return data.profile.name || "プレイヤー";
   }
 
-  return { data, write, playerName, exportData, checkImport, importData, defaults };
+  return { data, write, playerName, exportData, checkImport, importData, defaults, currentSeason, checkSeason, SEASON_TEST_KEY };
 })();

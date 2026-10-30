@@ -148,8 +148,8 @@
   function updateBestCard() {
     const best = Save.data.stats.best;
     $("best-score").innerHTML = best
-      ? `ハイスコア<b>${best.score}</b>${best.count}体・${best.height.toFixed(2)}m`
-      : `ハイスコア<b>---</b>まだ記録がありません`;
+      ? `ハイスコア（${Seasons.short(Seasons.currentId())}）<b>${best.score}</b>${best.count}体・${best.height.toFixed(2)}m`
+      : `ハイスコア（${Seasons.short(Seasons.currentId())}）<b>---</b>まだ記録がありません`;
   }
 
   function pauseGame() {
@@ -1156,6 +1156,21 @@
     });
   }
 
+  // ---------- シーズンのお知らせ ----------
+  // シーズンが変わって（save.js）、初めてゲームを開いたときに、1回だけ出す
+  async function showSeasonNotice() {
+    const id = Save.data.meta.seasonNotice;
+    if (!id) return;
+    while (UI.current !== "title" || document.querySelector(".dialog.active") || !$("splash").classList.contains("hidden")) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+    Save.data.meta.seasonNotice = 0;
+    Save.write();
+    const s = Seasons.get(id);
+    await UI.alert(`🎉 ${s.name}が始まりました！\nランキングは、シーズンごとに新しくなります。このシーズンのハイスコアは、0 からのスタートです。\n（全期間のハイスコアは「戦績」、前のシーズンの最終結果は「ランキング」で見られます）`);
+    updateBestCard();
+  }
+
   // ---------- 実績のリセットのお知らせ ----------
   // config.js の achievementsEpoch が上がって、実績と戦績をリセットした（save.js）ときに、1回だけ出す
   async function showEpochNotice() {
@@ -1380,6 +1395,7 @@ ${location.origin}${location.pathname}`), "image/png");
   Backup.init();
   PWA.init(); // アプリとしてインストールできるようにする
   Codes.init(); // 合言葉（ホーム画面の 🔑）
+  Seasons.init(); // ランキングのシーズン（サーバーの今のシーズンを、ときどき読みなおす）
   Updates.init(); // アップデートの予告と「更新する」ボタン（タイトル画面）
   Share.init();
   Stamps.init();
@@ -1416,9 +1432,15 @@ ${location.origin}${location.pathname}`), "image/png");
       showChallengePopup(received);
     } else News.popupIfUnread();
     // 実績が新しくなってリセットしたことを、1回だけ知らせる（ほかのポップアップが閉じてから）
-    shapesLoaded.then(showEpochNotice);
+    shapesLoaded.then(showEpochNotice).then(showSeasonNotice);
+    // 遊んでいるあいだにシーズンが変わった（管理者モードで始めた）：お知らせ・タイトルのハイスコア
+    Seasons.onChange(() => {
+      updateBestCard();
+      showSeasonNotice();
+    });
     // ランキング：前からハイスコアがある人は、ここで載せる（送っていいか、初めてなら聞く）
-    shapesLoaded.then(() => Ranking.atStartup());
+    // 今のシーズンをサーバーに聞いてから、ランキングに送る（シーズンがちがう記録を送らないように）
+    shapesLoaded.then(() => Seasons.sync()).then(() => Ranking.atStartup());
   });
 
   // characters.js に書いたキャラを全部読み込み、形（当たり判定）を作る

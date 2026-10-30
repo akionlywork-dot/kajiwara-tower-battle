@@ -36,7 +36,7 @@
   <!-- アプリとしてインストールするための設定（PWA） -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="css/style.css?v=3.2.3">
+  <link rel="stylesheet" href="css/style.css?v=3.3.0">
 </head>
 <body>
   <div id="app">
@@ -676,6 +676,11 @@
           <button class="btn btn-icon" data-back="title" aria-label="もどる">‹</button>
           <h2>ランキング</h2>
         </header>
+        <!-- シーズン：見ているシーズンの名前と始まった日・前のシーズンへの切りかえ（ranking.js・seasons.js） -->
+        <div id="rank-season-row" class="ranking-season">
+          <span id="rank-season-info" class="ranking-season-info"></span>
+          <select id="rank-season" class="ranking-season-select" aria-label="シーズン"></select>
+        </div>
         <!-- フリー（いつものスコアアタック）と 競技 を切りかえる（ranking.js） -->
         <div class="ranking-tabs" role="tablist">
           <button class="ranking-tab" data-rank-tab="free" role="tab">フリー</button>
@@ -972,6 +977,17 @@
               <pre id="admin-net" class="admin-net"></pre>
               <button id="btn-admin-net" class="btn btn-small btn-sub">更新</button>
             </details>
+            <details class="admin-sec" data-sec="season">
+              <summary class="section-title">シーズン<small class="admin-sec-state"></small></summary>
+              <p class="page-note">ランキングのシーズン（README の「シーズンの切り替え方」）。config.js の seasons に用意してあるシーズンを、ここで始めます。始めると、みんなのゲームも、次に開いたとき（開いているあいだは5分以内）に新しいシーズンになり、「シーズン〇が始まりました」が出ます。前のシーズンの1〜3位には、称号が出ます。</p>
+              <pre id="admin-season-state" class="admin-net"></pre>
+              <button id="btn-admin-season-set" class="btn btn-small btn-primary admin-wide">次のシーズンを始める</button>
+              <button id="btn-admin-season-reload" class="btn btn-small btn-sub admin-wide">状態を読みなおす</button>
+              <div class="setting-row">
+                <span>この端末だけ、次のシーズンにする（テスト）<small>保存データのシーズンの入れかえを確かめる。オフに戻すと、テストの前のデータに戻す。管理者モードのあいだは、ランキングに送らない</small></span>
+                <button id="toggle-admin-season-test" class="toggle" role="switch" aria-label="この端末だけ、次のシーズンにする（テスト）"></button>
+              </div>
+            </details>
             <details class="admin-sec" data-sec="codes">
               <summary class="section-title">合言葉<small class="admin-sec-state"></small></summary>
               <p class="page-note">合言葉を入れて「番号を作る」と、data/codes.json に書く番号（hash）が出ます。合言葉そのものは、どこにも保存しません（ソースはだれでも見られるため）。入力はそろえてから番号にします（全角・半角、大文字・小文字、ひらがな・カタカナ、空白）。</p>
@@ -1077,53 +1093,54 @@
 
   <!-- ?v= のあとの番号：更新したら config.js の version と一緒に上げる（スマホに古いファイルが残らないように） -->
   <!-- ライブラリ（lib/ に同梱） -->
-  <script src="lib/decomp.min.js?v=3.2.3"></script>
-  <script src="lib/matter.min.js?v=3.2.3"></script>
-  <script src="lib/peerjs.min.js?v=3.2.3"></script>
-  <script src="lib/mqtt.min.js?v=3.2.3"></script>
+  <script src="lib/decomp.min.js?v=3.3.0"></script>
+  <script src="lib/matter.min.js?v=3.3.0"></script>
+  <script src="lib/peerjs.min.js?v=3.3.0"></script>
+  <script src="lib/mqtt.min.js?v=3.3.0"></script>
   <!-- 設定ファイル -->
-  <script src="config.js?v=3.2.3"></script>
+  <script src="config.js?v=3.3.0"></script>
   <!-- 読み込みの状況（開発用。devMode か ?debug=1 のときだけ表示）。ほかより先に読み込む -->
-  <script src="js/load-status.js?v=3.2.3"></script>
-  <script src="characters.js?v=3.2.3"></script>
-  <script src="js/chars.js?v=3.2.3"></script>
+  <script src="js/load-status.js?v=3.3.0"></script>
+  <script src="characters.js?v=3.3.0"></script>
+  <script src="js/chars.js?v=3.3.0"></script>
   <!-- ゲーム本体 -->
-  <script src="js/settings.js?v=3.2.3"></script>
-  <script src="js/save.js?v=3.2.3"></script>
-  <script src="js/audio.js?v=3.2.3"></script>
-  <script src="js/shape.js?v=3.2.3"></script>
-  <script src="js/aura.js?v=3.2.3"></script>
-  <script src="js/platform-art.js?v=3.2.3"></script>
-  <script src="js/game.js?v=3.2.3"></script>
-  <script src="js/rules.js?v=3.2.3"></script>
-  <script src="js/cpu.js?v=3.2.3"></script>
-  <script src="js/challenge.js?v=3.2.3"></script>
-  <script src="js/card.js?v=3.2.3"></script>
-  <script src="js/stamps.js?v=3.2.3"></script>
-  <script src="js/halloween-home.js?v=3.2.3"></script>
-  <script src="js/halloween.js?v=3.2.3"></script>
-  <script src="js/title-fx.js?v=3.2.3"></script>
-  <script src="js/online.js?v=3.2.3"></script>
-  <script src="js/ui.js?v=3.2.3"></script>
-  <script src="js/themes.js?v=3.2.3"></script>
-  <script src="js/frames.js?v=3.2.3"></script>
-  <script src="js/profile.js?v=3.2.3"></script>
-  <script src="js/custom.js?v=3.2.3"></script>
-  <script src="js/codes.js?v=3.2.3"></script>
-  <script src="js/data-file.js?v=3.2.3"></script>
-  <script src="js/news.js?v=3.2.3"></script>
-  <script src="js/events.js?v=3.2.3"></script>
-  <script src="js/ranking.js?v=3.2.3"></script>
-  <script src="js/records.js?v=3.2.3"></script>
-  <script src="js/dex.js?v=3.2.3"></script>
-  <script src="js/achievements.js?v=3.2.3"></script>
-  <script src="js/vs-intro.js?v=3.2.3"></script>
-  <script src="js/backup.js?v=3.2.3"></script>
-  <script src="js/controls.js?v=3.2.3"></script>
-  <script src="js/admin.js?v=3.2.3"></script>
-  <script src="js/sandbox.js?v=3.2.3"></script>
-  <script src="js/pwa.js?v=3.2.3"></script>
-  <script src="js/updates.js?v=3.2.3"></script>
-  <script src="js/main.js?v=3.2.3"></script>
+  <script src="js/settings.js?v=3.3.0"></script>
+  <script src="js/save.js?v=3.3.0"></script>
+  <script src="js/seasons.js?v=3.3.0"></script>
+  <script src="js/audio.js?v=3.3.0"></script>
+  <script src="js/shape.js?v=3.3.0"></script>
+  <script src="js/aura.js?v=3.3.0"></script>
+  <script src="js/platform-art.js?v=3.3.0"></script>
+  <script src="js/game.js?v=3.3.0"></script>
+  <script src="js/rules.js?v=3.3.0"></script>
+  <script src="js/cpu.js?v=3.3.0"></script>
+  <script src="js/challenge.js?v=3.3.0"></script>
+  <script src="js/card.js?v=3.3.0"></script>
+  <script src="js/stamps.js?v=3.3.0"></script>
+  <script src="js/halloween-home.js?v=3.3.0"></script>
+  <script src="js/halloween.js?v=3.3.0"></script>
+  <script src="js/title-fx.js?v=3.3.0"></script>
+  <script src="js/online.js?v=3.3.0"></script>
+  <script src="js/ui.js?v=3.3.0"></script>
+  <script src="js/themes.js?v=3.3.0"></script>
+  <script src="js/frames.js?v=3.3.0"></script>
+  <script src="js/profile.js?v=3.3.0"></script>
+  <script src="js/custom.js?v=3.3.0"></script>
+  <script src="js/codes.js?v=3.3.0"></script>
+  <script src="js/data-file.js?v=3.3.0"></script>
+  <script src="js/news.js?v=3.3.0"></script>
+  <script src="js/events.js?v=3.3.0"></script>
+  <script src="js/ranking.js?v=3.3.0"></script>
+  <script src="js/records.js?v=3.3.0"></script>
+  <script src="js/dex.js?v=3.3.0"></script>
+  <script src="js/achievements.js?v=3.3.0"></script>
+  <script src="js/vs-intro.js?v=3.3.0"></script>
+  <script src="js/backup.js?v=3.3.0"></script>
+  <script src="js/controls.js?v=3.3.0"></script>
+  <script src="js/admin.js?v=3.3.0"></script>
+  <script src="js/sandbox.js?v=3.3.0"></script>
+  <script src="js/pwa.js?v=3.3.0"></script>
+  <script src="js/updates.js?v=3.3.0"></script>
+  <script src="js/main.js?v=3.3.0"></script>
 </body>
 </html>

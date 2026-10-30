@@ -37,11 +37,22 @@ const Ranking = (() => {
     comp: { label: "競技", best: () => Save.data.stats.compBest, sent: "sentScoreComp", sentProfile: "sentProfileComp" },
   };
   let tab = "free"; // ランキング画面で選んでいるタブ
+  let season = null; // ランキング画面で見ているシーズン（null なら今のシーズン。開くたびに今のシーズンに戻す。seasons.js）
   // フリー・競技のどちらかで、ハイスコアがあるか（初めて「送ってもいいか」を聞くのに使う）
   const anyBest = () => KINDS.free.best() || KINDS.comp.best();
 
   function init() {
-    UI.onShow("ranking", open);
+    // 開いたときは、今のシーズン
+    UI.onShow("ranking", () => {
+      season = Seasons.currentId();
+      renderSeasonPicker();
+      open();
+    });
+    // シーズンの切りかえ（前のシーズンの最終結果を見る）
+    $("rank-season").addEventListener("change", (e) => {
+      season = Number(e.target.value) || Seasons.currentId();
+      open();
+    });
     // 行をタップしたら、その人のプロフィールを出す
     $("ranking-list").addEventListener("click", (e) => {
       const row = e.target.closest("[data-index]");
@@ -141,7 +152,7 @@ const Ranking = (() => {
     if (isOnline()) {
       await submitBest(); // 名前・称号・アイコンを変えていたら、先に送っておく（自分の行に反映されるように）
       try {
-        json = await request(`${url()}?mode=${kind}&me=${encodeURIComponent(playerId())}&t=${Date.now()}`);
+        json = await request(`${url()}?mode=${kind}&season=${viewing()}&me=${encodeURIComponent(playerId())}&t=${Date.now()}`);
         if (kind === "comp" && json && json.mode !== "comp") {
           unsupported = true;
           json = null;
@@ -154,7 +165,16 @@ const Ranking = (() => {
       json = await DataFile.load("data/ranking.json");
       if (json && kind === "comp") json = json.comp && typeof json.comp === "object" ? json.comp : { updated: json.updated, ranking: [] }; // 手で書くときは comp: { ranking: [...] }
     }
-    if (UI.current !== "ranking" || tab !== kind) return; // 読み込み中に画面を閉じた・タブを変えた
+    if (UI.current !== "ranking" || tab !== kind || $("rank-season").value !== String(viewing())) return; // 読み込み中に画面を閉じた・タブやシーズンを変えた
+    renderSeasonHead();
+    // サーバーの今のシーズンが、このゲームより新しい（このゲームが古いバージョン）：「更新する」ボタンを出す
+    if (json && Number(json.current) > Seasons.currentId() && typeof Updates !== "undefined") Updates.refresh();
+    // まだ始まっていないシーズン（ゲームは新しいのに、サーバーの切り替えがまだ）
+    if (json && json.upcoming) {
+      box.innerHTML = `<div class="coming-soon"><span>🗓</span><b>${UI.escape(Seasons.get(viewing()).name)}は、まもなく始まります</b><p>もうしばらくお待ちください。記録は、始まったら自動で送ります。</p></div>`;
+      renderMine(null);
+      return;
+    }
     if (unsupported) {
       box.innerHTML = `<div class="coming-soon"><span>🏁</span><b>競技のランキングは準備中です</b><p>もうしばらくお待ちください。</p></div>`;
       return;
@@ -180,7 +200,7 @@ const Ranking = (() => {
         : isOnline()
         ? `<div class="coming-soon"><span>${kind === "comp" ? "🏁" : "🏆"}</span><b>まだ記録がありません</b><p>${kind === "comp" ? "競技" : "スコアアタック"}で遊ぶと、ハイスコアがここに載ります。</p></div>`
         : `<div class="coming-soon"><span>🏆</span><b>ランキングは準備中です</b><p>お楽しみに！<br>まずはハイスコアを目指して遊んでみてください。</p></div>`);
-    if (json.me && kind === "free") rememberRank(json.me.rank); // 対戦カードに出す順位は、フリーのもの
+    if (json.me && kind === "free" && viewing() === Seasons.currentId()) rememberRank(json.me.rank); // 対戦カードに出す順位は、今のシーズンのフリーのもの
     renderMine(json.me || null);
   }
 
@@ -330,16 +350,42 @@ const Ranking = (() => {
     $("rank-profile").classList.remove("active");
   }
 
-  // 画面の下：自分のハイスコア（選んでいるタブのもの。オンラインなら順位も）
+  // 見ているシーズン
+  function viewing() {
+    return season || Seasons.currentId();
+  }
+
+  // シーズンの切りかえ（新しい順。「S2（今）」「S1」…。スマホで改行しないように短く）
+  function renderSeasonPicker() {
+    const now = Seasons.currentId();
+    $("rank-season").innerHTML = Seasons.list()
+      .map((s) => `<option value="${s.id}">${Seasons.short(s.id)}${s.id === now ? "（今）" : ""}</option>`)
+      .join("");
+    $("rank-season").value = String(viewing());
+    $("rank-season-row").classList.toggle("hidden", !isOnline()); // 手で書く ranking.json には、シーズンがない
+    renderSeasonHead();
+  }
+
+  // 見出し：シーズンの名前と、始まった日（前のシーズンなら「最終結果」）
+  function renderSeasonHead() {
+    const s = Seasons.get(viewing());
+    const since = Seasons.since(s);
+    $("rank-season-info").innerHTML =
+      `<b>${UI.escape(s.name)}</b>` + (s.id === Seasons.currentId() ? (since ? `<small>${since}</small>` : "") : `<small>最終結果</small>`);
+  }
+
+  // 画面の下：自分のハイスコア（選んでいるタブ・シーズンのもの。オンラインなら順位も）
   function renderMine(me) {
-    const best = KINDS[tab].best();
+    const past = isOnline() && viewing() !== Seasons.currentId();
+    const pastBest = (Save.data.stats.seasonBests || {})[viewing()] || {};
+    const best = past ? pastBest[tab] || null : KINDS[tab].best();
     let note = "";
     if (isOnline() && best) {
       if (!Settings.get("ranking")) note = `<small class="my-rank">ランキングに未参加</small>`;
       else if (me) note = `<small class="my-rank">あなたは <b>${Number(me.rank)}位</b></small>`;
     }
     $("ranking-mine").innerHTML =
-      `<span class="my-record-label">あなたのハイスコア（${KINDS[tab].label}）</span>` +
+      `<span class="my-record-label">あなたのハイスコア（${KINDS[tab].label}・${Seasons.short(viewing())}）</span>` +
       Profile.badgeHTML() +
       (best
         ? `<span class="rank-score">${best.score}<small>点</small><em>${best.count}体・${best.height.toFixed(2)}m</em>${note}</span>`
@@ -353,6 +399,7 @@ const Ranking = (() => {
   // 同意していない人には、何もしない（スコアアタック・競技を遊ぶときに、同意のダイアログを出す）
   async function atStartup() {
     if (!isOnline() || Admin.unlocked || !Settings.get("ranking")) return; // 管理者モードの記録は、公開のランキングに送らない
+    checkAwards(); // 終わったシーズンの1〜3位（称号）
     if ((!mem().asked && anyBest()) || needIconQuestion()) {
       await waitTitle();
       return afterSoloGame();
@@ -564,8 +611,15 @@ const Ranking = (() => {
         method: "POST",
         // text/plain で送る（Apps Script は、事前の確認の通信（CORS のプリフライト）に答えられないため）
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ mode: kind, id: playerId(), name, title, staff, nameColor, icon, score: best.score, count: best.count, height: best.height, profile }),
+        body: JSON.stringify({ mode: kind, season: Seasons.currentId(), id: playerId(), name, title, staff, nameColor, icon, score: best.score, count: best.count, height: best.height, profile }),
       });
+      // シーズンがちがうと断られた：
+      //   サーバーの方が古い（切り替えがまだ）→ 送らずに残しておき、次の機会に送りなおす（sent を書きかえない）
+      //   サーバーの方が新しい（このゲームが古いバージョン）→「更新する」ボタンを出す（古いシーズンの記録は送らない）
+      if (res && res.error === "season") {
+        Seasons.sync(); // サーバーのシーズンが変わっていた：覚えなおす（このゲームに無いシーズンなら「更新する」ボタン）
+        return;
+      }
       if (!res || !res.ok) throw new Error((res && res.error) || "error");
       const improved = best.score > (mem()[k.sent] || 0);
       mem()[k.sent] = best.score;
@@ -581,5 +635,23 @@ const Ranking = (() => {
     }
   }
 
-  return { init, atStartup, afterSoloGame, submitBest, joined, opponentKey, ensureConsent, renderConsent, titleStats, rateText };
+  // ---------- シーズンの1〜3位（ranking.gs の ?awards=1） ----------
+  // 終わったシーズンで1〜3位だったら、Save.data.seasonAwards に入れて、称号（condition が seasonRank の実績）を出す。
+  // サーバーが古い（awards に対応していない）・通信できないときは、何もしない
+  async function checkAwards() {
+    if (!isOnline() || !mem().id) return;
+    try {
+      const json = await request(`${url()}?awards=1&me=${encodeURIComponent(playerId())}&t=${Date.now()}`);
+      if (!json || json.action !== "awards" || !Array.isArray(json.awards)) return;
+      const awards = json.awards
+        .filter((a) => a && Number.isInteger(a.season) && (a.mode === "free" || a.mode === "comp") && [1, 2, 3].includes(a.place))
+        .map((a) => ({ season: a.season, mode: a.mode, place: a.place }));
+      if (JSON.stringify(awards) === JSON.stringify(Save.data.seasonAwards || [])) return;
+      Save.data.seasonAwards = awards;
+      Save.write();
+      if (typeof Achievements !== "undefined") Achievements.check(null);
+    } catch (e) {}
+  }
+
+  return { init, atStartup, checkAwards, afterSoloGame, submitBest, joined, opponentKey, ensureConsent, renderConsent, titleStats, rateText };
 })();

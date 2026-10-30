@@ -2206,6 +2206,49 @@ select {
 }
 
 /* ランキング画面の上の「フリー / 競技」のタブ */
+/* シーズン：左に見ているシーズンの名前と始まった日、右に前のシーズンへの切りかえ（ranking.js・seasons.js） */
+.ranking-season {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  margin: 0 var(--space-m) var(--space-s);
+}
+
+.ranking-season-info {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.ranking-season-info b {
+  font-size: var(--font-size-s);
+  text-wrap: balance;
+}
+
+.ranking-season-info small {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+/* 切りかえ：「S2（今）」のように短く、改行しない */
+.ranking-season-select {
+  flex: none;
+  height: 32px;
+  padding: 0 var(--space-s);
+  border: 0;
+  border-radius: var(--radius-round);
+  color: var(--color-text-dark);
+  background: rgba(255, 255, 255, 0.92);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: bold;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 .ranking-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -927,6 +927,90 @@
         "type": "code",
         "code": "rinka"
       }
+    },
+    {
+      "id": "season_free_1",
+      "bonus": true,
+      "name": "シーズン優勝（フリー）",
+      "title": "シーズン王者",
+      "rank": "mythic",
+      "description": "シーズンが終わったときに、フリーのランキングで1位だった",
+      "category": "シーズン",
+      "condition": {
+        "type": "seasonRank",
+        "mode": "free",
+        "place": 1
+      }
+    },
+    {
+      "id": "season_free_2",
+      "bonus": true,
+      "name": "シーズン準優勝（フリー）",
+      "title": "シーズン準王者",
+      "rank": "legend",
+      "description": "シーズンが終わったときに、フリーのランキングで2位だった",
+      "category": "シーズン",
+      "condition": {
+        "type": "seasonRank",
+        "mode": "free",
+        "place": 2
+      }
+    },
+    {
+      "id": "season_free_3",
+      "bonus": true,
+      "name": "シーズン3位（フリー）",
+      "title": "シーズン3位",
+      "rank": "gold",
+      "description": "シーズンが終わったときに、フリーのランキングで3位だった",
+      "category": "シーズン",
+      "condition": {
+        "type": "seasonRank",
+        "mode": "free",
+        "place": 3
+      }
+    },
+    {
+      "id": "season_comp_1",
+      "bonus": true,
+      "name": "シーズン優勝（競技）",
+      "title": "競技シーズン王者",
+      "rank": "mythic",
+      "description": "シーズンが終わったときに、競技のランキングで1位だった",
+      "category": "シーズン",
+      "condition": {
+        "type": "seasonRank",
+        "mode": "comp",
+        "place": 1
+      }
+    },
+    {
+      "id": "season_comp_2",
+      "bonus": true,
+      "name": "シーズン準優勝（競技）",
+      "title": "競技シーズン準王者",
+      "rank": "legend",
+      "description": "シーズンが終わったときに、競技のランキングで2位だった",
+      "category": "シーズン",
+      "condition": {
+        "type": "seasonRank",
+        "mode": "comp",
+        "place": 2
+      }
+    },
+    {
+      "id": "season_comp_3",
+      "bonus": true,
+      "name": "シーズン3位（競技）",
+      "title": "競技シーズン3位",
+      "rank": "gold",
+      "description": "シーズンが終わったときに、競技のランキングで3位だった",
+      "category": "シーズン",
+      "condition": {
+        "type": "seasonRank",
+        "mode": "comp",
+        "place": 3
+      }
     }
   ]
 }

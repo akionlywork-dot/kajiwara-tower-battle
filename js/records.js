@@ -58,8 +58,10 @@ const Records = (() => {
     s.soloTotalScore += score;
     s.bestCount = Math.max(s.bestCount, count);
     s.bestHeight = Math.max(s.bestHeight, height);
+    // ハイスコア更新は、今のシーズンのベストで決める。全期間のベストも、上回っていれば書きかえる
     const isNew = !s.best || score > s.best.score;
     if (isNew) s.best = { score, count, height };
+    if (!s.allBest || score > s.allBest.score) s.allBest = { score, count, height };
     Save.write();
     return isNew;
   }
@@ -71,6 +73,7 @@ const Records = (() => {
     s.compTotalScore = (s.compTotalScore || 0) + score;
     const isNew = !s.compBest || score > s.compBest.score;
     if (isNew) s.compBest = { score, count, height };
+    if (!s.allCompBest || score > s.allCompBest.score) s.allCompBest = { score, count, height };
     Save.write();
     return isNew;
   }
@@ -163,7 +166,8 @@ const Records = (() => {
       `<h3 class="section-title">スコアアタック</h3>` +
       `<div class="stat-grid">` +
       item("プレイ回数", `${s.soloPlays}<small>回</small>`) +
-      item("ハイスコア", s.best ? `${s.best.score}<small>点</small>` : "---") +
+      item(`ハイスコア（${Seasons.short(Seasons.currentId())}）`, s.best ? `${s.best.score}<small>点</small>` : "---") +
+      item("ハイスコア（全期間）", s.allBest ? `${s.allBest.score}<small>点</small>` : "---") +
       item("平均スコア", s.soloPlays ? `${avg}<small>点</small>` : "---") +
       item("最高の積んだ数", `${s.bestCount}<small>体</small>`) +
       item("最高の高さ", `${s.bestHeight.toFixed(2)}<small>m</small>`) +
@@ -171,7 +175,8 @@ const Records = (() => {
       `<h3 class="section-title">🏁 競技</h3>` +
       `<div class="stat-grid">` +
       item("プレイ回数", `${s.compPlays || 0}<small>回</small>`) +
-      item("ハイスコア", s.compBest ? `${s.compBest.score}<small>点</small>` : "---") +
+      item(`ハイスコア（${Seasons.short(Seasons.currentId())}）`, s.compBest ? `${s.compBest.score}<small>点</small>` : "---") +
+      item("ハイスコア（全期間）", s.allCompBest ? `${s.allCompBest.score}<small>点</small>` : "---") +
       item("平均スコア", s.compPlays ? `${Math.round((s.compTotalScore || 0) / s.compPlays)}<small>点</small>` : "---") +
       item("最高の積んだ数", s.compBest ? `${s.compBest.count}<small>体</small>` : "---") +
       `</div>` +

@@ -77,6 +77,7 @@ const Admin = (() => {
     Settings.set("debug", false);
     Game.setForcedShape(null);
     setTestDate(null); // 実際の日付に戻す
+    endSeasonTest(); // シーズンのテストをやめて、テストの前のデータに戻す
     applyDisplay(); // FPS などの表示を消す
     // スタッフの称号（開発者など）は、獲得したものを残す（管理者モードを終えても、この端末で選べる）
   }
@@ -246,6 +247,11 @@ const Admin = (() => {
       });
     }
 
+    // シーズン：サーバーの切り替え・テスト
+    $("btn-admin-season-set").addEventListener("click", setServerSeason);
+    $("btn-admin-season-reload").addEventListener("click", () => renderSeason(true));
+    $("toggle-admin-season-test").addEventListener("click", toggleSeasonTest);
+
     // 合言葉：番号を作る・使った合言葉をリセット（codes.js）
     $("btn-admin-code-hash").addEventListener("click", async () => {
       const text = $("admin-code-text").value;
@@ -306,9 +312,125 @@ const Admin = (() => {
     renderStaff();
     renderNet();
     renderCodes();
+    renderSeason(true);
     renderNotice(true);
     Updates.refresh().then(() => UI.current === "admin" && renderNotice());
     renderSections();
+  }
+
+  // ---------- シーズン ----------
+  const SEASON_SNAP_KEY = "stack.admin.seasonSnap"; // テストの前の保存データ（シーズンにかかわる部分）
+  let serverSeason = null; // サーバーの今のシーズン（分からなければ null）
+
+  const rankingUrl = () => ((window.GAME_CONFIG.ranking || {}).url || "").trim();
+  const seasonTesting = () => {
+    try {
+      return !!localStorage.getItem(Save.SEASON_TEST_KEY);
+    } catch (e) {
+      return false;
+    }
+  };
+
+  // 状態：このゲームの今のシーズン・サーバーの今のシーズン。fetch：サーバーにも聞く
+  async function renderSeason(fetchServer = false) {
+    const s = Seasons.current();
+    $("toggle-admin-season-test").setAttribute("aria-checked", String(seasonTesting()));
+    const next = nextSeason();
+    const lines = () => [
+      `今のシーズン：${s.name}（${s.id}）${seasonTesting() ? "　※テスト中（この端末だけ）" : ""}`,
+      `サーバー　　：${!rankingUrl() ? "（ランキングのサーバーを使っていない）" : serverSeason === null ? "（確認中）" : `シーズン${serverSeason}`}`,
+      `用意している：シーズン${Seasons.lastPrepared()}まで（config.js の seasons）`,
+      serverSeason !== null && serverSeason > Seasons.lastPrepared() ? "→ サーバーの方が新しい（このゲームが古いバージョン）" : "",
+    ].filter(Boolean).join("\n");
+    $("admin-season-state").textContent = lines();
+    $("btn-admin-season-set").textContent = next ? `「${next.name}」を始める` : "次のシーズンが用意されていません（config.js の seasons に足す）";
+    $("btn-admin-season-set").disabled = !next;
+    renderSections();
+    if (!fetchServer || !rankingUrl()) return;
+    try {
+      const r = await fetch(`${rankingUrl()}?mode=free&t=${Date.now()}`, { cache: "no-store" });
+      const json = await r.json();
+      serverSeason = Number(json.current) || 1; // シーズンに対応していない古い ranking.gs は、current が無い（シーズン1 とみなす）
+      Seasons.sync();
+    } catch (e) {
+      serverSeason = null;
+    }
+    $("admin-season-state").textContent = lines();
+    renderSections();
+  }
+
+  // 次に始められるシーズン（サーバーの今のシーズンの次で、config.js に用意してあるもの。無ければ null）
+  function nextSeason() {
+    const base = serverSeason !== null ? serverSeason : Seasons.known().current;
+    const id = base + 1;
+    return id <= Seasons.lastPrepared() ? Seasons.get(id) : null;
+  }
+
+  // 次のシーズンを始める：サーバーの今のシーズンを書きかえる（鍵の確かめ方は、アップデート予告と同じ）
+  async function setServerSeason() {
+    if (seasonTesting()) return UI.alert("テスト中（この端末だけ次のシーズン）は、シーズンを始められません。\nテストをオフにしてから押してください。");
+    if (!rankingUrl()) return UI.toast("ランキングのサーバーを使っていません");
+    await renderSeason(true); // 押す前に、サーバーの今のシーズンを読みなおす
+    const s = nextSeason();
+    if (!s) return UI.toast("次のシーズンが用意されていません");
+    const ok = await UI.confirm(`「${s.name}」を始めますか？\n・みんなのゲームが、次に開いたとき（開いているあいだは5分以内）に新しいシーズンになります\n・シーズン${s.id - 1}のランキングは、ここで最終結果になり、1〜3位に称号が出ます\n・元には戻せません`, "始める");
+    if (!ok) return;
+    let key = null;
+    try {
+      key = localStorage.getItem(KEY);
+    } catch (e) {}
+    let res = null;
+    try {
+      const r = await fetch(rankingUrl(), { method: "POST", cache: "no-store", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "season", key, season: s.id }) });
+      res = await r.json();
+    } catch (e) {
+      return UI.alert("サーバーと通信できませんでした。\n通信できる場所で、もう一度ためしてください。");
+    }
+    if (res && res.ok && res.action === "season") {
+      serverSeason = res.season;
+      await Seasons.sync(); // この端末も、すぐ新しいシーズンに（お知らせも出る）
+      renderSeason();
+      return UI.toast(`「${s.name}」を始めました`);
+    }
+    if (res && res.error === "forbidden") return UI.alert("サーバーに断られました（鍵が合いません）。\nserver/ranking.gs の ADMIN_PASS_HASH が、config.js の admin.passHash と同じか確かめてください。");
+    return UI.alert("サーバーの ranking.gs が古く、シーズンに対応していません。\nserver/ranking.gs を貼りなおして、デプロイしなおしてください。");
+  }
+
+  // テスト：この端末だけ、次のシーズンにする（オンにする前の保存データを取っておき、オフで戻す）
+  function toggleSeasonTest() {
+    if (!seasonTesting()) {
+      const d = Save.data;
+      try {
+        localStorage.setItem(SEASON_SNAP_KEY, JSON.stringify({ stats: d.stats, ranking: d.ranking, seasonNotice: d.meta.seasonNotice, seasonAwards: d.seasonAwards }));
+        localStorage.setItem(Save.SEASON_TEST_KEY, "1");
+      } catch (e) {
+        return UI.toast("保存できませんでした");
+      }
+      Save.checkSeason(); // 次のシーズンに入れかえる（シーズンのお知らせは、次に開いたときに出る）
+      UI.toast(`この端末だけ、${Seasons.current().name}にしました（テスト）`);
+    } else {
+      endSeasonTest();
+      UI.toast("テストをやめて、テストの前のデータに戻しました");
+    }
+    if (typeof onChange === "function") onChange();
+    renderSeason();
+  }
+
+  // テストをやめる（管理者モードを終わるときにも）：テストの前の保存データに戻す
+  function endSeasonTest() {
+    let snap = null;
+    try {
+      snap = JSON.parse(localStorage.getItem(SEASON_SNAP_KEY) || "null");
+      localStorage.removeItem(Save.SEASON_TEST_KEY);
+      localStorage.removeItem(SEASON_SNAP_KEY);
+    } catch (e) {}
+    if (snap && snap.stats) {
+      Save.data.stats = snap.stats;
+      Save.data.ranking = snap.ranking;
+      Save.data.meta.seasonNotice = snap.seasonNotice || 0;
+      Save.data.seasonAwards = snap.seasonAwards || [];
+      Save.write();
+    }
   }
 
   // 使った合言葉の数（見出しの横にも出す）
@@ -358,6 +480,7 @@ const Admin = (() => {
     const t = LimitedEvents.testDate;
     set("date", t ? `テスト日付 ${fmtDate(t)}` : "");
     set("event", Settings.get("eventPreview") ? "期間中として表示 ON" : "");
+    set("season", `${Seasons.short(Seasons.currentId())}${seasonTesting() ? "（テスト中）" : ""}${serverSeason !== null && serverSeason > Seasons.lastPrepared() ? `・サーバー S${serverSeason}（このゲームが古い）` : ""}`);
     const codeCount = Object.keys(Save.data.codes || {}).length;
     set("codes", codeCount ? `使った合言葉 ${codeCount}個` : "");
   }

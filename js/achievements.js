@@ -34,6 +34,8 @@
 //   dejaVu       … 1回のゲームで、同じキャラが1体おきに3回出た（A→？→A→？→A）
 //   flipStreak   … 1体を落とす前に、反転を value 回続けて押した
 //   exactHeight  … タワーの高さが、ちょうど value m（画面の表示の数字。小数2けた）のときに積めた
+//   seasonRank   … シーズンが終わったときに、mode（"free" / "comp"）のランキングで place 位だった（ranking.gs の ?awards=1。js/ranking.js）
+//                  例 { "type": "seasonRank", "mode": "free", "place": 1 }
 //   code         … 合言葉 code（data/codes.json の id）を使った（合言葉でもらう称号。js/codes.js）
 //                  例 { "type": "code", "code": "launch2026" }。手に入れるまでは、実績画面・称号の一覧に出さず、全体の数にも入れない
 //   together     … ids に書いたキャラを全部、1回のゲームで同じタワーに積んだ（だれが積んでもよい。1体でも落ちるとゲームが終わるので、全員タワーに乗っている）。
@@ -50,6 +52,7 @@
 // そのほかの項目：
 //   category … 実績画面の分類（見出し）。同じ分類の実績をまとめて表示する
 //   hidden   … true にすると、達成するまで名前・説明・称号を「？？？」で表示する（隠し実績）
+//   bonus    … true にすると、まだ取っていないうちは、全体の達成数（〇 / 〇）に数えない（シーズンの順位など、だれでも取れるわけではないもの）
 //   hideCondition … true にすると、達成するまで説明（条件）だけを「？？？（条件はひみつ）」にする。名前は見せる（組み合わせの実績）
 //   rank     … 称号の枠の種類："bronze" / "silver" / "gold" / "legend" / "mythic"（まぼろし・星5つ）/ "event" / "secret"（隠し）/ "code"（合言葉の称号だけ）（frames.js）
 //   decoration … （省略可）アイコンのふちに並べる飾り："star"（星。省略したとき）/ "pumpkin"（カボチャ）（frames.js の DECORATIONS）
@@ -112,6 +115,8 @@ const Achievements = (() => {
         return !!game && (game.flipStreak || 0) >= v;
       case "exactHeight":
         return !!game && (game.heights || []).some((h) => h.toFixed(2) === v.toFixed(2));
+      case "seasonRank":
+        return (Save.data.seasonAwards || []).some((a) => a.mode === cond.mode && a.place === cond.place);
       case "code":
         return typeof Codes !== "undefined" && Codes.hasUsed(cond.code);
       case "together": {
@@ -274,7 +279,7 @@ const Achievements = (() => {
   // 読み込めていなければ null
   function counts() {
     if (!defs) return null;
-    const counted = defs.filter((a) => !closed(a) && !secretCode(a));
+    const counted = defs.filter((a) => !closed(a) && !secretCode(a) && !(a.bonus && !unlocked()[a.id]));
     return { got: counted.filter((a) => unlocked()[a.id]).length, total: counted.length };
   }
 
@@ -323,7 +328,7 @@ const Achievements = (() => {
     }
     box.innerHTML = [...groups.entries()]
       .map(([cat, list]) => {
-        const open = list.filter((a) => !closed(a));
+        const open = list.filter((a) => !closed(a) && !(a.bonus && !unlocked()[a.id]));
         const done = open.filter((a) => unlocked()[a.id]).length;
         return `<h3 class="ach-section">${UI.escape(cat)}<small>${done} / ${open.length}</small></h3>` + list.map(rowHTML).join("");
       })
