@@ -30,6 +30,8 @@ const Save = (() => {
       dex: {},
       // 実績：達成した実績の id → 達成した日時
       achievements: {},
+      // 使った合言葉：合言葉の id → { at: 使った日時, reward: もらったごほうび }（codes.js。1人1回）
+      codes: {},
       // 戦績
       stats: {
         soloPlays: 0, // 1人モードのプレイ回数

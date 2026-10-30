@@ -2845,7 +2845,16 @@ select {
   pointer-events: none;
 }
 
-#confetti span {
+/* 合言葉の紙吹雪（ダイアログの中に降らせる。codes.js） */
+.code-confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#confetti span,
+.code-confetti span {
   position: absolute;
   top: -20px;
   width: 10px;
@@ -2856,6 +2865,101 @@ select {
 
 @keyframes confetti {
   to { transform: translateY(110vh) rotate(720deg); }
+}
+
+/* ===== 合言葉（codes.js） ===== */
+.code-dialog-box {
+  position: relative;
+  overflow: hidden;
+}
+
+.code-title {
+  margin-bottom: var(--space-s);
+  font-size: var(--font-size-m);
+  font-weight: bold;
+}
+
+.code-title.code-ok {
+  color: #d97a00; /* 白いダイアログの上でも読める、濃い金色 */
+}
+
+.code-note {
+  margin-bottom: var(--space-m);
+  font-size: var(--font-size-s);
+  word-break: keep-all; /* 「ごほうび」などが、言葉の途中で改行しないように（読点で改行する） */
+  text-wrap: balance;
+  opacity: 0.85;
+}
+
+.code-input {
+  width: 100%;
+  padding: 12px var(--space-m);
+  border: 2px solid #c9d2e3;
+  border-radius: var(--radius-s);
+  color: var(--color-text-dark);
+  background: #f4f6fb;
+  font: inherit;
+  font-size: 20px;
+  font-weight: bold;
+  text-align: center;
+  letter-spacing: 0.1em;
+}
+
+.code-message {
+  min-height: 1.5em;
+  margin: var(--space-s) 0;
+  font-size: var(--font-size-s);
+  font-weight: bold;
+}
+
+.code-message.code-error {
+  color: #ff8a8a;
+}
+
+.code-message.code-info {
+  color: #8fe3ff;
+}
+
+.code-result-name {
+  margin-bottom: var(--space-m);
+  font-size: var(--font-size-l);
+  font-weight: bold;
+}
+
+.code-result-list {
+  display: grid;
+  gap: var(--space-s);
+  margin: 0 0 var(--space-m);
+  padding: 0;
+  list-style: none;
+}
+
+.code-reward {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  padding: var(--space-s);
+  border-radius: var(--radius-s);
+  background: rgba(255, 255, 255, 0.1);
+  animation: rise-up 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.code-reward:nth-child(2) { animation-delay: 0.15s; }
+.code-reward:nth-child(3) { animation-delay: 0.3s; }
+
+.code-reward img {
+  width: 96px;
+  border-radius: 6px;
+}
+
+.code-reward-kind {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-round);
+  color: var(--color-text-dark);
+  background: #ffd54a;
+  font-size: 11px;
+  font-weight: bold;
 }
 
 /* =============================================
@@ -3015,8 +3119,13 @@ select {
 }
 
 /* ホームの右上（歯車の左）の 🛠：管理者メニュー（管理者モードの端末だけ） */
-.btn-admin-home {
+/* 合言葉の 🔑（歯車の左）。管理者モードの 🛠 は、そのさらに左 */
+.btn-codes-home {
   right: calc(var(--space-m) + var(--safe-right) + 46px + var(--space-s));
+}
+
+.btn-admin-home {
+  right: calc(var(--space-m) + var(--safe-right) + (46px + var(--space-s)) * 2);
   font-size: 20px;
 }
 
@@ -4491,6 +4600,15 @@ body.sandbox-on .load-status {
 }
 /* 隠し：紫×黒（ふちには「？」。achievements.json の decoration: "question"）。輪も札と同じ紫→黒 */
 .frame-secret, .rank-secret { --frame-color: #8f5bff; --frame-dark: #1a0b2e; --frame-light: #c9a8ff; --frame-text: #f3e6ff; --frame-badge: linear-gradient(#3a1a66, #1a0b2e); --frame-ring: linear-gradient(#3a1a66, #1a0b2e); }
+/* 合言葉（合言葉でもらう称号だけ）：深い緑の札に金の文字。輪は深い緑に金色がゆっくり回る（下の「合言葉の枠」）。ふちには鍵 */
+.frame-code, .rank-code {
+  --frame-color: #f4c542;
+  --frame-dark: #06302a;
+  --frame-light: #ffe39a;
+  --frame-text: #ffe39a;
+  --frame-badge: linear-gradient(#11705f, #073d35);
+  --frame-ring: conic-gradient(#11705f, #f4c542 12%, #11705f 25%, #073d35 50%, #11705f 62%, #f4c542 75%, #11705f 88%, #073d35);
+}
 /* 期間限定：輪も札と同じ紫。星（飾り）は札の文字と同じオレンジ */
 .frame-event, .rank-event { --frame-color: #ff8a1f; --frame-dark: #3b1458; --frame-light: #ffc27a; --frame-text: #ffb15c; --frame-badge: linear-gradient(#5a2380, #3b1458); --frame-ring: linear-gradient(#5a2380, #3b1458); }
 /* まだ取っていない称号（称号を選ぶ画面だけ） */
@@ -4541,6 +4659,7 @@ body.sandbox-on .load-status {
 .deco-pumpkin { --deco-img: url("../images/decorations/pumpkin.svg"); }
 .deco-snow { --deco-img: url("../images/decorations/snowflake.svg"); }
 .deco-question { --deco-img: url("../images/decorations/question.svg"); }
+.deco-key { --deco-img: url("../images/decorations/key.svg"); } /* 合言葉でもらう称号だけの飾り（codes.js） */
 
 .avatar.frame[class*="deco-"]::after {
   -webkit-mask: none;
@@ -4781,13 +4900,15 @@ body.sandbox-on .load-status {
 /* 札と同じ色の輪（まぼろし・期間限定・隠し）：輪の形に切り抜いた --frame-ring を、ふちの上に重ねる（太さは共通の輪と同じ） */
 .avatar.frame-mythic,
 .avatar.frame-event,
-.avatar.frame-secret {
+.avatar.frame-secret,
+.avatar.frame-code {
   border-color: transparent;
 }
 
 .avatar.frame-mythic::before,
 .avatar.frame-event::before,
-.avatar.frame-secret::before {
+.avatar.frame-secret::before,
+.avatar.frame-code::before {
   content: "";
   position: absolute;
   --ring: max(2px, calc(var(--av) * 0.07));
@@ -4815,6 +4936,31 @@ body.sandbox-on .load-status {
 @keyframes frame-mythic-glow {
   0%, 100% { box-shadow: 0 0 0 max(1px, calc(var(--av) * 0.025)) var(--frame-dark), 0 0 calc(var(--av) * 0.12) rgba(255, 255, 255, 0.5); }
   50% { box-shadow: 0 0 0 max(1px, calc(var(--av) * 0.025)) var(--frame-dark), 0 0 calc(var(--av) * 0.3) rgba(255, 246, 214, 0.95); }
+}
+
+/* 合言葉の枠：金色の光が、深い緑の輪をゆっくり回る。まわりが、ほんのり金色に光る */
+.avatar.frame-code {
+  box-shadow: 0 0 0 max(1px, calc(var(--av) * 0.025)) var(--frame-dark), 0 0 calc(var(--av) * 0.14) rgba(244, 197, 66, 0.55);
+}
+
+.avatar.frame-code::before {
+  animation: frame-spin 8s linear infinite;
+}
+
+/* 合言葉の札：深い緑に金のふち。金色の光が、ときどき横に走る */
+.title-badge.rank-code {
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px #f4c542;
+}
+
+.title-badge.rank-code::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 35%, rgba(255, 243, 190, 0.55) 50%, transparent 65%) 100% 0 / 300% 100% no-repeat;
+  animation: frame-shine 4s ease-in-out infinite;
+  pointer-events: none;
 }
 
 /* まぼろしの札：夜空色の上を、ゆっくり色が流れる。文字は白く光る */
@@ -4915,6 +5061,8 @@ body.sandbox-on .load-status {
   .avatar.frame-legend::before,
   .avatar.frame-mythic,
   .avatar.frame-mythic::before,
+  .avatar.frame-code::before,
+  .title-badge.rank-code::after,
   .title-badge.rank-mythic,
   .title-badge.rank-legend,
   .title-badge.rank-gold::after {

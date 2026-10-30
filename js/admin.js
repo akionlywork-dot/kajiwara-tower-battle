@@ -246,6 +246,20 @@ const Admin = (() => {
       });
     }
 
+    // 合言葉：番号を作る・使った合言葉をリセット（codes.js）
+    $("btn-admin-code-hash").addEventListener("click", async () => {
+      const text = $("admin-code-text").value;
+      if (!Codes.normalize(text)) return UI.toast("合言葉を入れてください");
+      const hash = await Codes.hashOf(text);
+      $("admin-code-out").textContent = `そろえた形：${Codes.normalize(text)}\n"hash": "${hash}",`;
+    });
+    $("btn-admin-code-reset").addEventListener("click", async () => {
+      if (!(await UI.confirm("使った合言葉を、全部リセットしますか？\n合言葉でもらった称号・背景・土台も、使えなくなります（もう一度、合言葉を入れればもらえます）。", "リセット"))) return;
+      const n = Codes.resetAll();
+      renderCodes();
+      UI.toast(`使った合言葉を ${n} 個リセットしました`);
+    });
+
     setupSections();
 
     // 終わる
@@ -291,8 +305,16 @@ const Admin = (() => {
     renderUndo();
     renderStaff();
     renderNet();
+    renderCodes();
     renderNotice(true);
     Updates.refresh().then(() => UI.current === "admin" && renderNotice());
+    renderSections();
+  }
+
+  // 使った合言葉の数（見出しの横にも出す）
+  function renderCodes() {
+    const ids = Object.keys(Save.data.codes || {});
+    $("admin-code-used").textContent = ids.length ? `この端末で使った合言葉：${ids.join("・")}` : "この端末では、まだ合言葉を使っていません";
     renderSections();
   }
 
@@ -336,6 +358,8 @@ const Admin = (() => {
     const t = LimitedEvents.testDate;
     set("date", t ? `テスト日付 ${fmtDate(t)}` : "");
     set("event", Settings.get("eventPreview") ? "期間中として表示 ON" : "");
+    const codeCount = Object.keys(Save.data.codes || {}).length;
+    set("codes", codeCount ? `使った合言葉 ${codeCount}個` : "");
   }
 
   // ---------- アップデート予告 ----------

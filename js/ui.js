@@ -157,9 +157,8 @@ const UI = (() => {
   }
 
   // ---------- 演出 ----------
-  // 紙吹雪を降らせる（colors の色をランダムに使う）
-  function confetti(colors) {
-    const box = $("confetti");
+  // 紙吹雪を降らせる（colors の色をランダムに使う）。box：降らせる場所（省略すると、リザルト画面の #confetti）
+  function confetti(colors, box = $("confetti")) {
     box.innerHTML = "";
     for (let i = 0; i < 40; i++) {
       const s = document.createElement("span");

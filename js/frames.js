@@ -8,15 +8,16 @@
 //   legend … 虹色（輪がゆっくり回る） ／ event … オレンジ×紫（期間限定の実績）
 //   mythic … まぼろし。虹の輪が回り、まわりが白く光る。星5つ
 //   secret … 隠し（隠し実績）。紫×黒。ふちには星の代わりに「？」（decoration: "question"）
+//   code   … 合言葉（合言葉でもらう称号だけ。codes.js）。深い緑の輪に、金色がゆっくり回る。札は深い緑に金の文字。ふちには鍵（decoration: "key"）
 // 称号を選んでいない・実績が見つからないときは、枠なし。
 // 見た目は style.css の「称号の枠」（色は CSS の変数で切りかえる。動く枠は CSS のアニメーションで、「視差効果を減らす」では止まる）。
 // リザルトカードの画像の枠は card.js が、ここで決めた rank を見て描く
 // =============================================
 
 const Frames = (() => {
-  const RANKS = ["bronze", "silver", "gold", "legend", "mythic", "event", "secret"];
+  const RANKS = ["bronze", "silver", "gold", "legend", "mythic", "event", "secret", "code"];
   // 枠のてっぺんに並べる星の数（格が上がるほど増える。期間限定・隠しはゴールドと同じ）
-  const STARS = { bronze: 1, silver: 2, gold: 3, legend: 4, mythic: 5, event: 3, secret: 3 };
+  const STARS = { bronze: 1, silver: 2, gold: 3, legend: 4, mythic: 5, event: 3, secret: 3, code: 3 };
   const EVENT_PATTERN = /^[a-z0-9_-]{1,40}$/; // イベントの id として使ってよい形（CSS のクラス名に使うため）
 
   // アイコンのふちに並べる飾り（称号ごと。achievements.json の decoration。書いていなければ star）。
@@ -27,6 +28,7 @@ const Frames = (() => {
     pumpkin: "images/decorations/pumpkin.svg", // カボチャ（パンプキング）
     snow: "images/decorations/snowflake.svg", // 雪の結晶（今は使っている称号なし。足すときに）
     question: "images/decorations/question.svg", // 「？」（隠し実績の称号）
+    key: "images/decorations/key.svg", // 鍵（合言葉でもらう称号だけの飾り。js/codes.js）
   };
   const decoOf = (d) => (Object.prototype.hasOwnProperty.call(DECORATIONS, d) ? d : "star");
 

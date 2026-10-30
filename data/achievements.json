@@ -913,6 +913,20 @@
         "event": "halloween2026",
         "value": 3
       }
+    },
+    {
+      "id": "code_rinka",
+      "hidden": true,
+      "name": "合言葉「りんか」",
+      "title": "りんか",
+      "rank": "code",
+      "decoration": "key",
+      "description": "ある合言葉を入れた",
+      "category": "合言葉",
+      "condition": {
+        "type": "code",
+        "code": "rinka"
+      }
     }
   ]
 }

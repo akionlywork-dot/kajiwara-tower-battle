@@ -27,6 +27,10 @@ const Themes = (() => {
   function isUnlocked(def) {
     const u = def.unlock;
     if (!u) return true;
+    // 合言葉でもらったもの（unlock がほかのものでも、先にもらえる。js/codes.js）
+    const kind = (window.GAME_CONFIG.themes.platforms || []).includes(def) ? "platforms" : "backgrounds";
+    if (typeof Codes !== "undefined" && Codes.grants(kind, def.id)) return true;
+    if (u === "code") return false; // 合言葉でしか手に入らないもの
     if (u === "achievement") {
       // achievements.json の reward で決める（実績を読み込めていなければ、解放しない）
       const a = rewardOf(def);
@@ -58,6 +62,7 @@ const Themes = (() => {
 
   // 解放条件の説明（例：「実績『10体積み』を達成」）
   function conditionText(def) {
+    if (def.unlock === "code") return "合言葉で手に入る";
     if (def.unlock && typeof def.unlock === "object") return `${LimitedEvents.nameOf(def.unlock.event)}で${def.unlock.wins || 1}勝`;
     const a = def.unlock === "achievement" ? rewardOf(def) : typeof Achievements !== "undefined" ? Achievements.find(def.unlock) : null;
     if (a && a.hidden && !Save.data.achievements[a.id]) return "隠し実績を達成"; // 隠し実績は、名前も出さない

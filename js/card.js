@@ -259,6 +259,7 @@ const Card = (() => {
     event: { color: "#ff8a1f", dark: "#3b1458", light: "#ffc27a", text: "#ffb15c", badge: ["#5a2380", "#3b1458"], ring: ["#5a2380", "#3b1458"] },
     mythic: { color: "#fff6d6", dark: "#fff6d6", light: "#ffffff", text: "#ffffff", glow: "rgba(255, 246, 214, 0.95)", badge: ["#2a1660", "#4b2a9a", "#1d4f8a"], badgeAcross: true, ring: ["#4b2a9a", "#2a1660", "#1d4f8a"] },
     secret: { color: "#8f5bff", dark: "#1a0b2e", light: "#c9a8ff", text: "#f3e6ff", badge: ["#3a1a66", "#1a0b2e"], ring: ["#3a1a66", "#1a0b2e"] },
+    code: { color: "#f4c542", dark: "#06302a", light: "#ffe39a", text: "#ffe39a", badge: ["#11705f", "#073d35"], ring: ["#11705f", "#f4c542", "#073d35"] },
   };
   const RAINBOW = ["#ff5d73", "#ffc21a", "#4cd964", "#3d8bff", "#b65cf0", "#ff5d73"];
   let decoImg = null; // 称号の飾りの画像（カボチャなど。星なら null。render で読み込む）

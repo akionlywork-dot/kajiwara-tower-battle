@@ -34,6 +34,8 @@
 //   dejaVu       … 1回のゲームで、同じキャラが1体おきに3回出た（A→？→A→？→A）
 //   flipStreak   … 1体を落とす前に、反転を value 回続けて押した
 //   exactHeight  … タワーの高さが、ちょうど value m（画面の表示の数字。小数2けた）のときに積めた
+//   code         … 合言葉 code（data/codes.json の id）を使った（合言葉でもらう称号。js/codes.js）
+//                  例 { "type": "code", "code": "launch2026" }。手に入れるまでは、実績画面・称号の一覧に出さず、全体の数にも入れない
 //   together     … ids に書いたキャラを全部、1回のゲームで同じタワーに積んだ（だれが積んでもよい。1体でも落ちるとゲームが終わるので、全員タワーに乗っている）。
 //                  競技では数えない（★4 の公安・別班も同じ確率で出て、すぐそろってしまうため）
 //   sameChar     … 1回のゲームで、同じキャラを value 体積んだ
@@ -49,7 +51,7 @@
 //   category … 実績画面の分類（見出し）。同じ分類の実績をまとめて表示する
 //   hidden   … true にすると、達成するまで名前・説明・称号を「？？？」で表示する（隠し実績）
 //   hideCondition … true にすると、達成するまで説明（条件）だけを「？？？（条件はひみつ）」にする。名前は見せる（組み合わせの実績）
-//   rank     … 称号の枠の種類："bronze" / "silver" / "gold" / "legend" / "mythic"（まぼろし・星5つ）/ "event" / "secret"（隠し）（frames.js）
+//   rank     … 称号の枠の種類："bronze" / "silver" / "gold" / "legend" / "mythic"（まぼろし・星5つ）/ "event" / "secret"（隠し）/ "code"（合言葉の称号だけ）（frames.js）
 //   decoration … （省略可）アイコンのふちに並べる飾り："star"（星。省略したとき）/ "pumpkin"（カボチャ）（frames.js の DECORATIONS）
 //   reward   … （省略可）ごほうびの背景・土台。{ "background": "背景の id" } か { "platform": "土台の id" }。
 //              その背景・土台は、config.js の themes で unlock: "achievement" と書いておく（見た目の色は config.js）
@@ -110,6 +112,8 @@ const Achievements = (() => {
         return !!game && (game.flipStreak || 0) >= v;
       case "exactHeight":
         return !!game && (game.heights || []).some((h) => h.toFixed(2) === v.toFixed(2));
+      case "code":
+        return typeof Codes !== "undefined" && Codes.hasUsed(cond.code);
       case "together": {
         const ids = cond.ids || [];
         return !!game && !game.comp && ids.length > 0 && ids.every((id) => (game.placedIds || []).includes(id));
@@ -270,7 +274,7 @@ const Achievements = (() => {
   // 読み込めていなければ null
   function counts() {
     if (!defs) return null;
-    const counted = defs.filter((a) => !closed(a));
+    const counted = defs.filter((a) => !closed(a) && !secretCode(a));
     return { got: counted.filter((a) => unlocked()[a.id]).length, total: counted.length };
   }
 
@@ -278,7 +282,7 @@ const Achievements = (() => {
   //   [{ id, title, rank, event, hidden, description, got（取ったか）, closed（期間が終わって、もう取れないか）}]
   function titleList() {
     return (defs || [])
-      .filter((a) => a.title)
+      .filter((a) => a.title && !secretCode(a))
       .map((a) => ({
         id: a.id,
         title: a.title,
@@ -312,7 +316,7 @@ const Achievements = (() => {
     $("achievements-count").textContent = `${c.got} / ${c.total}`;
     // 分類ごとにまとめる（json に書いた順番のまま）
     const groups = new Map();
-    for (const a of defs) {
+    for (const a of defs.filter((x) => !secretCode(x))) {
       const cat = a.category || "そのほか";
       if (!groups.has(cat)) groups.set(cat, []);
       groups.get(cat).push(a);
@@ -335,6 +339,16 @@ const Achievements = (() => {
   }
 
   // 期間限定の実績で、期間外（開催前・終了）で、まだ達成していない（もう取れない）か
+  // 合言葉でもらう称号で、まだ持っていないもの（実績画面・称号の一覧に出さず、数にも入れない）
+  function secretCode(a) {
+    return !!a.condition && a.condition.type === "code" && !unlocked()[a.id];
+  }
+
+  // 合言葉でもらう称号の id の一覧（管理者モードの「使った合言葉のリセット」で使う）
+  function codeAchievementIds() {
+    return (defs || []).filter((a) => a.condition && a.condition.type === "code").map((a) => a.id);
+  }
+
   function closed(a) {
     return !!a.event && !unlocked()[a.id] && !LimitedEvents.isActive(a.event);
   }
@@ -389,5 +403,5 @@ const Achievements = (() => {
     if (typeof Profile !== "undefined") Profile.refresh();
   }
 
-  return { init, load, check, counts, titleList, unlockedList, find, findByTitle, rewardOf, setAll };
+  return { init, load, check, counts, titleList, unlockedList, find, findByTitle, rewardOf, setAll, codeAchievementIds };
 })();

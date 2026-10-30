@@ -1379,6 +1379,7 @@ ${location.origin}${location.pathname}`), "image/png");
   Achievements.init();
   Backup.init();
   PWA.init(); // アプリとしてインストールできるようにする
+  Codes.init(); // 合言葉（ホーム画面の 🔑）
   Updates.init(); // アップデートの予告と「更新する」ボタン（タイトル画面）
   Share.init();
   Stamps.init();

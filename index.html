@@ -36,7 +36,7 @@
   <!-- アプリとしてインストールするための設定（PWA） -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="css/style.css?v=3.2.1">
+  <link rel="stylesheet" href="css/style.css?v=3.2.2">
 </head>
 <body>
   <div id="app">
@@ -107,6 +107,11 @@
       </button>
 
       <!-- 右上（歯車の左）：管理者メニュー。管理者モードの端末だけ表示される（main.js の applyAdmin） -->
+      <!-- 右上（歯車の左）：合言葉（codes.js） -->
+      <button id="btn-codes" class="btn btn-icon btn-corner btn-codes-home" aria-label="合言葉">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="8" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M12 12h9M18 12v3M21 12v4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      </button>
+
       <button id="btn-admin-home" class="btn btn-icon btn-corner btn-admin-home hidden" data-open="admin" aria-label="管理者メニュー">🛠</button>
 
       <!-- 左上：自分のプロフィール（タップでプロフィール画面へ） -->
@@ -581,6 +586,34 @@
       </div>
     </section>
 
+    <!-- ===== 合言葉（codes.js）：入力 → 正しければ、ごほうびを並べて紙吹雪 ===== -->
+    <div id="code-dialog" class="dialog">
+      <div class="dialog-box code-dialog-box">
+        <div id="code-confetti" class="code-confetti"></div>
+        <div id="code-form">
+          <p class="code-title">🔑 合言葉</p>
+          <p class="code-note">合言葉を入れると、ごほうびがもらえます（1つの合言葉は1回だけ）</p>
+          <form onsubmit="return false">
+            <input id="code-input" class="code-input" type="text" maxlength="40" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="合言葉を入力" aria-label="合言葉">
+          </form>
+          <p id="code-message" class="code-message" aria-live="polite"></p>
+          <div class="dialog-buttons">
+            <button id="btn-code-cancel" class="btn btn-sub">とじる</button>
+            <button id="btn-code-ok" class="btn btn-primary">たしかめる</button>
+          </div>
+        </div>
+        <div id="code-result" class="hidden">
+          <p class="code-title code-ok">🎉 合言葉成功！</p>
+          <p id="code-result-name" class="code-result-name"></p>
+          <ul id="code-result-list" class="code-result-list"></ul>
+          <p id="code-result-note" class="code-note"></p>
+          <div class="dialog-buttons">
+            <button id="btn-code-done" class="btn btn-primary">OK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== キャラを選ぶ画面（お気に入りのキャラ・キャラのアイコン。custom.js） ===== -->
     <div id="char-picker" class="dialog">
       <div class="dialog-box stamp-picker-box">
@@ -939,6 +972,18 @@
               <pre id="admin-net" class="admin-net"></pre>
               <button id="btn-admin-net" class="btn btn-small btn-sub">更新</button>
             </details>
+            <details class="admin-sec" data-sec="codes">
+              <summary class="section-title">合言葉<small class="admin-sec-state"></small></summary>
+              <p class="page-note">合言葉を入れて「番号を作る」と、data/codes.json に書く番号（hash）が出ます。合言葉そのものは、どこにも保存しません（ソースはだれでも見られるため）。入力はそろえてから番号にします（全角・半角、大文字・小文字、ひらがな・カタカナ、空白）。</p>
+              <label class="field">
+                <span>合言葉</span>
+                <input id="admin-code-text" type="text" maxlength="40" autocomplete="off" spellcheck="false">
+              </label>
+              <button id="btn-admin-code-hash" class="btn btn-small btn-sub admin-wide">番号を作る</button>
+              <pre id="admin-code-out" class="admin-net"></pre>
+              <p id="admin-code-used" class="page-note"></p>
+              <button id="btn-admin-code-reset" class="btn btn-small btn-danger admin-wide">使った合言葉をリセット</button>
+            </details>
             <details class="admin-sec" data-sec="reset">
               <summary class="section-title">データのリセット<small class="admin-sec-state"></small></summary>
               <p class="page-note">選んだ項目だけを、初めの状態に戻します。</p>
@@ -1032,52 +1077,53 @@
 
   <!-- ?v= のあとの番号：更新したら config.js の version と一緒に上げる（スマホに古いファイルが残らないように） -->
   <!-- ライブラリ（lib/ に同梱） -->
-  <script src="lib/decomp.min.js?v=3.2.1"></script>
-  <script src="lib/matter.min.js?v=3.2.1"></script>
-  <script src="lib/peerjs.min.js?v=3.2.1"></script>
-  <script src="lib/mqtt.min.js?v=3.2.1"></script>
+  <script src="lib/decomp.min.js?v=3.2.2"></script>
+  <script src="lib/matter.min.js?v=3.2.2"></script>
+  <script src="lib/peerjs.min.js?v=3.2.2"></script>
+  <script src="lib/mqtt.min.js?v=3.2.2"></script>
   <!-- 設定ファイル -->
-  <script src="config.js?v=3.2.1"></script>
+  <script src="config.js?v=3.2.2"></script>
   <!-- 読み込みの状況（開発用。devMode か ?debug=1 のときだけ表示）。ほかより先に読み込む -->
-  <script src="js/load-status.js?v=3.2.1"></script>
-  <script src="characters.js?v=3.2.1"></script>
-  <script src="js/chars.js?v=3.2.1"></script>
+  <script src="js/load-status.js?v=3.2.2"></script>
+  <script src="characters.js?v=3.2.2"></script>
+  <script src="js/chars.js?v=3.2.2"></script>
   <!-- ゲーム本体 -->
-  <script src="js/settings.js?v=3.2.1"></script>
-  <script src="js/save.js?v=3.2.1"></script>
-  <script src="js/audio.js?v=3.2.1"></script>
-  <script src="js/shape.js?v=3.2.1"></script>
-  <script src="js/aura.js?v=3.2.1"></script>
-  <script src="js/platform-art.js?v=3.2.1"></script>
-  <script src="js/game.js?v=3.2.1"></script>
-  <script src="js/rules.js?v=3.2.1"></script>
-  <script src="js/cpu.js?v=3.2.1"></script>
-  <script src="js/challenge.js?v=3.2.1"></script>
-  <script src="js/card.js?v=3.2.1"></script>
-  <script src="js/stamps.js?v=3.2.1"></script>
-  <script src="js/halloween-home.js?v=3.2.1"></script>
-  <script src="js/halloween.js?v=3.2.1"></script>
-  <script src="js/title-fx.js?v=3.2.1"></script>
-  <script src="js/online.js?v=3.2.1"></script>
-  <script src="js/ui.js?v=3.2.1"></script>
-  <script src="js/themes.js?v=3.2.1"></script>
-  <script src="js/frames.js?v=3.2.1"></script>
-  <script src="js/profile.js?v=3.2.1"></script>
-  <script src="js/custom.js?v=3.2.1"></script>
-  <script src="js/data-file.js?v=3.2.1"></script>
-  <script src="js/news.js?v=3.2.1"></script>
-  <script src="js/events.js?v=3.2.1"></script>
-  <script src="js/ranking.js?v=3.2.1"></script>
-  <script src="js/records.js?v=3.2.1"></script>
-  <script src="js/dex.js?v=3.2.1"></script>
-  <script src="js/achievements.js?v=3.2.1"></script>
-  <script src="js/vs-intro.js?v=3.2.1"></script>
-  <script src="js/backup.js?v=3.2.1"></script>
-  <script src="js/controls.js?v=3.2.1"></script>
-  <script src="js/admin.js?v=3.2.1"></script>
-  <script src="js/sandbox.js?v=3.2.1"></script>
-  <script src="js/pwa.js?v=3.2.1"></script>
-  <script src="js/updates.js?v=3.2.1"></script>
-  <script src="js/main.js?v=3.2.1"></script>
+  <script src="js/settings.js?v=3.2.2"></script>
+  <script src="js/save.js?v=3.2.2"></script>
+  <script src="js/audio.js?v=3.2.2"></script>
+  <script src="js/shape.js?v=3.2.2"></script>
+  <script src="js/aura.js?v=3.2.2"></script>
+  <script src="js/platform-art.js?v=3.2.2"></script>
+  <script src="js/game.js?v=3.2.2"></script>
+  <script src="js/rules.js?v=3.2.2"></script>
+  <script src="js/cpu.js?v=3.2.2"></script>
+  <script src="js/challenge.js?v=3.2.2"></script>
+  <script src="js/card.js?v=3.2.2"></script>
+  <script src="js/stamps.js?v=3.2.2"></script>
+  <script src="js/halloween-home.js?v=3.2.2"></script>
+  <script src="js/halloween.js?v=3.2.2"></script>
+  <script src="js/title-fx.js?v=3.2.2"></script>
+  <script src="js/online.js?v=3.2.2"></script>
+  <script src="js/ui.js?v=3.2.2"></script>
+  <script src="js/themes.js?v=3.2.2"></script>
+  <script src="js/frames.js?v=3.2.2"></script>
+  <script src="js/profile.js?v=3.2.2"></script>
+  <script src="js/custom.js?v=3.2.2"></script>
+  <script src="js/codes.js?v=3.2.2"></script>
+  <script src="js/data-file.js?v=3.2.2"></script>
+  <script src="js/news.js?v=3.2.2"></script>
+  <script src="js/events.js?v=3.2.2"></script>
+  <script src="js/ranking.js?v=3.2.2"></script>
+  <script src="js/records.js?v=3.2.2"></script>
+  <script src="js/dex.js?v=3.2.2"></script>
+  <script src="js/achievements.js?v=3.2.2"></script>
+  <script src="js/vs-intro.js?v=3.2.2"></script>
+  <script src="js/backup.js?v=3.2.2"></script>
+  <script src="js/controls.js?v=3.2.2"></script>
+  <script src="js/admin.js?v=3.2.2"></script>
+  <script src="js/sandbox.js?v=3.2.2"></script>
+  <script src="js/pwa.js?v=3.2.2"></script>
+  <script src="js/updates.js?v=3.2.2"></script>
+  <script src="js/main.js?v=3.2.2"></script>
 </body>
 </html>

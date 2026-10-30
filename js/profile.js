@@ -136,6 +136,7 @@ const Profile = (() => {
     ["bronze", "ブロンズ"],
     ["event", "期間限定"],
     ["secret", "隠し"],
+    ["code", "合言葉"],
   ];
 
   function openTitles() {
