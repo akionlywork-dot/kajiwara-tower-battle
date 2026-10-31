@@ -984,6 +984,23 @@
               <pre id="admin-net" class="admin-net"></pre>
               <button id="btn-admin-net" class="btn btn-small btn-sub">更新</button>
             </details>
+            <details class="admin-sec" data-sec="platform">
+              <summary class="section-title">土台の形（テスト）<small class="admin-sec-state"></small></summary>
+              <p class="page-note">土台の厚さ（上の面の高さは同じで、下側だけ変わる）・両はしの段差の高さ・滑りにくさを変えて試します。選ぶと、ページを読みなおします。URL に <code>?plat=16&amp;lip=10&amp;grip=3</code> のように書いても試せます（URL の方が優先）。いつもの形以外のあいだは、ハイスコアにせず、ランキングにも送りません。</p>
+              <label class="field">
+                <span>厚さ</span>
+                <select id="admin-plat-h"></select>
+              </label>
+              <label class="field">
+                <span>両はしの段差の高さ</span>
+                <select id="admin-plat-lip"></select>
+              </label>
+              <label class="field">
+                <span>滑りにくさ（止まっているとき）</span>
+                <select id="admin-plat-grip"></select>
+              </label>
+              <button id="btn-admin-plat-reset" class="btn btn-small btn-sub admin-wide">いつもの形に戻す</button>
+            </details>
             <details class="admin-sec" data-sec="season">
               <summary class="section-title">シーズン<small class="admin-sec-state"></small></summary>
               <p class="page-note">ランキングのシーズン（README の「シーズンの切り替え方」）。config.js の seasons に用意してあるシーズンを、ここで始めます。始めると、みんなのゲームも、次に開いたとき（開いているあいだは5分以内）に新しいシーズンになり、「シーズン〇が始まりました」が出ます。前のシーズンの1〜3位には、称号が出ます。</p>

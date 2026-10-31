@@ -1403,6 +1403,8 @@ ${location.origin}${location.pathname}`), "image/png");
   Halloween.init((rule, cpu) => startGame("versus", rule, cpu));
   TitleFx.init(); // タイトル画面の演出（goTitle より前に）
   Card.init();
+  // 土台の形を試しているとき（game.js の ?plat=・?lip=・?grip=・管理者モード）は、開いたときに知らせる
+  if (Game.platformTest) setTimeout(() => UI.toast(`🧪 土台：${Game.platformTest}（テスト中。ハイスコア・ランキングにしない）`), 1500);
   // キャラの読み込みが終わったら進む Promise（挑戦状は、キャラがそろってから始める）
   let resolveShapesLoaded;
   const shapesLoaded = new Promise((resolve) => (resolveShapesLoaded = resolve));

@@ -59,6 +59,7 @@ const Records = (() => {
     s.bestCount = Math.max(s.bestCount, count);
     s.bestHeight = Math.max(s.bestHeight, height);
     // ハイスコア更新は、今のシーズンのベストで決める。全期間のベストも、上回っていれば書きかえる
+    if (Game.platformTest) return Save.write() && false; // 土台の厚さを試しているあいだは、ハイスコアにしない（ランキングに送られないように）
     const isNew = !s.best || score > s.best.score;
     if (isNew) s.best = { score, count, height };
     if (!s.allBest || score > s.allBest.score) s.allBest = { score, count, height, season: s.season }; // season：そのスコアを出したシーズン
@@ -71,6 +72,7 @@ const Records = (() => {
     const s = stats();
     s.compPlays = (s.compPlays || 0) + 1;
     s.compTotalScore = (s.compTotalScore || 0) + score;
+    if (Game.platformTest) return Save.write() && false; // 土台の厚さを試しているあいだは、ハイスコアにしない
     const isNew = !s.compBest || score > s.compBest.score;
     if (isNew) s.compBest = { score, count, height };
     if (!s.allCompBest || score > s.allCompBest.score) s.allCompBest = { score, count, height, season: s.season };
