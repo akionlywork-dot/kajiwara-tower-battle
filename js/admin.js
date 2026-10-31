@@ -94,6 +94,20 @@ const Admin = (() => {
     Save.write();
   }
 
+  // ---------- 土台の厚さ（テスト。game.js の PLATFORM_H） ----------
+  const PLAT_KEY = "stack.admin.platH";
+  const PLAT_CHOICES = [8, 12, 16, 20, 24, 30, 40];
+  function renderPlatform() {
+    const def = Game.PLATFORM_H_DEFAULT;
+    const now = Game.platformSize.h;
+    const fromUrl = new URLSearchParams(location.search).get("plat") !== null;
+    $("admin-plat-h").innerHTML =
+      `<option value="">いつもの厚さ（${def}）</option>` +
+      PLAT_CHOICES.filter((v) => v !== def).map((v) => `<option value="${v}">${v}${v === 40 ? "（前の厚さ）" : ""}</option>`).join("");
+    $("admin-plat-h").value = now === def ? "" : String(now);
+    $("admin-plat-h").disabled = fromUrl; // URL の ?plat= で試しているときは、URL を消して読みなおす
+  }
+
   // 1つずつ、獲得・リセット
   function setStaff(id, on) {
     const all = (Save.data.staffTitles = Save.data.staffTitles || {});
@@ -190,6 +204,14 @@ const Admin = (() => {
     });
 
     // スタッフの称号：獲得・リセット
+    // 土台の厚さ（テスト）：選んだら、その厚さで読みなおす（game.js が読みこむときに決めるため）
+    $("admin-plat-h").addEventListener("change", (e) => {
+      try {
+        if (e.target.value) localStorage.setItem(PLAT_KEY, e.target.value);
+        else localStorage.removeItem(PLAT_KEY);
+      } catch (err) {}
+      location.reload();
+    });
     $("admin-staff").addEventListener("click", (e) => {
       const b = e.target.closest("[data-staff]");
       if (b) setStaff(b.dataset.staff, b.dataset.on === "1");
@@ -310,6 +332,7 @@ const Admin = (() => {
     renderDate();
     renderUndo();
     renderStaff();
+    renderPlatform();
     renderNet();
     renderCodes();
     renderSeason(true);
@@ -480,6 +503,7 @@ const Admin = (() => {
     const t = LimitedEvents.testDate;
     set("date", t ? `テスト日付 ${fmtDate(t)}` : "");
     set("event", Settings.get("eventPreview") ? "期間中として表示 ON" : "");
+    set("platform", Game.platformTest ? `${Game.platformTest}（テスト中）` : "");
     set("season", `${Seasons.short(Seasons.currentId())}${seasonTesting() ? "（テスト中）" : ""}${serverSeason !== null && serverSeason > Seasons.lastPrepared() ? `・サーバー S${serverSeason}（このゲームが古い）` : ""}`);
     const codeCount = Object.keys(Save.data.codes || {}).length;
     set("codes", codeCount ? `使った合言葉 ${codeCount}個` : "");

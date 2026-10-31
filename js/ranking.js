@@ -571,6 +571,7 @@ const Ranking = (() => {
   // 自己ベストを送る（参加していない・送る必要がないときは何もしない）。フリーと競技の両方
   async function submitBest() {
     if (!isOnline() || !Settings.get("ranking") || Admin.unlocked) return;
+    if (Game.platformTest) return; // 土台の厚さを試しているあいだ（game.js の ?plat=）は送らない
     await submitKind("free");
     await submitKind("comp");
   }

@@ -3,6 +3,8 @@
 // 土台と柱の絵（config.js の themes.platforms の style ごとに描き方を変える）
 //
 // ・見た目だけ。当たり判定（物理の形）は game.js の四角（幅 PLATFORM_W × 高さ PLATFORM_H）のまま
+// ・土台の厚さ（h）は変えられる（game.js の PLATFORM_H。前は 40）。模様・飾りは h に合わせて置き場所と大きさを決める
+//   （40 のときに前と同じ見た目になるように。薄いときは、飾りを小さくして四角の中におさめる。下の fit・bodyMid）
 // ・軽くするため、テーマごとに1回だけ別のキャンバスに描いておき、ゲームでは毎フレームそれを貼るだけ
 //   （build の結果を覚えておく。テーマを変えると、新しいテーマの絵を1回描く）
 // ・style（描き方）：
@@ -76,6 +78,11 @@ const PlatformArt = (() => {
     ctx.fillRect(w - 2, 0, 2, 6);
   }
 
+  // 飾りの大きさの倍率：厚さ 40 のときに 1。薄いほど小さく（ただし、小さくしすぎない）
+  const fit = (h) => Math.max(0.45, Math.min(1, (h - 8) / 32));
+  // 上の面の帯（top）より下の、正面の真ん中の高さ
+  const bodyMid = (h, top) => (top + h) / 2;
+
   // 下に影の帯（どの土台にも）
   function bottomShade(ctx, w, h) {
     ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
@@ -102,13 +109,15 @@ const PlatformArt = (() => {
         ctx.strokeStyle = shade(d.body, -0.4);
         ctx.lineWidth = 1.2;
         for (let x = 56; x < w; x += 56) line(ctx, x, 8, x, h);
+        // リベットの列：厚いときは上下2列、薄いときは真ん中に1列
+        const rows = h >= 30 ? [14, h - 9] : [bodyMid(h, 8)];
         for (let x = 6; x < w; x += 14) {
-          ctx.fillStyle = shade(d.body, -0.35);
-          dot(ctx, x, 14, 1.8);
-          dot(ctx, x, h - 9, 1.8);
-          ctx.fillStyle = "rgba(255,255,255,0.35)";
-          dot(ctx, x - 0.5, 13.4, 0.8);
-          dot(ctx, x - 0.5, h - 9.6, 0.8);
+          for (const y of rows) {
+            ctx.fillStyle = shade(d.body, -0.35);
+            dot(ctx, x, y, 1.8);
+            ctx.fillStyle = "rgba(255,255,255,0.35)";
+            dot(ctx, x - 0.5, y - 0.6, 0.8);
+          }
         }
         bottomShade(ctx, w, h);
         // 上の面：注意のしま（黄色と黒のななめ）
@@ -166,27 +175,30 @@ const PlatformArt = (() => {
         ctx.fillRect(w / 2 - 14, 6, 28, h - 6);
         ctx.fillStyle = "rgba(255,255,255,0.18)";
         ctx.fillRect(w / 2 - 14, 6, 28, 3);
-        // 「天地無用」の矢印の印（左）と、こわれもののグラスの印（右）
+        // 「天地無用」の矢印の印（左）と、こわれもののグラスの印（右）。上の帯の下（y0）から、下のふち（y1）までにおさめる
         ctx.strokeStyle = shade(d.body, -0.55);
         ctx.fillStyle = shade(d.body, -0.55);
         ctx.lineWidth = 1.6;
-        for (const ax of [w * 0.18, w * 0.18 + 10]) {
-          line(ctx, ax, h - 6, ax, 15);
+        const s = fit(h);
+        const y0 = 13 - (1 - s) * 6, y1 = h - 6 + (1 - s) * 3;
+        for (const ax of [w * 0.18, w * 0.18 + 10 * s]) {
+          line(ctx, ax, y1, ax, y0 + 2 * s);
           ctx.beginPath();
-          ctx.moveTo(ax - 4, 19);
-          ctx.lineTo(ax, 13);
-          ctx.lineTo(ax + 4, 19);
+          ctx.moveTo(ax - 4 * s, y0 + 6 * s);
+          ctx.lineTo(ax, y0);
+          ctx.lineTo(ax + 4 * s, y0 + 6 * s);
           ctx.fill();
         }
         const gx = w * 0.8;
+        const cup = y0 + 10 * s; // グラスの杯の下
         ctx.beginPath();
-        ctx.moveTo(gx - 6, 13);
-        ctx.lineTo(gx + 6, 13);
-        ctx.quadraticCurveTo(gx + 6, 22, gx, 23);
-        ctx.quadraticCurveTo(gx - 6, 22, gx - 6, 13);
+        ctx.moveTo(gx - 6 * s, y0);
+        ctx.lineTo(gx + 6 * s, y0);
+        ctx.quadraticCurveTo(gx + 6 * s, cup - 1 * s, gx, cup);
+        ctx.quadraticCurveTo(gx - 6 * s, cup - 1 * s, gx - 6 * s, y0);
         ctx.stroke();
-        line(ctx, gx, 23, gx, h - 7);
-        line(ctx, gx - 5, h - 7, gx + 5, h - 7);
+        line(ctx, gx, cup, gx, y1 - 1);
+        line(ctx, gx - 5 * s, y1 - 1, gx + 5 * s, y1 - 1);
         bottomShade(ctx, w, h);
         // 上の面：波の断面（ダンボールの切り口）
         ctx.fillStyle = d.top;
@@ -221,16 +233,22 @@ const PlatformArt = (() => {
           ctx.fillStyle = shade(d.body, -0.35);
           ctx.fillRect(0, y + 7.2, w, 0.8);
         }
-        // 丸い窓（真ちゅうのふち）
+        // 丸い窓（真ちゅうのふち）。薄いときは、ロープ（上から 7〜13）の下に、小さくしておさめる
+        const s = fit(h);
+        const wy = h >= 30 ? h * 0.6 : bodyMid(h, 11);
         for (const x of [w * 0.2, w * 0.4, w * 0.6, w * 0.8]) {
           ctx.fillStyle = "#c9a227";
-          dot(ctx, x, h * 0.6, 5.2);
+          dot(ctx, x, wy, 5.2 * s);
           ctx.fillStyle = "#26384a";
-          dot(ctx, x, h * 0.6, 3.6);
+          dot(ctx, x, wy, 3.6 * s);
           ctx.fillStyle = "rgba(255,255,255,0.45)";
-          dot(ctx, x - 1.2, h * 0.6 - 1.2, 1);
+          dot(ctx, x - 1.2 * s, wy - 1.2 * s, 1 * s);
         }
-        // ドクロの旗の印（まん中）
+        // ドクロの旗の印（まん中。厚さ 40 のときの、上から 12〜27 の絵を、薄いときは小さくする）
+        ctx.save();
+        ctx.translate(w / 2, h >= 30 ? 0 : bodyMid(h, 8) - 19.5 * s);
+        ctx.scale(s, s);
+        ctx.translate(-w / 2, 0);
         ctx.fillStyle = "#1a1a1a";
         ctx.fillRect(w / 2 - 11, 12, 22, 15);
         ctx.fillStyle = "#f2efe6";
@@ -243,6 +261,7 @@ const PlatformArt = (() => {
         ctx.lineWidth = 1.2;
         line(ctx, w / 2 - 6, 21, w / 2 + 6, 26);
         line(ctx, w / 2 + 6, 21, w / 2 - 6, 26);
+        ctx.restore();
         bottomShade(ctx, w, h);
         // 上の面：船べり（明るい板）と、ロープ
         ctx.fillStyle = d.top;
@@ -307,7 +326,7 @@ const PlatformArt = (() => {
         ctx.lineWidth = 1.6;
         ctx.strokeRect(3, 9, w - 6, h - 14);
         ctx.fillStyle = "#e6b84a";
-        for (const x of [3, w - 3]) for (const y of [9, h - 5]) dot(ctx, x, y, 3);
+        for (const x of [3, w - 3]) for (const y of [9, h - 5]) dot(ctx, x, y, 3 * fit(h)); // 薄いときは、角の金具を小さく
         bottomShade(ctx, w, h);
         // 上の面：黒い漆の天板
         ctx.fillStyle = "#1c1412";
@@ -394,9 +413,11 @@ const PlatformArt = (() => {
         // すべり止めの小さな凸凹（ドットの並び）
         ctx.fillStyle = shade(d.body, -0.12);
         for (let y = 14; y < h - 6; y += 6) for (let x = 6 + ((y / 6) % 2) * 3; x < w - 4; x += 6) dot(ctx, x, y, 1);
-        // 真ん中のロゴ（はすの花の形）
+        // 真ん中のロゴ（はすの花の形。薄いときは小さく、正面の真ん中に）
         ctx.fillStyle = "rgba(255,255,255,0.55)";
-        for (const a of [-0.9, -0.45, 0, 0.45, 0.9]) leaf(ctx, w / 2 + Math.sin(a) * 6, 24 - Math.cos(a) * 4, 4.5, a);
+        const s = fit(h);
+        const ly = h >= 30 ? 24 : bodyMid(h, 6) + 2 * s;
+        for (const a of [-0.9, -0.45, 0, 0.45, 0.9]) leaf(ctx, w / 2 + Math.sin(a) * 6 * s, ly - Math.cos(a) * 4 * s, 4.5 * s, a);
         bottomShade(ctx, w, h);
         // 上の面と、両はしの丸まり
         ctx.fillStyle = d.top;
@@ -485,19 +506,22 @@ const PlatformArt = (() => {
         ctx.fillRect(0, 0, w, 8);
         ctx.fillStyle = shade(d.top, -0.2);
         for (let x = 2; x < w - 2; x += 7) {
-          const len = 4 + ((x * 7) % 9);
+          const len = (4 + ((x * 7) % 9)) * fit(h); // 薄いときは、たれる草も短く
           tri(ctx, x, 7, x + 5, 7, x + 2.5, 7 + len);
         }
         ctx.fillStyle = shade(d.top, 0.25); // 芝生のつや
         for (let x = 4; x < w; x += 11) ctx.fillRect(x, 1.5, 3, 1.5);
         // 側面の小さな花
+        // 花の高さは、厚さ 40 のときの位置（上から 19〜30）を、草の下〜下のふちのあいだに置きなおす。薄いときは小さく
         const flowers = [[22, 20, "#ff8fb1"], [70, 28, "#ffe066"], [150, 22, "#ffffff"], [214, 30, "#ff8fb1"], [258, 19, "#b8a6ff"]];
-        for (const [fx, fy, color] of flowers) {
+        const s = fit(h);
+        for (const [fx, fy40, color] of flowers) {
           if (fx > w - 6) continue;
+          const fy = 8 + ((fy40 - 8) * (h - 8)) / 32 - (1 - s) * 2;
           ctx.fillStyle = color;
-          for (let a = 0; a < 5; a++) dot(ctx, fx + Math.cos((a * Math.PI * 2) / 5) * 2.4, fy + Math.sin((a * Math.PI * 2) / 5) * 2.4, 1.7);
+          for (let a = 0; a < 5; a++) dot(ctx, fx + Math.cos((a * Math.PI * 2) / 5) * 2.4 * s, fy + Math.sin((a * Math.PI * 2) / 5) * 2.4 * s, 1.7 * s);
           ctx.fillStyle = "#f5b400";
-          dot(ctx, fx, fy, 1.3);
+          dot(ctx, fx, fy, 1.3 * s);
         }
       },
       // 丸太の柱
@@ -526,7 +550,11 @@ const PlatformArt = (() => {
       platform(ctx, w, h, d) {
         ctx.fillStyle = shade(d.body, -0.3); // 目地
         ctx.fillRect(0, 0, w, h);
-        const rows = [[6, 17], [17, 28], [28, h]];
+        // 石の段：上の板（6）から下のふちまでを、だいたい 11 ずつの段に分ける（厚さ 40 なら前と同じ 3 段。薄くても 2 段）
+        const n = Math.max(2, Math.round((h - 6) / 11));
+        const rows = [];
+        for (let i = 0; i < n; i++) rows.push([6 + Math.round(((h - 6) * i) / n), i === n - 1 ? h : 6 + Math.round(((h - 6) * (i + 1)) / n)]);
+        const joints = rows.slice(1).map(([y]) => y); // 段のさかいめ（こけを置く）
         rows.forEach(([y1, y2], r) => {
           const bw = 34;
           for (let x = r % 2 ? -bw / 2 : 0; x < w; x += bw) {
@@ -539,8 +567,9 @@ const PlatformArt = (() => {
         });
         // すき間のこけ
         ctx.fillStyle = "rgba(96, 150, 70, 0.85)";
-        for (const [mx, my] of [[33, 17], [101, 28], [170, 17], [238, 28], [68, 28], [204, 17]]) {
+        for (const [mx, j] of [[33, 0], [101, 1], [170, 0], [238, 1], [68, 1], [204, 0]]) {
           if (mx > w) continue;
+          const my = joints[j % joints.length];
           ellipse(ctx, mx, my, 5, 2);
           dot(ctx, mx + 4, my + 1.5, 1.6);
         }
@@ -627,21 +656,27 @@ const PlatformArt = (() => {
         // 彫り模様：内側のわく、ひし形、うず
         ctx.strokeStyle = shade(d.body, -0.35);
         ctx.lineWidth = 1.2;
-        ctx.strokeRect(5, 10, w - 10, h - 16);
+        // 内側のわく（薄いときは、上下のすき間をつめる）
+        const thin = h < 30;
+        const fy = thin ? 8 : 10, fb = thin ? 4 : 6;
+        ctx.strokeRect(5, fy, w - 10, h - fy - fb);
         ctx.strokeStyle = shade(d.body, 0.45);
-        ctx.strokeRect(6, 11, w - 12, h - 18);
+        ctx.strokeRect(6, fy + 1, w - 12, h - fy - fb - 2);
+        // ひし形とうず（わくの中の真ん中に。薄いときは小さく）
+        const s = fit(h);
+        const cy = thin ? fy + (h - fy - fb) / 2 : 21;
         ctx.fillStyle = shade(d.body, -0.3);
         for (let x = 30; x < w - 20; x += 44) {
           ctx.beginPath();
-          ctx.moveTo(x, 21);
-          ctx.lineTo(x + 6, 15);
-          ctx.lineTo(x + 12, 21);
-          ctx.lineTo(x + 6, 27);
+          ctx.moveTo(x, cy);
+          ctx.lineTo(x + 6 * s, cy - 6 * s);
+          ctx.lineTo(x + 12 * s, cy);
+          ctx.lineTo(x + 6 * s, cy + 6 * s);
           ctx.closePath();
           ctx.fill();
           ctx.strokeStyle = shade(d.body, -0.25);
           ctx.beginPath();
-          ctx.arc(x + 25, 21, 4, 0.3, Math.PI * 1.7);
+          ctx.arc(x + 25, cy, 4 * s, 0.3, Math.PI * 1.7);
           ctx.stroke();
         }
         bottomShade(ctx, w, h);
@@ -681,7 +716,7 @@ const PlatformArt = (() => {
         ctx.fillStyle = "rgba(255,255,255,0.8)";
         for (const [sx, sy] of [[40, 14], [130, 24], [215, 12]]) {
           if (sx > w) continue;
-          star(ctx, sx, sy, 5);
+          star(ctx, sx, (sy * h) / 40, 5 * fit(h)); // 厚さに合わせて、高さと大きさを変える
         }
         ctx.restore();
         bottomShade(ctx, w, h);
@@ -715,9 +750,11 @@ const PlatformArt = (() => {
           ctx.stroke();
         }
         bottomShade(ctx, w, h);
-        // くり抜いた顔（中から光っている）
+        // くり抜いた顔（中から光っている）。顔の絵は上下 -10〜22。薄いときは小さくして、正面の真ん中に
         ctx.save();
-        ctx.translate(w / 2, h / 2);
+        const s = Math.max(0.4, Math.min(1, (h - 6) / 34));
+        ctx.translate(w / 2, h >= 36 ? h / 2 : bodyMid(h, 6) - 6 * s);
+        ctx.scale(s, s);
         ctx.fillStyle = "#ffd23a";
         tri(ctx, -62, 6, -46, -10, -30, 6);
         tri(ctx, 30, 6, 46, -10, 62, 6);

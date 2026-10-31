@@ -32,7 +32,21 @@ const Game = (() => {
   const UNITS_PER_METER = 100;
   // 土台の大きさと位置（土台の上面が、画面の下からどれだけ上にあるか）
   const PLATFORM_W = 280;
-  const PLATFORM_H = 40;
+  // 土台の厚さ（当たり判定の四角の高さ）。上の面（platformTop）の位置は変えず、下側だけが厚く・薄くなる。
+  // 試すとき：URL に ?plat=16 のように書く（いちばん優先）か、管理者モードの「土台の厚さ（テスト）」で選ぶ（localStorage の stack.admin.platH）。
+  // 試している厚さ（PLATFORM_H_DEFAULT とちがう値）のあいだは、ランキングに送らない（ranking.js）
+  const PLATFORM_H_DEFAULT = 20;
+  const PLATFORM_H_TEST = (() => {
+    const ok = (v) => (Number.isInteger(v) && v >= 6 && v <= 60 ? v : null);
+    try {
+      const url = new URLSearchParams(location.search).get("plat");
+      if (url !== null) return ok(Number(url));
+      return ok(Number(localStorage.getItem("stack.admin.platH")));
+    } catch (e) {
+      return null;
+    }
+  })();
+  const PLATFORM_H = PLATFORM_H_TEST || PLATFORM_H_DEFAULT;
   const PLATFORM_FROM_BOTTOM = 230;
   // タイトル画面のデモでは、スタートボタンに隠れないよう土台を少し高くする
   const DEMO_PLATFORM_FROM_BOTTOM = 360;
@@ -2194,6 +2208,9 @@ const Game = (() => {
   return {
     init, start, stop, startDemo, flip, drawTest, startSandbox, sandbox: sandboxAPI, setTitleFx, towerImage, enterPhoto, exitPhoto, photoImage, setForcedShape, setDemoCeiling, setTheme, setHomeScene, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
     get platformSize() { return platformSize; }, // 土台と柱の大きさ（プロフィールの見本の絵に使う）
+    // 土台の厚さのテスト中なら、その厚さ（いつもの厚さなら null。ランキングに送らない・管理者モードの表示に使う）
+    get platformTest() { return PLATFORM_H_TEST && PLATFORM_H_TEST !== PLATFORM_H_DEFAULT ? PLATFORM_H_TEST : null; },
+    PLATFORM_H_DEFAULT,
     get state() { return state; },
     get rotations() { return rotations; }, // このゲームで回転を使った回数
     get competitive() { return !!comp; }, // 競技モードのゲームか
