@@ -591,8 +591,9 @@ const Ranking = (() => {
     if (fav) p.fav = fav.id; // お気に入りのキャラ
     if (c) p.ach = [c.got, c.total];
     if (online.plays > 0) p.online = [online.wins, online.plays - online.wins];
-    // 持っている実績（称号）の id の一覧。ranking.gs が「みんなの取得率」を数えるのに使う（ランキングには出さない）
-    p.achIds = Achievements.unlockedList().map((a) => a.id).sort();
+    // 持っている実績（称号）の id の一覧。ranking.gs が「みんなの取得率」を数えるのに使う（ランキングには出さない）。
+    // 管理者モードで手に入れた実績は入れない（Achievements.countableIds）
+    p.achIds = Achievements.countableIds().sort();
     return p;
   }
 

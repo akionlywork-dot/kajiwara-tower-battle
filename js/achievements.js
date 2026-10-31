@@ -237,6 +237,7 @@ const Achievements = (() => {
     if (!newly.length) return [];
     for (const a of newly) {
       unlocked()[a.id] = new Date().toISOString();
+      if (typeof Admin !== "undefined" && Admin.unlocked) markAdmin([a.id]); // 管理者モードで取った実績は、取得率に数えない
       UI.toast(
         `<span class="toast-medal">🏆</span><span><b>実績解除！</b> ${UI.escape(a.name)}` +
           `<small class="toast-sub">称号「${UI.escape(a.title)}」を獲得</small></span>`
@@ -402,12 +403,37 @@ const Achievements = (() => {
   // 管理者モード：全部達成する（on=true）／全部消す（on=false）
   function setAll(on) {
     const now = new Date().toISOString();
+    const before = Object.assign({}, unlocked());
     for (const key of Object.keys(unlocked())) delete unlocked()[key];
-    if (on) for (const a of defs || []) unlocked()[a.id] = now;
+    if (on) for (const a of defs || []) unlocked()[a.id] = before[a.id] || now; // 前から持っていたものは、達成した日時もそのまま
+    // 管理者モードの「すべて解放」で増えた実績は、取得率に数えない（前から持っていたものは、そのまま数える）
+    if (on) markAdmin((defs || []).map((a) => a.id).filter((id) => !before[id]));
+    pruneAdmin();
     Save.write();
     if (typeof Themes !== "undefined") Themes.apply(); // 使えなくなった背景・土台は元に戻す
     if (typeof Profile !== "undefined") Profile.refresh();
   }
 
-  return { init, load, check, counts, titleList, unlockedList, find, findByTitle, rewardOf, setAll, codeAchievementIds };
+  // ---------- 管理者モードで手に入れた実績（Save.data.adminAchievements） ----------
+  // ランキングの「みんなの称号の取得率」に数えないように、印を付けておく（ranking.js の publicProfile が achIds から外す）。
+  // 一度付けた印は、その実績を持っているあいだ残る（あとでふつうに条件を満たしても、もう解放ずみなので印は消えない）
+  function markAdmin(ids) {
+    const all = (Save.data.adminAchievements = Save.data.adminAchievements || {});
+    const now = new Date().toISOString();
+    for (const id of ids) if (!all[id]) all[id] = now;
+  }
+
+  // 持っていない実績の印を消す（管理者モードで未解放にした・元に戻したとき）
+  function pruneAdmin() {
+    const all = Save.data.adminAchievements || {};
+    for (const id of Object.keys(all)) if (!unlocked()[id]) delete all[id];
+  }
+
+  // 取得率に数える実績の id（持っている実績のうち、管理者モードで手に入れたものをのぞく）
+  function countableIds() {
+    const admin = Save.data.adminAchievements || {};
+    return unlockedList().map((a) => a.id).filter((id) => !admin[id]);
+  }
+
+  return { init, load, check, counts, titleList, unlockedList, find, findByTitle, rewardOf, setAll, codeAchievementIds, markAdmin, pruneAdmin, countableIds };
 })();

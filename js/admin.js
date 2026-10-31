@@ -53,6 +53,7 @@ const Admin = (() => {
     if (unlocked) {
       restoreTestDate();
       migrateDeveloper();
+      migrateAdminAchievements();
     }
     applyDisplay();
   }
@@ -91,6 +92,17 @@ const Admin = (() => {
     meta.staffMigrated = true;
     Save.data.staffTitles = Save.data.staffTitles || {};
     if (!Save.data.staffTitles.developer) Save.data.staffTitles.developer = new Date().toISOString();
+    Save.write();
+  }
+
+  // 管理者モードで手に入れた実績に、取得率に数えない印を付けるようになる前の端末：1回だけ、
+  // 「解放状態」の操作の前に保存した状態（stack.admin.undo）に無かった実績を、管理者モードで手に入れたものとして印を付ける
+  function migrateAdminAchievements() {
+    const meta = Save.data.meta;
+    if (meta.adminAchMigrated) return;
+    meta.adminAchMigrated = true;
+    const snap = readUndo();
+    if (snap && snap.achievements) Achievements.markAdmin(Object.keys(Save.data.achievements || {}).filter((id) => !snap.achievements[id]));
     Save.write();
   }
 
@@ -787,10 +799,12 @@ const Admin = (() => {
         const r = (d.eventStats[id] = d.eventStats[id] || { wins: 0, losses: 0 });
         r.wins = on ? Math.max(r.wins || 0, n) : 0;
       }
+      if (on) Achievements.markAdmin(achIds.filter((id) => !d.achievements[id])); // ここで増えた実績は、取得率に数えない
       for (const id of achIds) {
         if (on) d.achievements[id] = d.achievements[id] || now;
         else delete d.achievements[id];
       }
+      Achievements.pruneAdmin();
       if (!on) d.cosmetics = Save.defaults().cosmetics;
     }
     afterDataChange();
@@ -804,6 +818,7 @@ const Admin = (() => {
     const d = Save.data;
     d.dex = snap.dex || {};
     d.achievements = snap.achievements || {};
+    Achievements.pruneAdmin(); // 元に戻して無くなった実績の印を消す
     d.profile.titleId = snap.titleId || null;
     d.eventStats = snap.eventStats || {};
     d.cosmetics = Object.assign(Save.defaults().cosmetics, snap.cosmetics);

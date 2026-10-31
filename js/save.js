@@ -98,6 +98,9 @@ const Save = (() => {
       stamps: [null, null, null, null],
       // スタッフの称号（frames.js の STAFF。開発者・管理者・社員・運営）：称号の id → 獲得した日時。管理者モードで獲得・リセットする
       staffTitles: {},
+      // 管理者モードで手に入れた実績（実績の id → 手に入れた日時。achievements.js の markAdmin）。
+      // ランキングの「みんなの称号の取得率」には数えない（ranking.js の publicProfile が achIds から外す）
+      adminAchievements: {},
       // 選んでいる背景と土台（config.js の themes の id）。
       //   cardBg：オンライン対戦の対戦カードの色にする背景の id（null なら、いつもの色）
       cosmetics: { background: "sky", platform: "wood", cardBg: null },
