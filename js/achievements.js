@@ -34,7 +34,8 @@
 //   dejaVu       … 1回のゲームで、同じキャラが1体おきに3回出た（A→？→A→？→A）
 //   flipStreak   … 1体を落とす前に、反転を value 回続けて押した
 //   exactHeight  … タワーの高さが、ちょうど value m（画面の表示の数字。小数2けた）のときに積めた
-//   seasonRank   … シーズンが終わったときに、mode（"free" / "comp"）のランキングで place 位だった（ranking.gs の ?awards=1。js/ranking.js）
+//   seasonRank   … シーズンが終わったときに、mode（"free" / "comp"）のランキングで place 位だった（ranking.gs の ?awards=1。js/ranking.js）。
+//                  今は、この条件の実績は使っていない（シーズンの1〜3位は、ランキングの称号「シーズン2 フリー 1位」になった。js/rank-titles.js）
 //                  例 { "type": "seasonRank", "mode": "free", "place": 1 }
 //   code         … 合言葉 code（data/codes.json の id）を使った（合言葉でもらう称号。js/codes.js）
 //                  例 { "type": "code", "code": "launch2026" }。手に入れるまでは、実績画面・称号の一覧に出さず、全体の数にも入れない

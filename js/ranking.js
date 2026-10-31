@@ -31,13 +31,16 @@ const Ranking = (() => {
   const isOnline = () => !!url();
   const mem = () => Save.data.ranking;
   // ランキングの種類：free（フリー＝スコアアタックのふつうのルール）/ comp（競技）
-  //   best：その種類の自分のハイスコア、sent・sentProfile：最後に送ったスコア・プロフィールの目印（Save.data.ranking）
+  //   best：その種類の自分のハイスコア（今のシーズン）、allBest：歴代ベスト（全期間。{ score, count, height, season }）、
+  //   sent・sentProfile：最後に送ったスコア・プロフィールの目印（Save.data.ranking）
   const KINDS = {
-    free: { label: "フリー", best: () => Save.data.stats.best, sent: "sentScore", sentProfile: "sentProfile" },
-    comp: { label: "競技", best: () => Save.data.stats.compBest, sent: "sentScoreComp", sentProfile: "sentProfileComp" },
+    free: { label: "フリー", best: () => Save.data.stats.best, allBest: () => Save.data.stats.allBest, sent: "sentScore", sentProfile: "sentProfile" },
+    comp: { label: "競技", best: () => Save.data.stats.compBest, allBest: () => Save.data.stats.allCompBest, sent: "sentScoreComp", sentProfile: "sentProfileComp" },
   };
+  const ALL = "all"; // 歴代（全シーズンを通したランキング。ranking.gs の ?season=all）
   let tab = "free"; // ランキング画面で選んでいるタブ
-  let season = null; // ランキング画面で見ているシーズン（null なら今のシーズン。開くたびに今のシーズンに戻す。seasons.js）
+  // ランキング画面で見ているシーズン（シーズンの番号か、歴代なら "all"。null なら今のシーズン。開くたびに今のシーズンに戻す。seasons.js）
+  let season = null;
   // フリー・競技のどちらかで、ハイスコアがあるか（初めて「送ってもいいか」を聞くのに使う）
   const anyBest = () => KINDS.free.best() || KINDS.comp.best();
 
@@ -48,9 +51,20 @@ const Ranking = (() => {
       renderSeasonPicker();
       open();
     });
-    // シーズンの切りかえ（前のシーズンの最終結果を見る）
-    $("rank-season").addEventListener("change", (e) => {
+    // シーズンのタブ（今・前・歴代）。前のシーズンが2つ以上あるときは、「前」のタブがシーズンを選ぶ欄になる
+    $("rank-season-tabs").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-rank-season]");
+      if (!b) return;
+      const next = b.dataset.rankSeason === ALL ? ALL : Number(b.dataset.rankSeason);
+      if (next === viewing()) return;
+      season = next;
+      renderSeasonPicker();
+      open();
+    });
+    $("rank-season-tabs").addEventListener("change", (e) => {
+      if (!e.target.matches("select")) return;
       season = Number(e.target.value) || Seasons.currentId();
+      renderSeasonPicker();
       open();
     });
     // 行をタップしたら、その人のプロフィールを出す
@@ -139,6 +153,7 @@ const Ranking = (() => {
 
   async function open() {
     const kind = tab;
+    const view = viewing();
     shown = [];
     for (const b of document.querySelectorAll("[data-rank-tab]")) {
       b.classList.toggle("active", b.dataset.rankTab === kind);
@@ -152,7 +167,7 @@ const Ranking = (() => {
     if (isOnline()) {
       await submitBest(); // 名前・称号・アイコンを変えていたら、先に送っておく（自分の行に反映されるように）
       try {
-        json = await request(`${url()}?mode=${kind}&season=${viewing()}&me=${encodeURIComponent(playerId())}&t=${Date.now()}`);
+        json = await request(`${url()}?mode=${kind}&season=${view}&me=${encodeURIComponent(playerId())}&t=${Date.now()}`);
         if (kind === "comp" && json && json.mode !== "comp") {
           unsupported = true;
           json = null;
@@ -165,13 +180,18 @@ const Ranking = (() => {
       json = await DataFile.load("data/ranking.json");
       if (json && kind === "comp") json = json.comp && typeof json.comp === "object" ? json.comp : { updated: json.updated, ranking: [] }; // 手で書くときは comp: { ranking: [...] }
     }
-    if (UI.current !== "ranking" || tab !== kind || $("rank-season").value !== String(viewing())) return; // 読み込み中に画面を閉じた・タブやシーズンを変えた
+    if (UI.current !== "ranking" || tab !== kind || viewing() !== view) return; // 読み込み中に画面を閉じた・タブやシーズンを変えた
     renderSeasonHead();
+    // 歴代に対応していない、古い ranking.gs（season=all を「おかしなシーズン」と断る）
+    if (view === ALL && isOnline() && json && !json.all) {
+      box.innerHTML = `<div class="coming-soon"><span>🏛</span><b>歴代のランキングは準備中です</b><p>もうしばらくお待ちください。</p></div>`;
+      return;
+    }
     // サーバーの今のシーズンが、このゲームより新しい（このゲームが古いバージョン）：「更新する」ボタンを出す
     if (json && Number(json.current) > Seasons.currentId() && typeof Updates !== "undefined") Updates.refresh();
     // まだ始まっていないシーズン（ゲームは新しいのに、サーバーの切り替えがまだ）
     if (json && json.upcoming) {
-      box.innerHTML = `<div class="coming-soon"><span>🗓</span><b>${UI.escape(Seasons.get(viewing()).name)}は、まもなく始まります</b><p>もうしばらくお待ちください。記録は、始まったら自動で送ります。</p></div>`;
+      box.innerHTML = `<div class="coming-soon"><span>🗓</span><b>${UI.escape(Seasons.get(view).name)}は、まもなく始まります</b><p>もうしばらくお待ちください。記録は、始まったら自動で送ります。</p></div>`;
       renderMine(null);
       return;
     }
@@ -224,6 +244,8 @@ const Ranking = (() => {
       for (const r of rows) {
         r.staffId = manual ? (Frames.isStaff(r.title) ? r.title : null) : Frames.isStaff(r.staff) ? r.staff : null;
         if (r.staffId) r.title = ""; // スタッフは、称号の札の代わりに専用の札を出す
+        // ランキングの称号（rank-titles.js）の専用の枠は、ranking.gs が順位を確かめた行（rankTitle がある行）だけ。手で書く ranking.json には付けない
+        r.rankFrame = manual ? null : RankTitles.frameOfServer(r.rankTitle);
       }
       return { name: d.name, rows };
     });
@@ -240,12 +262,17 @@ const Ranking = (() => {
   // スタッフの称号の札（手で書く ranking.json の人だけ。開発者はコード風、管理者・社員・運営は専用の色）
   const staffBadge = (id) => Frames.titleHTML(Frames.STAFF[id].title, Frames.staff(id));
 
+  // 行の人の称号の枠：スタッフ → ランキングの称号（サーバーが確かめたもの）→ 称号の文字から実績を探す（見つからなければ枠なし）
+  function frameOfRow(r) {
+    if (r.staffId) return Frames.staff(r.staffId);
+    return r.rankFrame || Frames.ofTitleText(String(r.title || ""));
+  }
+
   // アイコン（写真か、名前の1文字目）に称号の枠を付けた HTML。cls：大きさのクラス
   function avatarHTML(r, cls) {
     const name = String(r.name || "");
     const icon = ICON_PATTERN.test(String(r.icon || "")) ? r.icon : null;
-    // 称号の枠：サーバーには称号の文字しか無いので、その文字から実績を探して決める（見つからなければ枠なし）
-    const fc = Frames.avatarClass(r.staffId ? Frames.staff(r.staffId) : Frames.ofTitleText(String(r.title || "")));
+    const fc = Frames.avatarClass(frameOfRow(r));
     return icon
       ? `<span class="avatar ${cls} ${fc}" style="background-image:url(${icon})"></span>`
       : `<span class="avatar avatar-empty ${cls} ${fc}">${UI.escape([...name][0] || "?")}</span>`;
@@ -256,8 +283,8 @@ const Ranking = (() => {
     const medal = MEDALS[r.rank] || "";
     const height = Number(r.height);
     const name = String(r.name || "");
-    const frame = Frames.ofTitleText(String(r.title || ""));
-    const avatar = `<span class="rank-avatar-wrap">${crownHTML(Number(r.rank))}${avatarHTML(r, "rank-avatar")}</span>`;
+    const frame = frameOfRow(r);
+    const avatar =`<span class="rank-avatar-wrap">${crownHTML(Number(r.rank))}${avatarHTML(r, "rank-avatar")}</span>`;
     // 積んだ数・高さ・日付（手で書く ranking.json で書いていない項目は出さない）
     const count = r.count !== undefined && r.count !== "" && isFinite(Number(r.count)) ? `${Number(r.count)}体` : "";
     const ht = r.height !== undefined && r.height !== "" && !isNaN(height) ? `${height.toFixed(2)}m` : "";
@@ -274,11 +301,17 @@ const Ranking = (() => {
           ${r.staffId ? `<span class="rank-dev">${staffBadge(r.staffId)}</span>` : r.title ? Frames.titleHTML(String(r.title), frame) : `<span class="title-badge title-empty">称号なし</span>`}
           <small>${sub.join("・")}</small>
         </span>
-        <span class="rank-score">${Number(r.score)}<small>点</small></span>
+        <span class="rank-score">${Number(r.score)}<small>点</small>${seasonTagHTML(r.season)}</span>
         <span class="rank-col rank-col-count">${count}</span>
         <span class="rank-col rank-col-height">${ht}</span>
         <span class="rank-col rank-col-date">${date}</span>
       </button>`;
+  }
+
+  // 歴代の記録の横に出す、そのスコアを出したシーズンの小さな札（「S1」。分からなければ ""）。records.js でも使う
+  function seasonTagHTML(id) {
+    const n = Number(id);
+    return Number.isInteger(n) && n >= 1 ? `<span class="rank-season-tag">${Seasons.short(n)}</span>` : "";
   }
 
   // 行に出す日付は短く（"2026-10-28" → "10/28"。それ以外の書き方なら、そのまま）
@@ -292,11 +325,11 @@ const Ranking = (() => {
   function openProfile(r) {
     const name = String(r.name || "プレイヤー");
     const title = String(r.title || "");
-    const frame = Frames.ofTitleText(title);
-    const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
+    const frame = frameOfRow(r);
+    const num =(v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
     const items = [];
     if (num(r.rank) !== null) items.push(["順位", `${num(r.rank)}<small>位</small>`]);
-    if (num(r.score) !== null) items.push(["ハイスコア", `${num(r.score)}<small>点</small>`]);
+    if (num(r.score) !== null) items.push(["ハイスコア", `${num(r.score)}<small>点</small>${seasonTagHTML(r.season)}`]);
     if (num(r.count) !== null) items.push(["積んだ数", `${num(r.count)}<small>体</small>`]);
     if (num(r.height) !== null) items.push(["高さ", `${num(r.height).toFixed(2)}<small>m</small>`]);
     if (r.date) items.push(["記録した日", UI.escape(String(r.date)), "wide"]);
@@ -355,40 +388,61 @@ const Ranking = (() => {
     return season || Seasons.currentId();
   }
 
-  // シーズンの切りかえ（新しい順。「S2（今）」「S1」…。スマホで改行しないように短く）
+  // シーズンのタブ：「S2 今」「S1」「歴代」（スマホで改行しないように短く）。
+  // 前のシーズンが2つ以上あるときは、2つ目のタブを、前のシーズンを選ぶ欄にする（「S2」「S1」…）
   function renderSeasonPicker() {
     const now = Seasons.currentId();
-    $("rank-season").innerHTML = Seasons.list()
-      .map((s) => `<option value="${s.id}">${Seasons.short(s.id)}${s.id === now ? "（今）" : ""}</option>`)
-      .join("");
-    $("rank-season").value = String(viewing());
-    $("rank-season-row").classList.toggle("hidden", !isOnline()); // 手で書く ranking.json には、シーズンがない
+    const view = viewing();
+    const past = Seasons.list().filter((s) => s.id !== now);
+    const tabHTML = (value, label) => {
+      const on = value === view;
+      return `<button class="ranking-tab ${on ? "active" : ""}" data-rank-season="${value}" role="tab" aria-selected="${on}">${label}</button>`;
+    };
+    let pastHTML = "";
+    if (past.length === 1) pastHTML = tabHTML(past[0].id, Seasons.short(past[0].id));
+    else if (past.length > 1) {
+      const on = view !== ALL && view !== now;
+      const options = past.map((s) => `<option value="${s.id}" ${s.id === view ? "selected" : ""}>${Seasons.short(s.id)}</option>`).join("");
+      pastHTML = `<select class="ranking-tab ranking-tab-select ${on ? "active" : ""}" aria-label="前のシーズン">${on ? "" : `<option value="" selected hidden>前</option>`}${options}</select>`;
+    }
+    $("rank-season-tabs").innerHTML = tabHTML(now, `${Seasons.short(now)} <small>今</small>`) + pastHTML + tabHTML(ALL, "歴代");
+    $("rank-season-tabs").style.gridTemplateColumns = `repeat(${pastHTML ? 3 : 2}, 1fr)`;
+    // 手で書く ranking.json には、シーズン・歴代がない
+    $("rank-season-row").classList.toggle("hidden", !isOnline());
+    $("rank-season-tabs").classList.toggle("hidden", !isOnline());
     renderSeasonHead();
   }
 
-  // 見出し：シーズンの名前と、始まった日（前のシーズンなら「最終結果」）
+  // 見出し：シーズンの名前と、始まった日（前のシーズンなら「最終結果」、歴代なら「全シーズンの記録」）
   function renderSeasonHead() {
+    if (viewing() === ALL) {
+      $("rank-season-info").innerHTML = `<b>歴代総合</b><small>全シーズンの記録（1人1つ・いちばん良いスコア）</small>`;
+      return;
+    }
     const s = Seasons.get(viewing());
     const since = Seasons.since(s);
     $("rank-season-info").innerHTML =
       `<b>${UI.escape(s.name)}</b>` + (s.id === Seasons.currentId() ? (since ? `<small>${since}</small>` : "") : `<small>最終結果</small>`);
   }
 
-  // 画面の下：自分のハイスコア（選んでいるタブ・シーズンのもの。オンラインなら順位も）
+  // 画面の下：自分のハイスコア（選んでいるタブ・シーズンのもの。歴代なら、歴代ベストとそのシーズン。オンラインなら順位も）
   function renderMine(me) {
-    const past = isOnline() && viewing() !== Seasons.currentId();
-    const pastBest = (Save.data.stats.seasonBests || {})[viewing()] || {};
-    const best = past ? pastBest[tab] || null : KINDS[tab].best();
+    const view = viewing();
+    const all = isOnline() && view === ALL;
+    const past = isOnline() && !all && view !== Seasons.currentId();
+    const pastBest = (Save.data.stats.seasonBests || {})[view] || {};
+    const best = all ? KINDS[tab].allBest() : past ? pastBest[tab] || null : KINDS[tab].best();
     let note = "";
     if (isOnline() && best) {
       if (!Settings.get("ranking")) note = `<small class="my-rank">ランキングに未参加</small>`;
       else if (me) note = `<small class="my-rank">あなたは <b>${Number(me.rank)}位</b></small>`;
     }
+    const label = all ? `あなたの歴代ベスト（${KINDS[tab].label}）` : `あなたのハイスコア（${KINDS[tab].label}・${Seasons.short(view)}）`;
     $("ranking-mine").innerHTML =
-      `<span class="my-record-label">あなたのハイスコア（${KINDS[tab].label}・${Seasons.short(viewing())}）</span>` +
+      `<span class="my-record-label">${label}</span>` +
       Profile.badgeHTML() +
       (best
-        ? `<span class="rank-score">${best.score}<small>点</small><em>${best.count}体・${best.height.toFixed(2)}m</em>${note}</span>`
+        ? `<span class="rank-score">${best.score}<small>点</small>${all ? seasonTagHTML(best.season) : ""}<em>${best.count}体・${best.height.toFixed(2)}m</em>${note}</span>`
         : `<span class="my-record-none">まだ記録がありません</span>`);
   }
 
@@ -561,7 +615,7 @@ const Ranking = (() => {
 
   // 「持っている人 〇%」の文字（集計にない称号・スタッフの称号は ""）
   function rateText(stats, id) {
-    if (!stats || !id || Frames.isStaff(id)) return "";
+    if (!stats || !id || Frames.isStaff(id) || RankTitles.isId(id)) return "";
     const n = Math.max(0, Number(stats.counts[id]) || 0);
     const pct = (n / stats.players) * 100;
     const text = pct === 0 ? "0" : pct < 1 ? "1未満" : String(Math.round(pct));
@@ -635,9 +689,11 @@ const Ranking = (() => {
     }
   }
 
-  // ---------- シーズンの1〜3位（ranking.gs の ?awards=1） ----------
-  // 終わったシーズンで1〜3位だったら、Save.data.seasonAwards に入れて、称号（condition が seasonRank の実績）を出す。
-  // サーバーが古い（awards に対応していない）・通信できないときは、何もしない
+  // ---------- ランキングの称号（ranking.gs の ?awards=1） ----------
+  // 終わったシーズンの1〜3位（awards）と、ランキングの称号を持てる順位（ranks：シーズンの1〜3位・今の歴代の1〜3位）を読んで、
+  // Save.data.seasonAwards・rankTitles をサーバーの結果で上書きする（rank-titles.js）。
+  // ranks が無い少し古い ranking.gs では、awards からシーズンの称号だけを作る。
+  // サーバーがとても古い（awards に対応していない）・通信できないときは、何もしない（前に分かったまま）
   async function checkAwards() {
     if (!isOnline() || !mem().id) return;
     try {
@@ -646,12 +702,24 @@ const Ranking = (() => {
       const awards = json.awards
         .filter((a) => a && Number.isInteger(a.season) && (a.mode === "free" || a.mode === "comp") && [1, 2, 3].includes(a.place))
         .map((a) => ({ season: a.season, mode: a.mode, place: a.place }));
-      if (JSON.stringify(awards) === JSON.stringify(Save.data.seasonAwards || [])) return;
-      Save.data.seasonAwards = awards;
-      Save.write();
-      if (typeof Achievements !== "undefined") Achievements.check(null);
+      if (JSON.stringify(awards) !== JSON.stringify(Save.data.seasonAwards || [])) {
+        Save.data.seasonAwards = awards;
+        Save.write();
+      }
+      const ranks = Array.isArray(json.ranks) ? json.ranks : awards.map((a) => Object.assign({ kind: "season" }, a));
+      if (RankTitles.setFromServer(ranks)) {
+        Profile.refresh(); // つけていた歴代の称号が外れた・新しくもらった
+        submitBest(); // ランキングの自分の行の称号も、新しくする
+      }
     } catch (e) {}
   }
 
-  return { init, atStartup, checkAwards, afterSoloGame, submitBest, joined, opponentKey, ensureConsent, renderConsent, titleStats, rateText };
+  // 管理者モード：ランキングの行の見本（r：行のデータ。rankTitle を付けると、ランキングの称号の見た目になる）
+  function sampleRowHTML(r) {
+    const row = Object.assign({ rank: 1, score: 0 }, r);
+    row.rankFrame = RankTitles.frameOfServer(row.rankTitle);
+    return rowHTML(row, -1);
+  }
+
+  return { init, atStartup, checkAwards, afterSoloGame, submitBest, joined, opponentKey, ensureConsent, renderConsent, titleStats, rateText, seasonTagHTML, sampleRowHTML };
 })();

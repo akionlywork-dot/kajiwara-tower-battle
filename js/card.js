@@ -281,6 +281,7 @@ const Card = (() => {
   function drawFrameRing(ctx, cx, cy, r, frame) {
     if (frame && frame.rank === "dev") return drawDevRing(ctx, cx, cy, r);
     if (frame && STAFF_COLORS[frame.rank]) return drawStaffRing(ctx, cx, cy, r, frame);
+    if (frame && CHAMP_COLORS[frame.rank]) return drawChampRing(ctx, cx, cy, r, frame);
     const f = frame && FRAME_COLORS[frame.rank];
     if (!f) {
       ring(ctx, cx, cy, r, "#fff", 4);
@@ -361,6 +362,35 @@ const Card = (() => {
     ctx.restore();
   }
 
+  // ランキングの称号（rank-titles.js）の枠と札の色（画面の style.css の .frame-champ-〇・.rank-champ-〇 と同じ）
+  //   band：太い帯、edge：ふちの線、glow：まわりの光、light：帯に重ねる光（虹なら rainbow）、badge：札の地、text：札の文字
+  const CHAMP_COLORS = {
+    "champ-1": { band: "#120d04", edge: "#ffd76a", glow: "rgba(255, 196, 64, 0.85)", light: ["#6b4c0e", "#ffe9a6", "#ffd76a"], badge: ["#2e2209", "#0b0803", "#1d1507"], text: "#ffe27a" },
+    "champ-2": { band: "#2a1660", edge: "#fff6d6", glow: "rgba(186, 150, 255, 0.8)", rainbow: true, badge: ["#2a1660", "#4b2a9a", "#1d4f8a"], badgeAcross: true, text: "#ffffff" },
+  };
+
+  // ランキングの称号の枠：星は付けず、三重の輪（ふち・太い帯・ふち・帯・ふち）と、まわりの光
+  function drawChampRing(ctx, cx, cy, r, frame) {
+    const c = CHAMP_COLORS[frame.rank];
+    const d = r * 2;
+    const w = Math.max(3, d * 0.09); // 太い帯
+    const line = Math.max(1, d * 0.022); // ふちの線
+    const outer = r + w; // 帯の外側
+    ctx.save();
+    ctx.shadowColor = c.glow;
+    ctx.shadowBlur = d * 0.3;
+    ring(ctx, cx, cy, outer + d * 0.036, c.edge, line * 2.2); // いちばん外のふち（光る）
+    ctx.restore();
+    ring(ctx, cx, cy, outer + d * 0.018, c.band, d * 0.028);
+    ring(ctx, cx, cy, outer + line / 2, c.edge, line);
+    ring(ctx, cx, cy, r + w / 2, c.band, w);
+    // 帯の上の光（1位は金のグラデーション、2・3位は虹）
+    ctx.save();
+    ctx.globalAlpha = c.rainbow ? 1 : 0.85;
+    ring(ctx, cx, cy, r + w / 2, c.rainbow ? rainbow(ctx, cx, cy, r) : stops(ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r), [c.band, c.light[0], c.light[1], c.light[2], c.band]), w * 0.7);
+    ctx.restore();
+  }
+
   // 開発者の枠：黒っぽい輪に、緑に光るふち。ふちの外側に </> と 0・1 を並べる（画面の .frame-dev と同じ）
   function drawDevRing(ctx, cx, cy, r) {
     const d = r * 2;
@@ -421,6 +451,7 @@ const Card = (() => {
   function titlePill(ctx, text, x, y, fontSize, frame) {
     const f = frame && FRAME_COLORS[frame.rank];
     if (frame && frame.rank === "dev") return devPill(ctx, text, x, y, fontSize);
+    if (frame && CHAMP_COLORS[frame.rank]) return champPill(ctx, text, x, y, fontSize, CHAMP_COLORS[frame.rank]);
     if (frame && STAFF_COLORS[frame.rank]) {
       // スタッフの称号の札：専用の色の地に、ふち
       const [bgColor, fg, line] = STAFF_COLORS[frame.rank].badge;
@@ -451,6 +482,35 @@ const Card = (() => {
     ctx.lineWidth = 2;
     roundRect(ctx, x + 1, y + 1, pw - 2, h - 2, (h - 2) / 2);
     ctx.stroke();
+  }
+
+  // ランキングの称号の札：リボンの形（両はしに切れこみ）。上下に、枠のふちと同じ色の線
+  function champPill(ctx, text, x, y, fontSize, c) {
+    ctx.save();
+    ctx.font = `bold ${fontSize}px ${FONT}`;
+    const h = fontSize + 16;
+    const pw = ctx.measureText(text).width + 40;
+    const notch = h * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + pw, y);
+    ctx.lineTo(x + pw - notch, y + h / 2);
+    ctx.lineTo(x + pw, y + h);
+    ctx.lineTo(x, y + h);
+    ctx.lineTo(x + notch, y + h / 2);
+    ctx.closePath();
+    ctx.fillStyle = stops(c.badgeAcross ? ctx.createLinearGradient(x, y, x + pw, y) : ctx.createLinearGradient(0, y, 0, y + h), c.badge);
+    ctx.fill();
+    ctx.fillStyle = c.edge;
+    ctx.fillRect(x, y, pw, 2);
+    ctx.fillRect(x, y + h - 2, pw, 2);
+    ctx.fillStyle = c.text;
+    ctx.shadowColor = c.glow;
+    ctx.shadowBlur = 6;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, x + pw / 2, y + h / 2 + 1);
+    ctx.restore();
   }
 
   // 開発者の札（コード風：黒地に緑の文字と </>）

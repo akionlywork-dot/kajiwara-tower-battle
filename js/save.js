@@ -37,7 +37,7 @@ const Save = (() => {
         soloPlays: 0, // 1人モードのプレイ回数
         soloTotalScore: 0, // 1人モードのスコアの合計（平均を出すため）
         best: null, // 今のシーズンのハイスコア { score, count, height }（シーズンが変わると、seasonBests に入れて空にする）
-        allBest: null, // 全期間のハイスコア（シーズンに関係なく、一番いいもの）
+        allBest: null, // 歴代ベスト（全期間のハイスコア。シーズンに関係なく、一番いいもの）{ score, count, height, season：そのスコアを出したシーズン }
         season: null, // best・compBest がどのシーズンのものか（config.js の seasons の id。null は、シーズン制より前の古いデータ）
         seasonBests: {}, // 終わったシーズンのハイスコア：シーズンの id → { free, comp }
         bestCount: 0, // 1回のゲームで積んだ数の最高
@@ -63,7 +63,7 @@ const Save = (() => {
         compPlays: 0, // プレイ回数
         compTotalScore: 0, // スコアの合計（平均を出すため）
         compBest: null, // 今のシーズンの、競技のハイスコア { score, count, height }
-        allCompBest: null, // 全期間の、競技のハイスコア
+        allCompBest: null, // 競技の歴代ベスト（allBest と同じ形）
       },
       // 実績の世代番号（config.js の achievementsEpoch）。config の番号の方が大きければ、1回だけ実績と戦績をリセットする
       //   epochResetNotice：リセットしたことを、次にタイトル画面が出たときに知らせるか
@@ -71,6 +71,11 @@ const Save = (() => {
       meta: { achievementsEpoch: currentEpoch(), epochResetNotice: false, seasonNotice: 0 },
       // シーズンが終わったときの順位（1〜3位）：[{ season, mode, place }]（ranking.gs の ?awards=1 から。称号になる）
       seasonAwards: [],
+      // ランキングの称号（rank-titles.js）：[{ kind: "season", season, mode, place } / { kind: "all", mode, place }]。
+      // ranking.gs の ?awards=1 の ranks で、起動するたびに上書きする
+      rankTitles: [],
+      // 管理者モードで、見た目の確認用に付けたランキングの称号（rankTitles と同じ形。管理者モードのあいだだけ持てる）
+      rankTitlesTest: [],
       // お知らせ：最後に読んだお知らせの id
       news: { lastReadId: 0 },
       // ランキング（オンライン）
@@ -184,6 +189,8 @@ const Save = (() => {
       if (!s.allCompBest) s.allCompBest = s.compBest;
     }
     if (!s.seasonBests || typeof s.seasonBests !== "object") s.seasonBests = {};
+    fillBestSeason(s, "allBest", "best", "free");
+    fillBestSeason(s, "allCompBest", "compBest", "comp");
     if (s.season >= now) return false;
     if (s.best || s.compBest) s.seasonBests[s.season] = { free: s.best || null, comp: s.compBest || null };
     s.best = null;
@@ -192,6 +199,19 @@ const Save = (() => {
     Object.assign(d.ranking, { sentScore: 0, sentScoreComp: 0, sentProfile: "", sentProfileComp: "", lastRank: null });
     if (hadData) d.meta.seasonNotice = now;
     return true;
+  }
+
+  // 歴代ベスト（allBest・allCompBest）に、どのシーズンの記録か（season）が無い古いデータ：
+  // 今のシーズンのベストか、終わったシーズンのベスト（seasonBests）に同じ点数があれば、そのシーズンにする（分からなければ、そのまま）
+  function fillBestSeason(s, allKey, bestKey, kind) {
+    const b = s[allKey];
+    if (!b || typeof b !== "object" || b.season) return;
+    if (s[bestKey] && s[bestKey].score === b.score) {
+      b.season = s.season;
+      return;
+    }
+    const hit = Object.entries(s.seasonBests).find(([, v]) => v && v[kind] && v[kind].score === b.score);
+    if (hit && Number(hit[0]) >= 1) b.season = Number(hit[0]);
   }
 
   // 遊んでいるあいだにシーズンが変わったか調べる（管理者モードのテストの切りかえ）。変わったら保存して true

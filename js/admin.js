@@ -124,6 +124,62 @@ const Admin = (() => {
       .join("");
   }
 
+  // ---------- ランキングの称号（rank-titles.js。見た目の確認用） ----------
+  // 付けたり外したりできる見本：今のシーズンの1つ前（無ければシーズン1）の1〜3位と、歴代の1〜3位（フリー・競技）
+  function rankTitleSamples() {
+    const season = Math.max(1, Seasons.currentId() - 1);
+    const out = [];
+    for (const mode of ["free", "comp"]) {
+      for (const place of [1, 2, 3]) out.push({ kind: "season", season, mode, place });
+      for (const place of [1, 2, 3]) out.push({ kind: "all", mode, place });
+    }
+    return out;
+  }
+
+  const sameRankTitle = (a, b) => a.kind === b.kind && a.mode === b.mode && a.place === b.place && (a.kind === "all" || a.season === b.season);
+
+  // 1つずつ、付ける・外す（歴代は、同じ種類の称号は1つだけ：2位を付けたら、1位・3位は外す）
+  function setRankTitle(t, on) {
+    let list = (Save.data.rankTitlesTest || []).filter((x) => !sameRankTitle(x, t) && !(on && t.kind === "all" && x.kind === "all" && x.mode === t.mode));
+    if (on) list = list.concat([t]);
+    Save.data.rankTitlesTest = list;
+    const id = RankTitles.idOf(t);
+    if (!on && Save.data.profile.titleId === id && !RankTitles.find(id)) Save.data.profile.titleId = null; // つけていた称号なら外す
+    Save.write();
+    Profile.refresh();
+    renderRankTitles();
+    UI.toast(`称号「${RankTitles.textOf(t)}」を${on ? "付けました" : "外しました"}（確認用）`);
+  }
+
+  function renderRankTitles() {
+    const test = Save.data.rankTitlesTest || [];
+    const samples = rankTitleSamples();
+    $("admin-rank-titles").innerHTML = samples
+      .map((t, i) => {
+        const got = test.some((x) => sameRankTitle(x, t));
+        const real = (Save.data.rankTitles || []).some((x) => sameRankTitle(x, t));
+        const frame = RankTitles.frameOf(t);
+        const text = RankTitles.textOf(t);
+        return `
+          <div class="admin-staff-row">
+            <span class="avatar avatar-empty admin-staff-avatar ${Frames.avatarClass(frame)}">${t.place}</span>
+            <span class="admin-staff-main">${Frames.titleHTML(text, frame)}<small>${real ? "サーバーの順位で持っている" : got ? "確認用に付けている" : "付けていない"}</small></span>
+            <button class="btn btn-small ${got ? "btn-sub" : "btn-primary"}" data-rank-title="${i}" data-on="${got ? "0" : "1"}">${got ? "外す" : "付ける"}</button>
+          </div>`;
+      })
+      .join("");
+    // ランキングの行の見本（1位・2位・3位と、ふつうの称号の人）。歴代の見え方なので、記録の横にシーズンも出す
+    const name = Save.playerName(1);
+    const rows = [
+      { rank: 1, name, score: 4820, count: 41, height: 12.4, date: "2026-10-20", season: 1, rankTitle: { kind: "all", mode: "free", place: 1 }, title: "歴代 フリー 1位" },
+      { rank: 2, name, score: 4510, count: 38, height: 11.9, date: "2026-11-01", season: 2, rankTitle: { kind: "season", season: 1, mode: "free", place: 2 }, title: "シーズン1 フリー 2位" },
+      { rank: 3, name, score: 4300, count: 36, height: 11.2, date: "2026-10-12", season: 1, rankTitle: { kind: "all", mode: "free", place: 3 }, title: "歴代 フリー 3位" },
+      { rank: 4, name, score: 3900, count: 33, height: 10.1, date: "2026-10-30", season: 2, title: "積み上げ界の神" },
+    ];
+    $("admin-rank-preview").innerHTML = rows.map((r) => Ranking.sampleRowHTML(r)).join("");
+    renderSections();
+  }
+
   // ---------- 画面 ----------
   function setupUI() {
     // 入り口：バージョン表示を、3秒以内に7回タップ
@@ -193,6 +249,12 @@ const Admin = (() => {
     $("admin-staff").addEventListener("click", (e) => {
       const b = e.target.closest("[data-staff]");
       if (b) setStaff(b.dataset.staff, b.dataset.on === "1");
+    });
+    // ランキングの称号：確認用に付ける・外す
+    $("admin-rank-titles").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-rank-title]");
+      const t = b && rankTitleSamples()[Number(b.dataset.rankTitle)];
+      if (t) setRankTitle(t, b.dataset.on === "1");
     });
 
     // 自由配置モード（sandbox.js。始める前の後かたづけは main.js）
@@ -310,6 +372,7 @@ const Admin = (() => {
     renderDate();
     renderUndo();
     renderStaff();
+    renderRankTitles();
     renderNet();
     renderCodes();
     renderSeason(true);
@@ -481,6 +544,8 @@ const Admin = (() => {
     set("date", t ? `テスト日付 ${fmtDate(t)}` : "");
     set("event", Settings.get("eventPreview") ? "期間中として表示 ON" : "");
     set("season", `${Seasons.short(Seasons.currentId())}${seasonTesting() ? "（テスト中）" : ""}${serverSeason !== null && serverSeason > Seasons.lastPrepared() ? `・サーバー S${serverSeason}（このゲームが古い）` : ""}`);
+    const rankTest = (Save.data.rankTitlesTest || []).length;
+    set("rankTitles", rankTest ? `確認用に ${rankTest}個` : "");
     const codeCount = Object.keys(Save.data.codes || {}).length;
     set("codes", codeCount ? `使った合言葉 ${codeCount}個` : "");
   }

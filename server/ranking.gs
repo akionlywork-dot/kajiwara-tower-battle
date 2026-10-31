@@ -17,7 +17,17 @@
 //   ・スコアを受け取るのは、今のシーズンのものだけ。ゲームが送る season がちがうときは
 //     { ok: false, error: "season", season: 今のシーズン } を返す（season を送らない古いバージョンのゲームは、シーズン1 として扱う）
 //   ・読むときは ?season=番号（無ければ今のシーズン）。今より先のシーズンなら、空のランキングと upcoming: true
-//   ・シーズンが終わったときの1〜3位：?awards=1&me=端末の番号 で、前のシーズンまでの1〜3位を返す（ゲームが称号を出す）
+//   ・シーズンが終わったときの1〜3位：?awards=1&me=端末の番号 で、前のシーズンまでの1〜3位を返す（ゲームが称号を出す）。
+//     同じ返事の ranks に、ランキングの称号（下の「ランキングの称号」）を持てる順位を入れる
+//   ・歴代（全シーズンを通した記録）：?season=all。1人1行（全シーズンでいちばん良いスコア）。行の season に、そのスコアを出したシーズン。
+//     歴代のシートは持たず、読むたびに全シーズンのシートから計算する（書きこみが増えない・hidden や記録の削除がそのまま効くため）
+//
+// ランキングの称号（ゲームの js/rank-titles.js と同じ決まり。称号の文字は、ゲームがここと同じ形で作る）：
+//   シーズンの称号：「シーズン2 フリー 1位」… 終わったシーズン（今のシーズンより前）の1〜3位。ずっと持てる
+//   歴代の称号  ：「歴代 競技 2位」… 今の歴代の1〜3位（RANK_TITLE_ALL_PLACES）。順位が下がったら外れる
+//   この称号は、本当にその順位の人しか名乗れない：スコアを受け取るときに確かめて、ちがえば称号を空にして保存する。
+//   歴代の称号は、あとで順位が下がることがあるので、ランキングを返すときにも確かめなおす（ちがえば、称号を出さない）。
+//   確かめた称号の行には rankTitle: { kind: "season" | "all", season, mode, place } を付けて返す（ゲームは、これがある行だけ専用の見た目にする）
 //   ・今のシーズン：?seasoninfo=1 で { action: "seasoninfo", current, starts: { シーズンの番号: 始まった日時 } }。
 //     ゲームは、これで今のシーズンを決める（管理者モードで切り替えると、みんなのゲームも次に開いたときに切り替わる）。
 //     始まった日時は、切り替えたときに、スクリプトのプロパティ「seasonStarts」に残す
@@ -97,6 +107,8 @@ const AWARD_TITLES = {
   "競技シーズン3位": { mode: "comp", place: 3 },
 };
 const TZ = "Asia/Tokyo";
+const RANK_TITLE_ALL_PLACES = 3; // 歴代の称号がもらえる順位（1〜3位。1位と2〜3位で見た目が変わる）
+const MODE_LABELS = { free: "フリー", comp: "競技" }; // ランキングの称号の文字に入れる、ランキングの種類の名前
 
 // ---------- ランキングを返す（ゲームのランキング画面が読みに来る） ----------
 // ?mode=comp で競技（無ければフリー）。?me=端末の番号 を付けると、その人の順位も返す
@@ -107,24 +119,34 @@ function doGet(e) {
   if (p.stats === "titles") return json_(titleStats_());
   if (p.notice) return json_({ action: "notice", notice: readNotice_() });
   const current = currentSeason_();
-  if (p.awards) return json_({ action: "awards", current: current, awards: awardsOf_(String(p.me || "")) });
+  if (p.awards) return json_({ action: "awards", current: current, awards: awardsOf_(String(p.me || "")), ranks: rankTitlesOf_(String(p.me || ""), current) });
   if (p.seasoninfo) return json_({ action: "seasoninfo", current: current, starts: seasonStarts_() });
   const mode = modeOf_(p.mode);
+  if (p.season === "all") return json_(Object.assign(rankingResponse_(allTimeList_(mode, current), mode, "all", current, String(p.me || "")), { all: true }));
   const season = p.season ? seasonOf_(p.season) : current;
   if (!season) return json_({ ok: false, error: "bad season" });
   // まだ始まっていないシーズン（ゲームは新しいのに、サーバーの切り替えがまだ）：空のランキング
   if (season > current) return json_({ mode: mode, season: season, current: current, upcoming: true, total: 0, ranking: [], me: null });
-  const me = String(p.me || "");
-  const list = ranked_(readRows_(mode, season));
+  return json_(rankingResponse_(ranked_(readRows_(mode, season)), mode, season, current, String(p.me || "")));
+}
+
+// ランキングの返事（list：ranked_ で並べた全員。season：シーズンの番号か、歴代なら "all"。me：端末の番号）
+function rankingResponse_(list, mode, season, current, me) {
   const mine = me ? list.find((r) => r.id === me) : null;
-  return json_({
+  const check = rankTitleChecker_();
+  return {
     mode: mode,
     season: season,
     current: current,
     updated: Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd HH:mm"),
     total: list.length,
     ranking: list.slice(0, TOP).map((r) => {
-      const row = { rank: r.rank, name: r.name, title: r.title, score: r.score, count: r.count, height: r.height, date: r.date };
+      // ランキングの称号は、今もその順位のときだけ出す（歴代の順位が下がった人は、称号なし）
+      const rankTitle = parseRankTitle_(r.title);
+      const ok = !!rankTitle && check(r.id, rankTitle);
+      const row = { rank: r.rank, name: r.name, title: rankTitle && !ok ? "" : r.title, score: r.score, count: r.count, height: r.height, date: r.date };
+      if (ok) row.rankTitle = rankTitle;
+      if (season === "all") row.season = r.season; // 歴代：そのスコアを出したシーズン
       if (r.icon) row.icon = r.icon;
       if (r.profile) row.profile = r.profile; // プロフィールを公開している人だけ
       if (r.staff) row.staff = r.staff; // スタッフの称号の人だけ
@@ -133,8 +155,29 @@ function doGet(e) {
       if (mine && r.id === me) row.me = true;
       return row;
     }),
-    me: mine ? { rank: mine.rank, score: mine.score } : null,
-  });
+    me: mine ? { rank: mine.rank, score: mine.score, season: season === "all" ? mine.season : season } : null,
+  };
+}
+
+// 歴代のランキング：全シーズン（シーズン1 から今のシーズンまで）のシートをまとめて、1人1行にして並べる。
+//   スコア・積んだ数・高さ・日付・season は、その人のいちばん良い記録（同じ点数なら、先に出した方）。
+//   名前・称号・アイコン・プロフィールは、いちばん新しいシーズンの行のもの。hidden の行は使わない
+function allTimeList_(mode, current) {
+  const by = {}; // 端末の番号 → まとめた行
+  for (let season = 1; season <= (current || currentSeason_()); season++) {
+    for (const r of readRows_(mode, season)) {
+      if (!r.id || r.hidden) continue;
+      r.season = season;
+      const b = by[r.id];
+      if (!b) {
+        by[r.id] = r;
+        continue;
+      }
+      const best = r.score > b.score ? r : b; // シーズンは古い順に読むので、同じ点数なら前のもの（b）
+      by[r.id] = Object.assign({}, r, { score: best.score, count: best.count, height: best.height, date: best.date, season: best.season });
+    }
+  }
+  return ranked_(Object.keys(by).map((id) => by[id]));
 }
 
 // ---------- スコアを受け取る（ゲームが自動で送ってくる） ----------
@@ -168,7 +211,10 @@ function doPost(e) {
   // スタッフの称号：決まった id だけ。そのときは称号の文字も、その称号にそろえる
   const staff = Object.prototype.hasOwnProperty.call(STAFF_TITLES, String(d.staff || "")) ? String(d.staff) : "";
   let title = staff ? STAFF_TITLES[staff] : cleanText_(d.title, TITLE_MAX);
-  // シーズンの順位の称号は、本当にその順位だった人だけ（ちがえば、称号なしで保存する）
+  // ランキングの称号（「シーズン2 フリー 1位」「歴代 競技 2位」）は、本当にその順位の人だけ（ちがえば、称号なしで保存する）
+  const rankTitle = parseRankTitle_(title);
+  if (rankTitle && !rankTitleChecker_()(id, rankTitle)) title = "";
+  // 前のバージョンのゲームの、シーズンの順位の称号（「シーズン王者」など）も同じ
   if (Object.prototype.hasOwnProperty.call(AWARD_TITLES, title)) {
     const need = AWARD_TITLES[title];
     if (!awardsOf_(id).some((a) => a.mode === need.mode && a.place === need.place)) title = "";
@@ -300,6 +346,58 @@ function awardsOf_(id) {
     }
   }
   return out;
+}
+
+// ---------- ランキングの称号 ----------
+// その端末が持てるランキングの称号：
+//   [{ kind: "season", season, mode, place }（終わったシーズンの1〜3位）, { kind: "all", mode, place }（今の歴代の1〜3位）]
+function rankTitlesOf_(id, current) {
+  if (!/^[0-9a-zA-Z-]{16,64}$/.test(id)) return [];
+  const out = awardsOf_(id).map((a) => ({ kind: "season", season: a.season, mode: a.mode, place: a.place }));
+  for (const mode of Object.keys(MODES)) {
+    const mine = allTimeList_(mode, current).find((r) => r.id === id);
+    if (mine && mine.rank <= RANK_TITLE_ALL_PLACES) out.push({ kind: "all", mode: mode, place: mine.rank });
+  }
+  return out;
+}
+
+// 称号の文字が、ランキングの称号なら { kind, season, mode, place }。ちがえば null
+//   「シーズン2 フリー 1位」→ { kind: "season", season: 2, mode: "free", place: 1 }
+//   「歴代 競技 3位」     → { kind: "all", mode: "comp", place: 3 }
+function parseRankTitle_(title) {
+  const t = String(title || "");
+  const modeOf = (label) => Object.keys(MODE_LABELS).find((m) => MODE_LABELS[m] === label);
+  let m = /^シーズン(\d{1,3}) (\S+) ([1-9]\d*)位$/.exec(t);
+  if (m && modeOf(m[2]) && seasonOf_(m[1])) return { kind: "season", season: Number(m[1]), mode: modeOf(m[2]), place: Number(m[3]) };
+  m = /^歴代 (\S+) ([1-9]\d*)位$/.exec(t);
+  if (m && modeOf(m[1])) return { kind: "all", mode: modeOf(m[1]), place: Number(m[2]) };
+  return null;
+}
+
+// ランキングの称号を確かめる関数 (端末の番号, parseRankTitle_ の結果) → 本当にその順位なら true。
+// 1つの返事の中で何人も確かめるので、読んだシートの順位を覚えておく（使うシーズン・種類のシートだけ読む）
+function rankTitleChecker_() {
+  const current = currentSeason_();
+  const memo = {};
+  const ranksOf = (key, make) => {
+    if (!memo[key]) {
+      memo[key] = {};
+      for (const r of make()) memo[key][r.id] = r.rank;
+    }
+    return memo[key];
+  };
+  return (id, t) => {
+    if (!id || !t || !MODES[t.mode]) return false;
+    if (t.kind === "season") {
+      if (t.season >= current || t.place > AWARD_PLACES) return false; // 終わったシーズンの1〜3位だけ
+      return ranksOf(t.mode + ":" + t.season, () => ranked_(readRows_(t.mode, t.season)))[id] === t.place;
+    }
+    if (t.kind === "all") {
+      if (t.place > RANK_TITLE_ALL_PLACES) return false;
+      return ranksOf(t.mode + ":all", () => allTimeList_(t.mode, current))[id] === t.place;
+    }
+    return false;
+  };
 }
 
 // ---------- アップデート予告 ----------

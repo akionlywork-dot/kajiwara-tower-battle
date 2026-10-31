@@ -9,6 +9,8 @@
 //   mythic … まぼろし。虹の輪が回り、まわりが白く光る。星5つ
 //   secret … 隠し（隠し実績）。紫×黒。ふちには星の代わりに「？」（decoration: "question"）
 //   code   … 合言葉（合言葉でもらう称号だけ。codes.js）。深い緑の輪に、金色がゆっくり回る。札は深い緑に金の文字。ふちには鍵（decoration: "key"）
+// ランキングの称号（rank-titles.js。ランキングの上位の人だけ）は、ほかとちがう形：星は付けず、三重の輪に光が回る。札はリボンの形
+//   champ-1 … 1位。★6 のような黒×金 ／ champ-2 … 2・3位。★5 のような夜空色に虹
 // 称号を選んでいない・実績が見つからないときは、枠なし。
 // 見た目は style.css の「称号の枠」（色は CSS の変数で切りかえる。動く枠は CSS のアニメーションで、「視差効果を減らす」では止まる）。
 // リザルトカードの画像の枠は card.js が、ここで決めた rank を見て描く
@@ -75,8 +77,12 @@ const Frames = (() => {
   function ofTitleId(id) {
     if (!id) return null;
     if (isStaff(id)) return staffGranted(id) ? staff(id) : null; // スタッフの称号は、獲得した端末だけ
+    if (typeof RankTitles !== "undefined" && RankTitles.isId(id)) return RankTitles.frame(id); // ランキングの称号は、持っているときだけ
     return ofAchievement(typeof Achievements !== "undefined" ? Achievements.find(id) : null);
   }
+
+  // ランキングの称号の枠か（champ-1・champ-2。rank-titles.js）
+  const isChamp = (f) => !!f && (f.rank === "champ-1" || f.rank === "champ-2");
 
   // 称号の文字から、枠を決める（ランキング・オンライン対戦の相手のように、称号の文字しか分からないとき）。見つからなければ null。
   // 「開発者」の文字が届いても、開発者の枠にはしない（だれでも名乗れてしまうため）
@@ -90,6 +96,7 @@ const Frames = (() => {
     if (!f) return "";
     if (f.rank === "dev") return "frame frame-dev";
     if (String(f.rank).startsWith("staff-")) return `frame frame-staff frame-${f.rank}`; // 管理者・社員・運営（星の代わりに、枠の下に札）
+    if (isChamp(f)) return `frame frame-champ frame-${f.rank}`; // ランキングの称号（星なし）
     const deco = f.decoration && f.decoration !== "star" ? ` deco-${f.decoration}` : "";
     return `frame frame-${f.rank} stars-${STARS[f.rank] || 1}${deco}${f.event ? ` frame-ev-${f.event}` : ""}`;
   }
@@ -140,8 +147,9 @@ const Frames = (() => {
     if (!text) return "";
     if (f && f.rank === "dev") return `<span class="title-badge dev-title"><span class="dev-code">&lt;/&gt;</span>${UI.escape(text)}<span class="dev-caret"></span></span>`;
     if (f && String(f.rank).startsWith("staff-")) return `<span class="title-badge staff-title rank-${f.rank}">${UI.escape(text)}</span>`;
+    if (isChamp(f)) return `<span class="title-badge champ-title rank-${f.rank}">${UI.escape(text)}</span>`;
     return `<span class="title-badge${f ? ` ranked rank-${f.rank}${f.event ? ` rank-ev-${f.event}` : ""}` : ""}">${UI.escape(text)}</span>`;
   }
 
-  return { clean, ofAchievement, developer, STAFF, isStaff, staffGranted, staff, ofTitleId, ofTitleText, avatarClass, starsClass, decoClass, decorationImage, starCount, starLayout, applyAvatar, titleHTML };
+  return { clean, ofAchievement, developer, STAFF, isStaff, staffGranted, staff, isChamp, ofTitleId, ofTitleText, avatarClass, starsClass, decoClass, decorationImage, starCount, starLayout, applyAvatar, titleHTML };
 })();

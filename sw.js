@@ -7,10 +7,10 @@
 //   （番号が変わると、新しいファイルを保存しなおし、古いものは消す）
 // =============================================
 
-const VERSION = "3.3.0";
+const VERSION = "3.4.0";
 // 同じバージョンのまま、ファイルを直したとき（例：v3.3.0 のあとで config.js のシーズン2の名前を直した）は、REVISION を1つ上げる。
 // 画面に出るバージョンはそのままで、みんなの端末のファイルが保存しなおされる。バージョンを上げたときは 1 に戻す
-const REVISION = 2;
+const REVISION = 1;
 const CACHE = `kajiwara-tb-${VERSION}-r${REVISION}`;
 
 // バージョン番号（?v=）を付けて読み込んでいるファイル（index.html と同じもの）
@@ -19,7 +19,7 @@ const VERSIONED = [
   "lib/decomp.min.js", "lib/matter.min.js", "lib/peerjs.min.js", "lib/mqtt.min.js",
   "config.js", "characters.js", "js/load-status.js", "js/chars.js",
   "js/settings.js", "js/save.js", "js/seasons.js", "js/audio.js", "js/shape.js", "js/aura.js", "js/platform-art.js", "js/game.js", "js/rules.js",
-  "js/cpu.js", "js/challenge.js", "js/card.js", "js/stamps.js", "js/halloween-home.js", "js/halloween.js", "js/title-fx.js", "js/online.js", "js/ui.js", "js/themes.js", "js/frames.js", "js/vs-intro.js", "js/profile.js", "js/custom.js", "js/codes.js", "js/data-file.js",
+  "js/cpu.js", "js/challenge.js", "js/card.js", "js/stamps.js", "js/halloween-home.js", "js/halloween.js", "js/title-fx.js", "js/online.js", "js/ui.js", "js/themes.js", "js/frames.js", "js/rank-titles.js", "js/vs-intro.js", "js/profile.js", "js/custom.js", "js/codes.js", "js/data-file.js",
   "js/news.js", "js/events.js", "js/ranking.js", "js/records.js", "js/dex.js", "js/achievements.js",
   "js/backup.js", "js/controls.js", "js/admin.js", "js/sandbox.js", "js/pwa.js", "js/updates.js", "js/main.js",
 ].map((p) => `${p}?v=${VERSION}`);

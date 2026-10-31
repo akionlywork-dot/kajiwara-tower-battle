@@ -20,6 +20,7 @@ const Profile = (() => {
 
   // ---------- 初期化 ----------
   function init() {
+    RankTitles.migrate(); // 前のバージョンの「シーズン王者」などを、ランキングの称号にする（1回だけ）
     // 名前：入力するたびに保存
     $("input-name").addEventListener("input", (e) => {
       Save.data.profile.name = e.target.value.trim().slice(0, 10);
@@ -113,7 +114,8 @@ const Profile = (() => {
     const list = typeof Achievements !== "undefined" ? Achievements.unlockedList() : [];
     // スタッフの称号（開発者・管理者・社員・運営）は、管理者モードで獲得した端末だけ選べる（frames.js の STAFF）
     const staff = Object.entries(Frames.STAFF).filter(([id]) => Frames.staffGranted(id)).map(([id, s]) => ({ id, title: s.title }));
-    return staff.concat(list);
+    // ランキングの称号は、サーバーで分かった順位のものだけ（rank-titles.js）
+    return staff.concat(RankTitles.list(), list);
   }
 
   // 称号の id → 称号の文字（無ければ ""）
@@ -129,6 +131,7 @@ const Profile = (() => {
   // 格の見出し（上から、むずかしい順）
   const RANK_GROUPS = [
     ["staff", "スタッフ"],
+    ["champ", "ランキング"],
     ["mythic", "まぼろし"],
     ["legend", "レジェンド"],
     ["gold", "ゴールド"],
@@ -168,7 +171,7 @@ const Profile = (() => {
     const staff = Object.entries(Frames.STAFF)
       .filter(([id]) => Frames.staffGranted(id))
       .map(([id, s]) => ({ id, title: s.title, rank: "staff", got: true, description: "スタッフの称号" }));
-    all.unshift(...staff);
+    all.unshift(...staff, ...RankTitles.list()); // ランキングの称号：持っているものだけ（rank-titles.js）
     // 持っている称号だけを並べる（持っていないものは出さず、見出しの数「持っている数 / 全部」でわかるようにする）
     let html = rowHTML({ id: "", none: true });
     for (const [rank, label] of RANK_GROUPS) {
@@ -211,8 +214,9 @@ const Profile = (() => {
       const note = a.closed ? `<span class="limited-tag">期間限定（終了）</span>` : a.event ? `<span class="limited-tag">期間限定</span>` : "";
       return `<div class="title-row locked">${myAvatarHTML(`frame frame-locked ${Frames.starsClass(a.rank)} ${Frames.decoClass(a.decoration)}`)}<span class="title-row-main"><span class="title-badge ranked rank-locked">？？？</span><small>${how} ${note}</small></span></div>`;
     }
-    const frame = Frames.isStaff(a.id) ? Frames.staff(a.id) : Frames.ofAchievement(a);
-    return `<button class="title-row ${selected ? "selected" : ""}" data-title="${UI.escape(a.id)}">${myAvatarHTML(Frames.avatarClass(frame))}<span class="title-row-main">${Frames.titleHTML(a.title, frame)}</span>${mark}</button>`;
+    const frame = Frames.isStaff(a.id) ? Frames.staff(a.id) : RankTitles.isId(a.id) ? RankTitles.frame(a.id) : Frames.ofAchievement(a);
+    const note = a.rank === "champ" ? `<small class="title-rate">${UI.escape(a.description)}</small>` : ""; // ランキングの称号は、何の順位か
+    return `<button class="title-row ${selected ? "selected" : ""}" data-title="${UI.escape(a.id)}">${myAvatarHTML(Frames.avatarClass(frame))}<span class="title-row-main">${Frames.titleHTML(a.title, frame)}${note}</span>${mark}</button>`;
   }
 
   // 名前・アイコンを表示しているところを、全部最新にする

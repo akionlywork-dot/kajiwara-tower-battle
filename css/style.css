@@ -2233,20 +2233,50 @@ select {
   opacity: 0.8;
 }
 
-/* 切りかえ：「S2（今）」のように短く、改行しない */
-.ranking-season-select {
-  flex: none;
+/* シーズンのタブ：「S2 今」「S1」「歴代」（列の数は ranking.js が決める）。短く、改行しない */
+.ranking-tabs.ranking-season-tabs .ranking-tab {
   height: 32px;
-  padding: 0 var(--space-s);
-  border: 0;
-  border-radius: var(--radius-round);
-  color: var(--color-text-dark);
-  background: rgba(255, 255, 255, 0.92);
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: bold;
+  font-size: 14px;
   white-space: nowrap;
-  cursor: pointer;
+}
+
+.ranking-season-tabs .ranking-tab small {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+/* 前のシーズンが2つ以上あるとき：2つ目のタブが、シーズンを選ぶ欄になる */
+.ranking-tab.ranking-tab-select {
+  min-width: 0;
+  padding: 0 18px 0 8px;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: center;
+  text-align-last: center;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.6'/%3E%3C/svg%3E") right 8px center / 9px 6px no-repeat;
+}
+
+.ranking-tab.ranking-tab-select.active {
+  background-color: #fff;
+}
+
+.ranking-tab-select option {
+  color: var(--color-text-dark);
+}
+
+/* 歴代の記録の横の、そのスコアを出したシーズン（「S1」） */
+.rank-season-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: var(--color-text-dark);
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 1.5;
+  vertical-align: 0.25em;
+  white-space: nowrap;
 }
 
 .ranking-tabs {
@@ -4810,6 +4840,114 @@ body.sandbox-on .load-status {
   margin-top: 2px;
   font-size: 12px;
   opacity: 0.8;
+}
+
+/* =============================================
+   ランキングの称号の枠（.frame-champ）と札（.champ-title）：ランキングの上位の人だけ（rank-titles.js）
+   ほかの称号とちがう形：星は付けず、三重の輪（ふち・太い帯・ふち・帯・ふち）に光がゆっくり回り、まわりがゆっくり光る。
+   札は、両はしが切れこんだリボンの形で、ときどき光が走る。色は card.js の CHAMP_COLORS と同じ
+     champ-1 … 1位：★6（シークレット）のような黒×金
+     champ-2 … 2・3位：★5（まぼろし）のような夜空色に虹
+   「視差効果を減らす」では動かない
+   ============================================= */
+.frame-champ-1, .rank-champ-1 {
+  --champ-band: #120d04;
+  --champ-edge: #ffd76a;
+  --champ-glow: rgba(255, 196, 64, 0.8);
+  --champ-light: conic-gradient(from 0deg, transparent 0 50%, #6b4c0e 62%, #ffe9a6 76%, #fffbe8 80%, #ffd76a 84%, transparent 96%);
+  --champ-badge: linear-gradient(180deg, #2e2209, #0b0803 55%, #1d1507);
+  --champ-text: #ffe27a;
+}
+
+.frame-champ-2, .rank-champ-2 {
+  --champ-band: #2a1660;
+  --champ-edge: #fff6d6;
+  --champ-glow: rgba(186, 150, 255, 0.75);
+  --champ-light: conic-gradient(#ff5d73, #ffc21a, #4cd964, #3d8bff, #b65cf0, #ff5d73);
+  --champ-badge: linear-gradient(90deg, #2a1660, #4b2a9a, #1d4f8a, #2a1660) 0 0 / 300% 100%;
+  --champ-text: #ffffff;
+}
+
+.avatar.frame.frame-champ {
+  --ring: max(3px, calc(var(--av) * 0.09));
+  border-color: var(--champ-band);
+  border-width: var(--ring);
+  box-shadow:
+    0 0 0 max(1px, calc(var(--av) * 0.022)) var(--champ-edge),
+    0 0 0 max(2px, calc(var(--av) * 0.05)) var(--champ-band),
+    0 0 0 max(3px, calc(var(--av) * 0.072)) var(--champ-edge),
+    0 0 calc(var(--av) * 0.3) var(--champ-glow);
+  animation: champ-glow 3.2s ease-in-out infinite;
+}
+
+/* 太い帯の上を回る光（1位は金の光が1つ、2・3位は虹がまるごと回る） */
+.avatar.frame.frame-champ::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--ring) * -1);
+  border-radius: 50%;
+  background: var(--champ-light);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring) + 0.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring) + 0.5px));
+  animation: frame-spin 4.5s linear infinite;
+  pointer-events: none;
+}
+
+/* 星は付けない */
+.avatar.frame.frame-champ::after {
+  content: none;
+}
+
+@keyframes champ-glow {
+  50% {
+    box-shadow:
+      0 0 0 max(1px, calc(var(--av) * 0.022)) var(--champ-edge),
+      0 0 0 max(2px, calc(var(--av) * 0.05)) var(--champ-band),
+      0 0 0 max(3px, calc(var(--av) * 0.072)) var(--champ-edge),
+      0 0 calc(var(--av) * 0.5) var(--champ-glow);
+  }
+}
+
+/* 札：リボンの形（両はしに切れこみ）。上下に枠と同じ色の細い線 */
+.title-badge.champ-title {
+  padding: 0 10px;
+  border-radius: 0;
+  color: var(--champ-text);
+  background: var(--champ-badge);
+  box-shadow: inset 0 1px 0 var(--champ-edge), inset 0 -1px 0 var(--champ-edge);
+  -webkit-clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 50%, 100% 100%, 0 100%, 6px 50%);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 50%, 100% 100%, 0 100%, 6px 50%);
+  text-shadow: 0 0 5px var(--champ-glow);
+}
+
+.title-badge.rank-champ-2 {
+  animation: badge-rainbow 6s linear infinite;
+}
+
+/* ときどき光が走る（金の札と同じ動き） */
+.title-badge.champ-title::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.75) 50%, transparent 60%) no-repeat;
+  background-size: 300% 100%;
+  background-position: 100% 0;
+  animation: frame-shine 3.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar.frame.frame-champ,
+  .avatar.frame.frame-champ::before,
+  .title-badge.champ-title,
+  .title-badge.champ-title::after {
+    animation: none;
+  }
+}
+
+/* 管理者メニュー：ランキングの称号の一覧（見た目の確認用）とランキングの行の見本 */
+.admin-rank-preview {
+  margin-top: var(--space-s);
+  pointer-events: none;
 }
 
 /* =============================================
