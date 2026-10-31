@@ -94,18 +94,35 @@ const Admin = (() => {
     Save.write();
   }
 
-  // ---------- 土台の厚さ（テスト。game.js の PLATFORM_H） ----------
-  const PLAT_KEY = "stack.admin.platH";
-  const PLAT_CHOICES = [8, 12, 16, 20, 24, 30, 40];
+  // ---------- 土台の形（テスト。game.js の PLATFORM_DEFAULT：厚さ・両はしの段差・滑りにくさ） ----------
+  const PLAT_KEY = "stack.admin.platform"; // { h, lip, grip }（いつもとちがうものだけ）
+  const PLAT_CHOICES = {
+    h: { el: "admin-plat-h", url: "plat", list: [8, 12, 16, 20, 24, 30, 40], note: { 40: "前の厚さ" } },
+    lip: { el: "admin-plat-lip", url: "lip", list: [0, 3, 6, 10, 14], note: { 0: "段差なし（前の形）" } },
+    grip: { el: "admin-plat-grip", url: "grip", list: [0.5, 1.8, 3, 5, 10], note: { 0.5: "前の滑りにくさ" } },
+  };
   function renderPlatform() {
-    const def = Game.PLATFORM_H_DEFAULT;
-    const now = Game.platformSize.h;
-    const fromUrl = new URLSearchParams(location.search).get("plat") !== null;
-    $("admin-plat-h").innerHTML =
-      `<option value="">いつもの厚さ（${def}）</option>` +
-      PLAT_CHOICES.filter((v) => v !== def).map((v) => `<option value="${v}">${v}${v === 40 ? "（前の厚さ）" : ""}</option>`).join("");
-    $("admin-plat-h").value = now === def ? "" : String(now);
-    $("admin-plat-h").disabled = fromUrl; // URL の ?plat= で試しているときは、URL を消して読みなおす
+    const def = Game.PLATFORM_DEFAULT, now = Game.platformShape;
+    const url = new URLSearchParams(location.search);
+    for (const [k, c] of Object.entries(PLAT_CHOICES)) {
+      const el = $(c.el);
+      const list = c.list.includes(now[k]) ? c.list : c.list.concat([now[k]]).sort((a, b) => a - b);
+      el.innerHTML = list.map((v) => `<option value="${v}">${v}${v === def[k] ? "（いつも）" : c.note[v] ? `（${c.note[v]}）` : ""}</option>`).join("");
+      el.value = String(now[k]);
+      el.disabled = url.get(c.url) !== null; // URL で試しているものは、URL を消して読みなおす
+    }
+  }
+
+  // 選んだ形を覚えて、読みなおす（game.js が読みこむときに決めるため）。いつもと同じものは覚えない
+  function setPlatform(reset) {
+    const def = Game.PLATFORM_DEFAULT;
+    const v = {};
+    if (!reset) for (const [k, c] of Object.entries(PLAT_CHOICES)) if (Number($(c.el).value) !== def[k]) v[k] = Number($(c.el).value);
+    try {
+      if (Object.keys(v).length) localStorage.setItem(PLAT_KEY, JSON.stringify(v));
+      else localStorage.removeItem(PLAT_KEY);
+    } catch (err) {}
+    location.reload();
   }
 
   // 1つずつ、獲得・リセット
@@ -204,14 +221,9 @@ const Admin = (() => {
     });
 
     // スタッフの称号：獲得・リセット
-    // 土台の厚さ（テスト）：選んだら、その厚さで読みなおす（game.js が読みこむときに決めるため）
-    $("admin-plat-h").addEventListener("change", (e) => {
-      try {
-        if (e.target.value) localStorage.setItem(PLAT_KEY, e.target.value);
-        else localStorage.removeItem(PLAT_KEY);
-      } catch (err) {}
-      location.reload();
-    });
+    // 土台の形（テスト）：選んだら、その形で読みなおす
+    for (const c of Object.values(PLAT_CHOICES)) $(c.el).addEventListener("change", () => setPlatform(false));
+    $("btn-admin-plat-reset").addEventListener("click", () => setPlatform(true));
     $("admin-staff").addEventListener("click", (e) => {
       const b = e.target.closest("[data-staff]");
       if (b) setStaff(b.dataset.staff, b.dataset.on === "1");

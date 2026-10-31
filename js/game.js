@@ -32,21 +32,32 @@ const Game = (() => {
   const UNITS_PER_METER = 100;
   // 土台の大きさと位置（土台の上面が、画面の下からどれだけ上にあるか）
   const PLATFORM_W = 280;
-  // 土台の厚さ（当たり判定の四角の高さ）。上の面（platformTop）の位置は変えず、下側だけが厚く・薄くなる。
-  // 試すとき：URL に ?plat=16 のように書く（いちばん優先）か、管理者モードの「土台の厚さ（テスト）」で選ぶ（localStorage の stack.admin.platH）。
-  // 試している厚さ（PLATFORM_H_DEFAULT とちがう値）のあいだは、ランキングに送らない（ranking.js）
-  const PLATFORM_H_DEFAULT = 20;
-  const PLATFORM_H_TEST = (() => {
-    const ok = (v) => (Number.isInteger(v) && v >= 6 && v <= 60 ? v : null);
+  // 土台の形（キャラが土台のふちにひっかかりやすいように）：
+  //   h    … 厚さ（当たり判定の四角の高さ）。上の面（platformTop）の位置は変えず、下側だけが厚く・薄くなる（前は 40）
+  //   lip  … 両はしの小さな段差（ふちのでっぱり）の高さ。0 なら段差なし。幅は LIP_W、上の角は丸い
+  //   grip … 土台（段差もふくむ）の止まっているときの滑りにくさ（frictionStatic。ぶつかった2つのうち大きい方が使われるので、
+  //          キャラ（1.8）より大きくすると、土台の上・ふちで止まりやすくなる）
+  // 試すとき：URL に ?plat=16&lip=10&grip=3 のように書く（書いたものが優先）か、管理者モードの「土台の形（テスト）」で選ぶ
+  // （localStorage の stack.admin.platform）。いつもの形（PLATFORM_DEFAULT）とちがうあいだは、ハイスコアにせず、ランキングにも送らない
+  const PLATFORM_DEFAULT = { h: 20, lip: 6, grip: 5 };
+  const PLATFORM_LIMITS = { h: [6, 60], lip: [0, 20], grip: [0, 20] };
+  const PLATFORM_SHAPE = (() => {
+    const out = Object.assign({}, PLATFORM_DEFAULT);
+    const ok = (k, v) => v !== null && v !== "" && isFinite(Number(v)) && Number(v) >= PLATFORM_LIMITS[k][0] && Number(v) <= PLATFORM_LIMITS[k][1];
     try {
-      const url = new URLSearchParams(location.search).get("plat");
-      if (url !== null) return ok(Number(url));
-      return ok(Number(localStorage.getItem("stack.admin.platH")));
-    } catch (e) {
-      return null;
-    }
+      const saved = JSON.parse(localStorage.getItem("stack.admin.platform") || "{}") || {};
+      const url = new URLSearchParams(location.search);
+      for (const [k, q] of [["h", "plat"], ["lip", "lip"], ["grip", "grip"]]) {
+        if (ok(k, saved[k])) out[k] = Number(saved[k]);
+        if (ok(k, url.get(q))) out[k] = Number(url.get(q));
+      }
+    } catch (e) {}
+    out.h = Math.round(out.h);
+    return out;
   })();
-  const PLATFORM_H = PLATFORM_H_TEST || PLATFORM_H_DEFAULT;
+  const PLATFORM_H = PLATFORM_SHAPE.h;
+  const LIP_H = PLATFORM_SHAPE.lip;
+  const LIP_W = 8;
   const PLATFORM_FROM_BOTTOM = 230;
   // タイトル画面のデモでは、スタートボタンに隠れないよう土台を少し高くする
   const DEMO_PLATFORM_FROM_BOTTOM = 360;
@@ -67,6 +78,7 @@ const Game = (() => {
   let camY = 0; // カメラの位置（画面の一番上が、ゲーム内のどの y か）
   let camTargetY = 0; // カメラが向かう先
   let platform; // 土台
+  let lips = []; // 土台の両はしの段差（makeLips）
   let platformTop; // 土台の上面の y 座標
 
   let shapes = []; // 読み込んだキャラの形データ
@@ -158,9 +170,13 @@ const Game = (() => {
     platform = Bodies.rectangle(WORLD_W / 2, platformTop + PLATFORM_H / 2, PLATFORM_W, PLATFORM_H, {
       isStatic: true,
       friction: BODY_OPTIONS.friction, // キャラと同じにする（ぶつかった2つのうち小さい方が使われるため）
+      frictionStatic: PLATFORM_SHAPE.grip, // 止まっているときの滑りにくさ（大きい方が使われる。ふちで止まりやすく）
       label: "platform",
     });
     Composite.add(engine.world, platform);
+    // 両はしの段差（ふちのでっぱり）。土台といっしょに傾く（syncLips）
+    lips = makeLips(platform);
+    Composite.add(engine.world, lips);
 
     // 衝突を監視して、何かにぶつかったキャラに「着地した」印をつける
     Events.on(engine, "collisionStart", (e) => {
@@ -184,6 +200,31 @@ const Game = (() => {
     paused = false;
     dropped = null;
     held = null;
+  }
+
+  // 土台 plat の両はしの段差（LIP_H が 0 なら、無し）。上の角を丸めた、幅 LIP_W の四角を、土台の上の面の両はしに置く
+  function makeLips(plat) {
+    if (!LIP_H) return [];
+    return [-1, 1].map((side) => {
+      const lip = Bodies.rectangle(0, 0, LIP_W, LIP_H, {
+        isStatic: true,
+        friction: plat.friction,
+        frictionStatic: plat.frictionStatic,
+        chamfer: { radius: [LIP_W / 2 - 0.5, LIP_W / 2 - 0.5, 0, 0] }, // 上の2つの角だけ丸く
+        label: "platform",
+      });
+      lip.side = side;
+      syncLip(lip, plat);
+      return lip;
+    });
+  }
+
+  // 段差を、土台の今の位置・角度に合わせる（土台を傾けるルールのため）
+  function syncLip(lip, plat) {
+    const lx = lip.side * (PLATFORM_W / 2 - LIP_W / 2), ly = -PLATFORM_H / 2 - LIP_H / 2; // 土台の真ん中から見た位置
+    const c = Math.cos(plat.angle), s = Math.sin(plat.angle);
+    Body.setAngle(lip, plat.angle);
+    Body.setPosition(lip, { x: plat.position.x + lx * c - ly * s, y: plat.position.y + lx * s + ly * c });
   }
 
   // ---------- ゲーム開始 ----------
@@ -213,7 +254,9 @@ const Game = (() => {
     fair = !!(opts && opts.fair);
     if (rule) {
       rule.state = {};
-      if (rule.platformOptions) Body.set(platform, rule.platformOptions(rule.params));
+      // 土台の性質を変えるルール（つるつる）では、滑りにくさ（grip）を Matter.js の初めの値（0.5）に戻してから変える
+      // （grip のままだと、つるつるでも滑らなくなるため）。段差も同じ性質に
+      if (rule.platformOptions) for (const b of [platform, ...lips]) Body.set(b, Object.assign({ frictionStatic: 0.5 }, rule.platformOptions(rule.params)));
       if (rule.start) rule.start(ruleAPI, rule.params, rule.state);
     }
 
@@ -239,7 +282,10 @@ const Game = (() => {
       for (const b of bodies()) if (!b.landed) out.push({ x: b.position.x, y: b.position.y - camY });
       return out;
     },
-    setPlatformAngle: (angle) => Body.setAngle(platform, angle),
+    setPlatformAngle: (angle) => {
+      Body.setAngle(platform, angle);
+      for (const lip of lips) syncLip(lip, platform); // 段差もいっしょに傾ける
+    },
   };
 
   // キャラの物理的な性質（特殊ルールで変わることがある）
@@ -959,8 +1005,10 @@ const Game = (() => {
       isStatic: true,
       angle: platform.angle,
       friction: platform.friction,
+      frictionStatic: platform.frictionStatic,
     });
     Composite.add(sim.world, plat);
+    Composite.add(sim.world, makeLips(plat)); // 両はしの段差も、本物と同じに
     const tower = [];
     for (const b of pieces()) {
       const copy = Shape.spawnBody(b.shape, b.position.x, b.position.y, b.angle, pieceOptions());
@@ -1243,7 +1291,7 @@ const Game = (() => {
 
   // 土台以外のすべてのキャラ（固定したものも含む）。描画に使う
   function pieces() {
-    return Composite.allBodies(engine.world).filter((b) => b !== platform && b.parent === b);
+    return Composite.allBodies(engine.world).filter((b) => b !== platform && !lips.includes(b) && b.parent === b); // 土台と段差はのぞく
   }
 
   // ---------- 描画 ----------
@@ -1692,7 +1740,26 @@ const Game = (() => {
     ctx.rotate(angle);
     ctx.drawImage(p.canvas, -PLATFORM_W / 2 + p.x, -PLATFORM_H / 2 + p.y, p.w, p.h);
     if (platTheme.style === "gold") drawGoldShine();
+    drawLips();
     ctx.restore();
+  }
+
+  // 両はしの段差（当たり判定と同じ形。上の面の色に、こいふちと、上の光。ctx は土台の真ん中に合わせてある）
+  function drawLips() {
+    if (!LIP_H) return;
+    const r = LIP_W / 2 - 0.5;
+    for (const side of [-1, 1]) {
+      const x = side * (PLATFORM_W / 2 - LIP_W / 2) - LIP_W / 2, y = -PLATFORM_H / 2 - LIP_H;
+      ctx.beginPath();
+      ctx.roundRect(x, y, LIP_W, LIP_H + 1, [r, r, 0, 0]);
+      ctx.fillStyle = platTheme.top || "#ffffff";
+      ctx.fill();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+      ctx.fillRect(x + 2, y + 1.5, LIP_W - 4, 1.4);
+    }
   }
 
   // 金の台：ときどき、光が横に走る（4.5秒ごとに0.9秒。ctx は土台の真ん中に合わせてある）
@@ -2208,9 +2275,13 @@ const Game = (() => {
   return {
     init, start, stop, startDemo, flip, drawTest, startSandbox, sandbox: sandboxAPI, setTitleFx, towerImage, enterPhoto, exitPhoto, photoImage, setForcedShape, setDemoCeiling, setTheme, setHomeScene, startRemote, snapshot, applySnapshot, setHeldPose, heldPose, moveHeldTo, evaluatePlacement, candidateXs, setInputEnabled, pause, resume, setTurnTimeLimit, drop, rotate, nextPiece, setDebug, setShapes, getStats, getCanvas,
     get platformSize() { return platformSize; }, // 土台と柱の大きさ（プロフィールの見本の絵に使う）
-    // 土台の厚さのテスト中なら、その厚さ（いつもの厚さなら null。ランキングに送らない・管理者モードの表示に使う）
-    get platformTest() { return PLATFORM_H_TEST && PLATFORM_H_TEST !== PLATFORM_H_DEFAULT ? PLATFORM_H_TEST : null; },
-    PLATFORM_H_DEFAULT,
+    // 土台の形のテスト中なら、その説明（「厚さ 16・段差 10・滑りにくさ 3」。いつもの形なら null。ランキングに送らない・管理者モードの表示に使う）
+    get platformTest() {
+      const changed = Object.keys(PLATFORM_DEFAULT).some((k) => PLATFORM_SHAPE[k] !== PLATFORM_DEFAULT[k]);
+      return changed ? `厚さ ${PLATFORM_SHAPE.h}・段差 ${PLATFORM_SHAPE.lip}・滑りにくさ ${PLATFORM_SHAPE.grip}` : null;
+    },
+    platformShape: Object.assign({}, PLATFORM_SHAPE), // 今の土台の形 { h, lip, grip }
+    PLATFORM_DEFAULT,
     get state() { return state; },
     get rotations() { return rotations; }, // このゲームで回転を使った回数
     get competitive() { return !!comp; }, // 競技モードのゲームか

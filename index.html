@@ -978,12 +978,21 @@
               <button id="btn-admin-net" class="btn btn-small btn-sub">更新</button>
             </details>
             <details class="admin-sec" data-sec="platform">
-              <summary class="section-title">土台の厚さ（テスト）<small class="admin-sec-state"></small></summary>
-              <p class="page-note">土台の当たり判定の厚さを変えて試します（上の面の高さは同じで、下側だけ変わる）。選ぶと、ページを読みなおします。URL に <code>?plat=16</code> のように書いても試せます（URL の方が優先）。いつもの厚さ以外のあいだは、ハイスコアにせず、ランキングにも送りません。</p>
+              <summary class="section-title">土台の形（テスト）<small class="admin-sec-state"></small></summary>
+              <p class="page-note">土台の厚さ（上の面の高さは同じで、下側だけ変わる）・両はしの段差の高さ・滑りにくさを変えて試します。選ぶと、ページを読みなおします。URL に <code>?plat=16&amp;lip=10&amp;grip=3</code> のように書いても試せます（URL の方が優先）。いつもの形以外のあいだは、ハイスコアにせず、ランキングにも送りません。</p>
               <label class="field">
                 <span>厚さ</span>
                 <select id="admin-plat-h"></select>
               </label>
+              <label class="field">
+                <span>両はしの段差の高さ</span>
+                <select id="admin-plat-lip"></select>
+              </label>
+              <label class="field">
+                <span>滑りにくさ（止まっているとき）</span>
+                <select id="admin-plat-grip"></select>
+              </label>
+              <button id="btn-admin-plat-reset" class="btn btn-small btn-sub admin-wide">いつもの形に戻す</button>
             </details>
             <details class="admin-sec" data-sec="season">
               <summary class="section-title">シーズン<small class="admin-sec-state"></small></summary>
