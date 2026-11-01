@@ -106,11 +106,10 @@ const Admin = (() => {
     Save.write();
   }
 
-  // ---------- 土台の形（テスト。game.js の PLATFORM_DEFAULT：厚さ・両はしの段差・滑りにくさ） ----------
-  const PLAT_KEY = "stack.admin.platform"; // { h, lip, grip }（いつもとちがうものだけ）
+  // ---------- 土台の形（テスト。game.js の PLATFORM_DEFAULT：厚さ・滑りにくさ） ----------
+  const PLAT_KEY = "stack.admin.platform"; // { h, grip }（いつもとちがうものだけ）
   const PLAT_CHOICES = {
     h: { el: "admin-plat-h", url: "plat", list: [8, 12, 16, 20, 24, 30, 40], note: { 40: "前の厚さ" } },
-    lip: { el: "admin-plat-lip", url: "lip", list: [0, 3, 6, 10, 14], note: { 0: "段差なし（前の形）" } },
     grip: { el: "admin-plat-grip", url: "grip", list: [0.5, 1.8, 3, 5, 10], note: { 0.5: "前の滑りにくさ" } },
   };
   function renderPlatform() {
@@ -626,7 +625,7 @@ const Admin = (() => {
     set("date", t ? `テスト日付 ${fmtDate(t)}` : "");
     set("event", Settings.get("eventPreview") ? "期間中として表示 ON" : "");
     const plat = Game.platformShape, pdef = Game.PLATFORM_DEFAULT;
-    set("platform", Object.keys(pdef).some((k) => plat[k] !== pdef[k]) ? `厚さ ${plat.h}・段差 ${plat.lip}・滑りにくさ ${plat.grip}（テスト中）` : "");
+    set("platform", Object.keys(pdef).some((k) => plat[k] !== pdef[k]) ? `厚さ ${plat.h}・滑りにくさ ${plat.grip}（テスト中）` : "");
     const aim = Game.aimOut, adef = Game.AIM_OUT_DEFAULT;
     const aimTest = aim.mode !== adef.mode || aim[aim.mode] !== adef[aim.mode];
     set("aim", aimTest ? (aim.mode === "center" ? `案A ${aim.center}` : aim.mode === "body" ? `案B ${Math.round(aim.body * 100)}%` : "前と同じ") + "（テスト中）" : "");

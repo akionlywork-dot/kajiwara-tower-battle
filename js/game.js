@@ -34,20 +34,19 @@ const Game = (() => {
   const PLATFORM_W = 280;
   // 土台の形（キャラが土台のふちにひっかかりやすいように）：
   //   h    … 厚さ（当たり判定の四角の高さ）。上の面（platformTop）の位置は変えず、下側だけが厚く・薄くなる（前は 40）
-  //   lip  … 両はしの小さな段差（ふちのでっぱり）の高さ。0 なら段差なし。幅は LIP_W、上の角は丸い
-  //   grip … 土台（段差もふくむ）の止まっているときの滑りにくさ（frictionStatic。ぶつかった2つのうち大きい方が使われるので、
-  //          キャラ（1.8）より大きくすると、土台の上・ふちで止まりやすくなる）
-  // 試すとき：URL に ?plat=16&lip=10&grip=3 のように書く（書いたものが優先）か、管理者モードの「土台の形（テスト）」で選ぶ
+  //   grip … 土台の止まっているときの滑りにくさ（frictionStatic。ぶつかった2つのうち大きい方が使われるので、
+  //          キャラ（1.8）より大きくすると、土台の上で止まりやすくなる）
+  // 試すとき：URL に ?plat=16&grip=3 のように書く（書いたものが優先）か、管理者モードの「土台の形（テスト）」で選ぶ
   // （localStorage の stack.admin.platform）。いつもの形（PLATFORM_DEFAULT）とちがうあいだは、ハイスコアにせず、ランキングにも送らない
-  const PLATFORM_DEFAULT = { h: 20, lip: 6, grip: 5 };
-  const PLATFORM_LIMITS = { h: [6, 60], lip: [0, 20], grip: [0, 20] };
+  const PLATFORM_DEFAULT = { h: 20, grip: 5 };
+  const PLATFORM_LIMITS = { h: [6, 60], grip: [0, 20] };
   const PLATFORM_SHAPE = (() => {
     const out = Object.assign({}, PLATFORM_DEFAULT);
     const ok = (k, v) => v !== null && v !== "" && isFinite(Number(v)) && Number(v) >= PLATFORM_LIMITS[k][0] && Number(v) <= PLATFORM_LIMITS[k][1];
     try {
       const saved = JSON.parse(localStorage.getItem("stack.admin.platform") || "{}") || {};
       const url = new URLSearchParams(location.search);
-      for (const [k, q] of [["h", "plat"], ["lip", "lip"], ["grip", "grip"]]) {
+      for (const [k, q] of [["h", "plat"], ["grip", "grip"]]) {
         if (ok(k, saved[k])) out[k] = Number(saved[k]);
         if (ok(k, url.get(q))) out[k] = Number(url.get(q));
       }
@@ -85,8 +84,6 @@ const Game = (() => {
   // 「案A 60」「案B 35%」「前と同じ」（管理者モード・テスト中の表示）
   const aimText = () => (AIM_OUT.mode === "center" ? `案A ${AIM_OUT.center}` : AIM_OUT.mode === "body" ? `案B ${Math.round(AIM_OUT.body * 100)}%` : "前と同じ");
   const aimChanged = () => AIM_OUT.mode !== AIM_OUT_DEFAULT.mode || AIM_OUT[AIM_OUT.mode] !== AIM_OUT_DEFAULT[AIM_OUT.mode];
-  const LIP_H = PLATFORM_SHAPE.lip;
-  const LIP_W = 8;
   const PLATFORM_FROM_BOTTOM = 230;
   // タイトル画面のデモでは、スタートボタンに隠れないよう土台を少し高くする
   const DEMO_PLATFORM_FROM_BOTTOM = 360;
@@ -104,10 +101,11 @@ const Game = (() => {
   // 場を真ん中に置き、左右には背景（空・雲・地面）だけを広げて描く。ゲームの中身（WORLD_W・土台・物理）は同じ
   let fieldLeft = 0;
   let fieldW = 1;
+  let playfield = { left: 0, right: WORLD_W };
   let camY = 0; // カメラの位置（画面の一番上が、ゲーム内のどの y か）
   let camTargetY = 0; // カメラが向かう先
+  let manualCamera = false; // 指で上下に動かしているあいだ、自動追従を止める
   let platform; // 土台
-  let lips = []; // 土台の両はしの段差（makeLips）
   let platformTop; // 土台の上面の y 座標
 
   let shapes = []; // 読み込んだキャラの形データ
@@ -189,6 +187,7 @@ const Game = (() => {
   // fromBottom: 土台の上面を、画面の下からどれだけ上に置くか
   function createWorld(fromBottom) {
     engine = Engine.create();
+    playfield = { left: 0, right: WORLD_W };
     engine.gravity.y = 1;
     // 計算の回数を増やして、積み重ねたときのめり込みやガタつきを減らす
     engine.positionIterations = 12;
@@ -203,10 +202,6 @@ const Game = (() => {
       label: "platform",
     });
     Composite.add(engine.world, platform);
-    // 両はしの段差（ふちのでっぱり）。土台といっしょに傾く（syncLips）
-    lips = makeLips(platform);
-    Composite.add(engine.world, lips);
-
     // 衝突を監視して、何かにぶつかったキャラに「着地した」印をつける
     Events.on(engine, "collisionStart", (e) => {
       for (const pair of e.pairs) {
@@ -222,6 +217,7 @@ const Game = (() => {
     });
 
     camY = camTargetY = 0;
+    manualCamera = false;
     Aura.clear(); // 前のゲームのオーラの粒を消す
     peakHeight = skyHeight = 0;
     skyStage = 0;
@@ -229,31 +225,6 @@ const Game = (() => {
     paused = false;
     dropped = null;
     held = null;
-  }
-
-  // 土台 plat の両はしの段差（LIP_H が 0 なら、無し）。上の角を丸めた、幅 LIP_W の四角を、土台の上の面の両はしに置く
-  function makeLips(plat) {
-    if (!LIP_H) return [];
-    return [-1, 1].map((side) => {
-      const lip = Bodies.rectangle(0, 0, LIP_W, LIP_H, {
-        isStatic: true,
-        friction: plat.friction,
-        frictionStatic: plat.frictionStatic,
-        chamfer: { radius: [LIP_W / 2 - 0.5, LIP_W / 2 - 0.5, 0, 0] }, // 上の2つの角だけ丸く
-        label: "platform",
-      });
-      lip.side = side;
-      syncLip(lip, plat);
-      return lip;
-    });
-  }
-
-  // 段差を、土台の今の位置・角度に合わせる（土台を傾けるルールのため）
-  function syncLip(lip, plat) {
-    const lx = lip.side * (PLATFORM_W / 2 - LIP_W / 2), ly = -PLATFORM_H / 2 - LIP_H / 2; // 土台の真ん中から見た位置
-    const c = Math.cos(plat.angle), s = Math.sin(plat.angle);
-    Body.setAngle(lip, plat.angle);
-    Body.setPosition(lip, { x: plat.position.x + lx * c - ly * s, y: plat.position.y + lx * s + ly * c });
   }
 
   // ---------- ゲーム開始 ----------
@@ -285,7 +256,7 @@ const Game = (() => {
       rule.state = {};
       // 土台の性質を変えるルール（つるつる）では、滑りにくさ（grip）を Matter.js の初めの値（0.5）に戻してから変える
       // （grip のままだと、つるつるでも滑らなくなるため）。段差も同じ性質に
-      if (rule.platformOptions) for (const b of [platform, ...lips]) Body.set(b, Object.assign({ frictionStatic: 0.5 }, rule.platformOptions(rule.params)));
+      if (rule.platformOptions) Body.set(platform, Object.assign({ frictionStatic: 0.5 }, rule.platformOptions(rule.params)));
       if (rule.start) rule.start(ruleAPI, rule.params, rule.state);
     }
 
@@ -311,10 +282,7 @@ const Game = (() => {
       for (const b of bodies()) if (!b.landed) out.push({ x: b.position.x, y: b.position.y - camY });
       return out;
     },
-    setPlatformAngle: (angle) => {
-      Body.setAngle(platform, angle);
-      for (const lip of lips) syncLip(lip, platform); // 段差もいっしょに傾ける
-    },
+    setPlatformAngle: (angle) => Body.setAngle(platform, angle),
   };
 
   // キャラの物理的な性質（特殊ルールで変わることがある）
@@ -332,6 +300,8 @@ const Game = (() => {
   // ゲームをやめる（タイトルに戻るとき）
   function stop() {
     engine = null;
+    playfield = { left: 0, right: WORLD_W };
+    manualCamera = false;
     held = null;
     demo = null;
     rule = null;
@@ -925,8 +895,8 @@ const Game = (() => {
   // ホスト：今の状態を書き出す（小さく送れるよう、数字の配列にする）
   function snapshot() {
     return {
-      // [番号, キャラの ID, x, y, 角度, 反転（1 / 0）]
-      b: pieces().map((b) => [b.id, b.shape.id, round(b.position.x, 10), round(b.position.y - platformTop, 10), round(b.angle, 1000), b.shape.flip ? 1 : 0]),
+      // [番号, キャラの ID, x, y, 角度, 反転（1 / 0）, 着地（1 / 0）, 左端, 右端]
+      b: pieces().map((b) => [b.id, b.shape.id, round(b.position.x, 10), round(b.position.y - platformTop, 10), round(b.angle, 1000), b.shape.flip ? 1 : 0, b.landed ? 1 : 0, round(b.bounds.min.x, 10), round(b.bounds.max.x, 10)]),
       h: held && state === "aim" ? [held.shape.id, round(held.x, 10), round(held.angle, 1000), held.shape.flip ? 1 : 0] : null,
       t: turnLimit && state === "aim" ? [Math.round(timeLeft()), turnLimit] : null, // 制限時間 [残り, 全部]（ミリ秒）
     };
@@ -940,7 +910,7 @@ const Game = (() => {
     remoteTime = t ? { left: Math.min(t[0], t[1]), limit: t[1], at: performance.now() } : null;
     const seen = new Set();
     let top = platformTop;
-    for (const [id, charId, x, yRel, a, f] of snap.b) {
+    for (const [id, charId, x, yRel, a, f, landed, minX, maxX] of snap.b) {
       const y = yRel + platformTop;
       let r = remoteBodies.get(id);
       if (!r) {
@@ -954,6 +924,9 @@ const Game = (() => {
       r.tx = x;
       r.ty = y;
       r.ta = a;
+      r.landed = landed === 1;
+      r.minX = Number.isFinite(minX) ? minX : x - Math.max(r.shape.w, r.shape.h) / 2;
+      r.maxX = Number.isFinite(maxX) ? maxX : x + Math.max(r.shape.w, r.shape.h) / 2;
       top = Math.min(top, y - Math.max(r.shape.w, r.shape.h) / 2);
     }
     for (const id of [...remoteBodies.keys()]) if (!seen.has(id)) remoteBodies.delete(id);
@@ -1037,7 +1010,6 @@ const Game = (() => {
       frictionStatic: platform.frictionStatic,
     });
     Composite.add(sim.world, plat);
-    Composite.add(sim.world, makeLips(plat)); // 両はしの段差も、本物と同じに
     const tower = [];
     for (const b of pieces()) {
       const copy = Shape.spawnBody(b.shape, b.position.x, b.position.y, b.angle, pieceOptions());
@@ -1146,7 +1118,10 @@ const Game = (() => {
   // 持っているキャラの真ん中（重心）を動かせる範囲 { lo, hi, minX, maxX }
   function heldRange() {
     const { minX, maxX } = heldExtent();
-    let lo = -minX, hi = WORLD_W - maxX; // 前の範囲（体全体が場の中）
+    const bounds = stageBounds();
+    const extraLeft = bounds.left < 0 ? STAGE_OVERHANG : 0;
+    const extraRight = bounds.right > WORLD_W ? STAGE_OVERHANG : 0;
+    let lo = bounds.left - minX - extraLeft, hi = bounds.right - maxX + extraRight;
     if (AIM_OUT.mode === "center") {
       // 案A：キャラの真ん中（重心）が、土台の端から AIM_OUT.center だけ外まで行ける
       lo = Math.min(lo, WORLD_W / 2 - PLATFORM_W / 2 - AIM_OUT.center);
@@ -1166,9 +1141,32 @@ const Game = (() => {
   // 急に変わらないよう、毎フレーム少しずつ近づける。横長の画面で、場の左右の背景の分だけで足りるときは引かない
   let aimZoom = 1;
   const AIM_ZOOM_PAD = 10; // はみ出したキャラのまわりにとる余白（ゲーム内の長さ）
-  const AIM_ZOOM_MAX = 1.6; // いちばん引いたとき
+  const AIM_ZOOM_MAX = 1.6; // ふだんの最大。広がった場は全体が画面に入るまで引く
+  const STAGE_GROWTH = 60; // キャラが場の端を越えて止まったとき、その側に増やす余白
+  const STAGE_OVERHANG = 40; // 広がった場の端から、次のキャラをさらに引っかけられる幅
+
+  // 着地したキャラが場の端を越えたら、その側のプレイ範囲を広げる（ゲーム中は縮まない）
+  function stageBounds() {
+    const grow = (left, right) => {
+      if (left < playfield.left) playfield.left = left - STAGE_GROWTH;
+      if (right > playfield.right) playfield.right = right + STAGE_GROWTH;
+    };
+    if (engine && state !== "demo" && state !== "sandbox") {
+      for (const b of pieces()) {
+        if (b.landed && b.bounds.min.y < groundY()) grow(b.bounds.min.x, b.bounds.max.x);
+      }
+    }
+    if (remote) {
+      for (const b of remoteBodies.values()) {
+        if (b.landed && b.y < groundY()) grow(b.minX, b.maxX);
+      }
+    }
+    return playfield;
+  }
+
   function updateAimZoom() {
-    let lo = 0, hi = WORLD_W; // 写したい左右の範囲
+    const bounds = stageBounds();
+    let lo = bounds.left, hi = bounds.right; // 写したい左右の範囲
     if (engine && state !== "demo" && state !== "sandbox") {
       if (held && (state === "aim" || state === "remote")) {
         const { minX, maxX } = heldExtent();
@@ -1190,9 +1188,11 @@ const Game = (() => {
         hi = Math.max(hi, r.x + half);
       }
     }
-    const out = lo < 0 || hi > WORLD_W;
-    const half = Math.max(WORLD_W / 2 - lo, hi - WORLD_W / 2) + (out ? AIM_ZOOM_PAD : 0);
-    const target = Math.min(AIM_ZOOM_MAX, Math.max(1, half / (canvas.clientWidth / viewScale / 2)));
+    const out = bounds.left < 0 || bounds.right > WORLD_W || lo < bounds.left || hi > bounds.right;
+    const center = (bounds.left + bounds.right) / 2;
+    const half = Math.max(center - lo, hi - center) + (out ? AIM_ZOOM_PAD : 0);
+    const neededZoom = Math.max(1, half / (canvas.clientWidth / viewScale / 2));
+    const target = bounds.left < 0 || bounds.right > WORLD_W ? neededZoom : Math.min(AIM_ZOOM_MAX, neededZoom);
     aimZoom += (target - aimZoom) * 0.18;
     if (Math.abs(target - aimZoom) < 0.001) aimZoom = target;
   }
@@ -1200,7 +1200,9 @@ const Game = (() => {
   // ふだんの画面に写す範囲（場の左右に広がった背景もふくめた、キャンバスの幅いっぱい。aimZoom で引いたぶんも入れる）
   function normalView() {
     const w = canvas.clientWidth / viewScale, h = worldH;
-    return { left: WORLD_W / 2 - (w * aimZoom) / 2, top: camY + h - h * aimZoom, w: w * aimZoom, h: h * aimZoom, k: 1 };
+    const bounds = stageBounds();
+    const center = (bounds.left + bounds.right) / 2;
+    return { left: center - (w * aimZoom) / 2, top: camY + h - h * aimZoom, w: w * aimZoom, h: h * aimZoom, k: 1 };
   }
 
   // キャンバスの上の位置（CSS のピクセル）→ ゲーム内の位置（ふだんの画面）
@@ -1368,7 +1370,9 @@ const Game = (() => {
 
   // 塔のてっぺんが、持っているキャラに近づいたらカメラを上げる
   function updateCamera() {
-    camTargetY = Math.min(0, towerTop() - (HOLD_Y + 240));
+    const upper = Math.min(0, towerTop() - (HOLD_Y + 240));
+    if (manualCamera) camTargetY = Math.max(upper, Math.min(0, camTargetY));
+    else camTargetY = upper;
   }
 
   // 塔のてっぺんの y 座標（何もなければ土台の上面）
@@ -1394,7 +1398,7 @@ const Game = (() => {
 
   // 土台以外のすべてのキャラ（固定したものも含む）。描画に使う
   function pieces() {
-    return Composite.allBodies(engine.world).filter((b) => b !== platform && !lips.includes(b) && b.parent === b); // 土台と段差はのぞく
+    return Composite.allBodies(engine.world).filter((b) => b !== platform && b.parent === b); // 土台はのぞく
   }
 
   // ---------- 描画 ----------
@@ -1845,26 +1849,7 @@ const Game = (() => {
     ctx.rotate(angle);
     ctx.drawImage(p.canvas, -PLATFORM_W / 2 + p.x, -PLATFORM_H / 2 + p.y, p.w, p.h);
     if (platTheme.style === "gold") drawGoldShine();
-    drawLips();
     ctx.restore();
-  }
-
-  // 両はしの段差（当たり判定と同じ形。上の面の色に、こいふちと、上の光。ctx は土台の真ん中に合わせてある）
-  function drawLips() {
-    if (!LIP_H) return;
-    const r = LIP_W / 2 - 0.5;
-    for (const side of [-1, 1]) {
-      const x = side * (PLATFORM_W / 2 - LIP_W / 2) - LIP_W / 2, y = -PLATFORM_H / 2 - LIP_H;
-      ctx.beginPath();
-      ctx.roundRect(x, y, LIP_W, LIP_H + 1, [r, r, 0, 0]);
-      ctx.fillStyle = platTheme.top || "#ffffff";
-      ctx.fill();
-      ctx.lineWidth = 1.2;
-      ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
-      ctx.stroke();
-      ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
-      ctx.fillRect(x + 2, y + 1.5, LIP_W - 4, 1.4);
-    }
   }
 
   // 金の台：ときどき、光が横に走る（4.5秒ごとに0.9秒。ctx は土台の真ん中に合わせてある）
@@ -2081,15 +2066,17 @@ const Game = (() => {
   // 写す範囲が画面より広いとき（フォトモードで縮小したとき）は、左右にまっすぐのばす
   function drawGround() {
     const top = groundY();
-    const left = Math.min(-10, view.left - 10);
-    const right = Math.max(WORLD_W + 10, view.left + view.w + 10);
+    const bounds = stageBounds();
+    const width = bounds.right - bounds.left;
+    const left = Math.min(bounds.left - 10, view.left - 10);
+    const right = Math.max(bounds.right + 10, view.left + view.w + 10);
     const bottom = Math.max(top + 3000, view.top + view.h + 10);
     ctx.fillStyle = bgTheme.ground;
     ctx.beginPath();
     ctx.moveTo(left, top + 14);
-    ctx.lineTo(-10, top + 14);
-    ctx.quadraticCurveTo(WORLD_W * 0.25, top - 10, WORLD_W / 2, top);
-    ctx.quadraticCurveTo(WORLD_W * 0.75, top + 10, WORLD_W + 10, top - 6);
+    ctx.lineTo(bounds.left - 10, top + 14);
+    ctx.quadraticCurveTo(bounds.left + width * 0.25, top - 10, (bounds.left + bounds.right) / 2, top);
+    ctx.quadraticCurveTo(bounds.left + width * 0.75, top + 10, bounds.right + 10, top - 6);
     ctx.lineTo(right, top - 6);
     ctx.lineTo(right, bottom);
     ctx.lineTo(left, bottom);
@@ -2108,6 +2095,7 @@ const Game = (() => {
 
   // 高さの目盛り（1mごと）
   function drawHeightMarks() {
+    const left = stageBounds().left;
     ctx.font = "bold 14px sans-serif";
     ctx.fillStyle = "rgba(255,255,255,0.75)";
     ctx.strokeStyle = "rgba(255,255,255,0.35)";
@@ -2117,10 +2105,10 @@ const Game = (() => {
       if (y < view.top + 90) break; // 画面の上の方はスコア表示と重なるので描かない
       if (y > view.top + view.h) continue;
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(30, y);
+      ctx.moveTo(left, y);
+      ctx.lineTo(left + 30, y);
       ctx.stroke();
-      ctx.fillText(m + "m", 4, y - 4);
+      ctx.fillText(m + "m", left + 4, y - 4);
     }
   }
 
@@ -2227,10 +2215,14 @@ const Game = (() => {
   }
 
   // ---------- タッチ操作 ----------
-  // 画面のどこでも、指を左右に動かすとキャラが動く
+  // 左右スワイプでキャラを動かし、上下スワイプでカメラを動かす
   function setupInput() {
     let lastX = 0;
+    let lastY = 0;
+    let startX = 0;
+    let startY = 0;
     let dragging = false;
+    let dragMode = null; // "piece" / "camera"
     let moved = 0; // ドラッグした距離（タップとドラッグを区別するため）
     // フォトモード：画面にふれている指（id → 位置）と、2本指の間の距離
     const fingers = new Map();
@@ -2291,10 +2283,12 @@ const Game = (() => {
         drop(); // 左クリック：落とす
         return;
       }
-      if (paused || state !== "aim" || !inputEnabled) return;
+      if (paused || !engine || state === "demo") return;
       dragging = true;
+      dragMode = null;
       moved = 0;
-      lastX = e.clientX;
+      lastX = startX = e.clientX;
+      lastY = startY = e.clientY;
       canvas.setPointerCapture(e.pointerId);
     });
     canvas.addEventListener("pointermove", (e) => {
@@ -2321,19 +2315,39 @@ const Game = (() => {
         return;
       }
       if (!dragging || paused) return;
-      const dx = ((e.clientX - lastX) / viewScale) * aimZoom; // カメラを引いているときも、指の動きとキャラの動きをそろえる
+      const totalX = e.clientX - startX;
+      const totalY = e.clientY - startY;
+      if (!dragMode && Math.hypot(totalX, totalY) > 8) {
+        dragMode = Math.abs(totalY) > Math.abs(totalX) * 1.2 ? "camera" : "piece";
+      }
+      if (!dragMode) return;
+      if (dragMode === "camera") {
+        const dy = e.clientY - lastY;
+        const upper = Math.min(0, towerTop() - (HOLD_Y + 240));
+        manualCamera = true;
+        camTargetY = Math.max(upper, Math.min(0, camTargetY - (dy / viewScale) * aimZoom));
+      } else if (state === "aim" && inputEnabled) {
+        const dx = ((e.clientX - lastX) / viewScale) * aimZoom; // カメラを引いているときも、指の動きとキャラの動きをそろえる
+        moved += Math.abs(dx);
+        moveBy(dx);
+      }
       lastX = e.clientX;
-      moved += Math.abs(dx);
-      moveBy(dx);
+      lastY = e.clientY;
     });
     canvas.addEventListener("pointerup", () => {
       if (state === "sandbox") return sandboxUp();
       if (!dragging) return;
       dragging = false;
+      const mode = dragMode;
+      dragMode = null;
+      if (mode !== "piece" || state !== "aim" || !inputEnabled) return;
       // 「指を離したら落とす」設定のときは、ドラッグのあとに指を離すと落とす
       if (callbacks.dropOnRelease && callbacks.dropOnRelease() && moved > 5) drop();
     });
-    canvas.addEventListener("pointercancel", () => (dragging = false));
+    canvas.addEventListener("pointercancel", () => {
+      dragging = false;
+      dragMode = null;
+    });
     const release = (e) => {
       fingers.delete(e.pointerId);
       pinchDist = fingers.size === 2 ? fingerDist() : 0;
@@ -2388,11 +2402,11 @@ const Game = (() => {
     // キャラを動かせる範囲（AIM_OUT）を試しているときも、ここに入れる（ハイスコア・ランキングにしないのは同じ）
     get platformTest() {
       const out = [];
-      if (Object.keys(PLATFORM_DEFAULT).some((k) => PLATFORM_SHAPE[k] !== PLATFORM_DEFAULT[k])) out.push(`厚さ ${PLATFORM_SHAPE.h}・段差 ${PLATFORM_SHAPE.lip}・滑りにくさ ${PLATFORM_SHAPE.grip}`);
+      if (Object.keys(PLATFORM_DEFAULT).some((k) => PLATFORM_SHAPE[k] !== PLATFORM_DEFAULT[k])) out.push(`厚さ ${PLATFORM_SHAPE.h}・滑りにくさ ${PLATFORM_SHAPE.grip}`);
       if (aimChanged()) out.push(`動かせる範囲 ${aimText()}`);
       return out.length ? out.join("・") : null;
     },
-    platformShape: Object.assign({}, PLATFORM_SHAPE), // 今の土台の形 { h, lip, grip }
+    platformShape: Object.assign({}, PLATFORM_SHAPE), // 今の土台の形 { h, grip }
     PLATFORM_DEFAULT,
     aimOut: Object.assign({}, AIM_OUT), // 今のキャラを動かせる範囲 { mode, center, body }
     AIM_OUT_DEFAULT,
