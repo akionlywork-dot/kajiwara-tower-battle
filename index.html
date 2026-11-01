@@ -1001,6 +1001,22 @@
               </label>
               <button id="btn-admin-plat-reset" class="btn btn-small btn-sub admin-wide">いつもの形に戻す</button>
             </details>
+            <details class="admin-sec" data-sec="aim">
+              <summary class="section-title">キャラを動かせる範囲（テスト）<small class="admin-sec-state"></small></summary>
+              <p class="page-note">持っているキャラを、場の外へどれだけはみ出させてよいか。案A：キャラの真ん中が、土台の端から〇だけ外まで行ける。案B：キャラの幅の〇割まで、場の外に出てよい。はみ出すと、カメラが少し引いて全体を写します。選ぶと、ページを読みなおします。URL に <code>?aim=b&amp;aimOut=0.4</code> のように書いても試せます（aim は a / b / off）。いつもとちがうあいだは、ハイスコアにせず、ランキングにも送りません。</p>
+              <label class="field">
+                <span>決め方</span>
+                <select id="admin-aim-mode">
+                  <option value="center">案A：真ん中が、土台の端から外まで</option>
+                  <option value="body">案B：キャラの幅の割合まで</option>
+                  <option value="off">前と同じ（場の外に出ない）</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>はみ出せる量</span>
+                <select id="admin-aim-amount"></select>
+              </label>
+            </details>
             <details class="admin-sec" data-sec="season">
               <summary class="section-title">シーズン<small class="admin-sec-state"></small></summary>
               <p class="page-note">ランキングのシーズン（README の「シーズンの切り替え方」）。config.js の seasons に用意してあるシーズンを、ここで始めます。始めると、みんなのゲームも、次に開いたとき（開いているあいだは5分以内）に新しいシーズンになり、「シーズン〇が始まりました」が出ます。前のシーズンの1〜3位には、称号が出ます。</p>
