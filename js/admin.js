@@ -125,6 +125,33 @@ const Admin = (() => {
     }
   }
 
+  // ---------- キャラを動かせる範囲（テスト。game.js の AIM_OUT） ----------
+  const AIM_KEY = "stack.admin.aim"; // { mode, amount }
+  const AIM_AMOUNTS = { center: [20, 40, 60, 80, 100, 130], body: [0.2, 0.25, 0.35, 0.45, 0.5, 0.6], off: [0] };
+  function renderAim() {
+    const now = Game.aimOut, def = Game.AIM_OUT_DEFAULT;
+    const mode = $("admin-aim-mode").dataset.picked || now.mode;
+    $("admin-aim-mode").value = mode;
+    const cur = mode === now.mode ? now[mode] : def[mode];
+    const list = AIM_AMOUNTS[mode].includes(cur) || mode === "off" ? AIM_AMOUNTS[mode] : AIM_AMOUNTS[mode].concat([cur]).sort((a, b) => a - b);
+    const label = (v) => (mode === "center" ? `土台の端から ${v}` : mode === "body" ? `キャラの幅の ${Math.round(v * 100)}%` : "（なし）");
+    $("admin-aim-amount").innerHTML = list.map((v) => `<option value="${v}">${label(v)}${mode !== "off" && v === def[mode] ? "（いつも）" : ""}</option>`).join("");
+    $("admin-aim-amount").value = String(mode === "off" ? 0 : cur);
+    const url = new URLSearchParams(location.search);
+    $("admin-aim-mode").disabled = $("admin-aim-amount").disabled = url.get("aim") !== null || url.get("aimOut") !== null; // URL で試しているときは、URL を消して読みなおす
+  }
+
+  // 選んだ範囲を覚えて、読みなおす（いつもと同じなら覚えない）
+  function setAim() {
+    const def = Game.AIM_OUT_DEFAULT;
+    const mode = $("admin-aim-mode").value, amount = Number($("admin-aim-amount").value);
+    try {
+      if (mode === def.mode && amount === def[mode]) localStorage.removeItem(AIM_KEY);
+      else localStorage.setItem(AIM_KEY, JSON.stringify({ mode, amount }));
+    } catch (err) {}
+    location.reload();
+  }
+
   // 選んだ形を覚えて、読みなおす（game.js が読みこむときに決めるため）。いつもと同じものは覚えない
   function setPlatform(reset) {
     const def = Game.PLATFORM_DEFAULT;
@@ -292,6 +319,13 @@ const Admin = (() => {
     // 土台の形（テスト）：選んだら、その形で読みなおす
     for (const c of Object.values(PLAT_CHOICES)) $(c.el).addEventListener("change", () => setPlatform(false));
     $("btn-admin-plat-reset").addEventListener("click", () => setPlatform(true));
+    // キャラを動かせる範囲（テスト）：決め方を変えたら、その決め方のいつもの量で読みなおす（量は、そのあと選びなおせる）
+    $("admin-aim-mode").addEventListener("change", (e) => {
+      e.target.dataset.picked = e.target.value;
+      renderAim();
+      setAim();
+    });
+    $("admin-aim-amount").addEventListener("change", setAim);
     $("admin-staff").addEventListener("click", (e) => {
       const b = e.target.closest("[data-staff]");
       if (b) setStaff(b.dataset.staff, b.dataset.on === "1");
@@ -420,6 +454,7 @@ const Admin = (() => {
     renderStaff();
     renderRankTitles();
     renderPlatform();
+    renderAim();
     renderNet();
     renderCodes();
     renderSeason(true);
@@ -590,7 +625,11 @@ const Admin = (() => {
     const t = LimitedEvents.testDate;
     set("date", t ? `テスト日付 ${fmtDate(t)}` : "");
     set("event", Settings.get("eventPreview") ? "期間中として表示 ON" : "");
-    set("platform", Game.platformTest ? `${Game.platformTest}（テスト中）` : "");
+    const plat = Game.platformShape, pdef = Game.PLATFORM_DEFAULT;
+    set("platform", Object.keys(pdef).some((k) => plat[k] !== pdef[k]) ? `厚さ ${plat.h}・段差 ${plat.lip}・滑りにくさ ${plat.grip}（テスト中）` : "");
+    const aim = Game.aimOut, adef = Game.AIM_OUT_DEFAULT;
+    const aimTest = aim.mode !== adef.mode || aim[aim.mode] !== adef[aim.mode];
+    set("aim", aimTest ? (aim.mode === "center" ? `案A ${aim.center}` : aim.mode === "body" ? `案B ${Math.round(aim.body * 100)}%` : "前と同じ") + "（テスト中）" : "");
     set("season", `${Seasons.short(Seasons.currentId())}${seasonTesting() ? "（テスト中）" : ""}${serverSeason !== null && serverSeason > Seasons.lastPrepared() ? `・サーバー S${serverSeason}（このゲームが古い）` : ""}`);
     const rankTest = (Save.data.rankTitlesTest || []).length;
     set("rankTitles", rankTest ? `確認用に ${rankTest}個` : "");
