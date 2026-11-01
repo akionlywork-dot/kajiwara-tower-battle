@@ -927,6 +927,20 @@
         "type": "code",
         "code": "rinka"
       }
+    },
+    {
+      "id": "code_animal_tower_battle",
+      "hidden": true,
+      "name": "合言葉「動物タワーバトル」",
+      "title": "動物タワー",
+      "rank": "code",
+      "decoration": "key",
+      "description": "合言葉「動物タワーバトル」を入れた",
+      "category": "合言葉",
+      "condition": {
+        "type": "code",
+        "code": "animal_tower_battle"
+      }
     }
   ]
 }

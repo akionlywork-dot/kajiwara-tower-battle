@@ -7,6 +7,14 @@
       "reward": {
         "title": "code_rinka"
       }
+    },
+    {
+      "id": "animal_tower_battle",
+      "hash": "32d74020390e59a26a563cf113a09f049bead0891b75308de9c6d17510833fd7",
+      "name": "動物タワーバトル",
+      "reward": {
+        "title": "code_animal_tower_battle"
+      }
     }
   ]
 }
